@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PitchPulse — Tiverton Town FC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter','system-ui','-apple-system','sans-serif'] } } }
+    }
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    *, *::before, *::after { -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+    html { height: 100%; }
+    body { height: 100%; height: 100dvh; overscroll-behavior: none; background: #09090b;
+           font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .no-scrollbar { scrollbar-width: none; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+
+    @keyframes rec-pulse {
+      0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(74,222,128,.55); }
+      55%      { opacity:.5; box-shadow: 0 0 0 5px rgba(74,222,128,0); }
+    }
+    .rec-dot { width:8px; height:8px; border-radius:50%; background:#4ade80; flex-shrink:0;
+               animation: rec-pulse 1.9s ease-in-out infinite; }
+
+    /* Badge spring */
+    #event-badge { transition: transform .18s cubic-bezier(.34,1.56,.64,1), background-color .12s; }
+
+    /* Chip panel animated visibility — overrides Tailwind hidden via ID specificity */
+    #chip-panel { display:block !important;
+                  transition: opacity .17s ease, transform .17s cubic-bezier(.34,1.56,.64,1), visibility 0s; }
+    #chip-panel.hidden    { opacity:0; transform:translateY(-7px); pointer-events:none; visibility:hidden; }
+    #chip-panel:not(.hidden) { opacity:1; transform:translateY(0); pointer-events:auto; visibility:visible; }
+
+    /* Shared tactile inset highlight */
+    .btn-inset { box-shadow: inset 0 1px 0 0 rgba(255,255,255,.09), 0 2px 6px rgba(0,0,0,.45); }
+
+    /* Action button resting shadow + per-colour active glow rings */
+    .act-btn   { box-shadow: inset 0 1px 0 0 rgba(255,255,255,.08), 0 2px 10px rgba(0,0,0,.55); }
+    .act-shot:active    { box-shadow: 0 0 0 2px rgba(251,113,133,.55), inset 0 1px 0 rgba(255,255,255,.09) !important; }
+    .act-box:active     { box-shadow: 0 0 0 2px rgba(34,211,238,.5),  inset 0 1px 0 rgba(255,255,255,.09) !important; }
+    .act-turn:active    { box-shadow: 0 0 0 2px rgba(251,191,36,.5),  inset 0 1px 0 rgba(255,255,255,.09) !important; }
+    .act-regain:active  { box-shadow: 0 0 0 2px rgba(52,211,153,.5),  inset 0 1px 0 rgba(255,255,255,.09) !important; }
+    .act-set:active     { box-shadow: 0 0 0 2px rgba(192,132,252,.5), inset 0 1px 0 rgba(255,255,255,.09) !important; }
+
+    /* Clock digit glow */
+    #clock-mm, #clock-ss { text-shadow: 0 0 22px rgba(255,255,255,.18); }
+
+    /* Phase pill */
+    .phase-pill { font-size:10px; letter-spacing:.15em; font-weight:900; padding:3px 8px; border-radius:5px;
+                  background:rgba(251,191,36,.11); border:1px solid rgba(251,191,36,.28); color:#fbbf24; }
+  </style>
+</head>
+
+<body class="text-white flex flex-col" style="height:100dvh;">
+
+  <!-- ═══ HUD Header ══════════════════════════════════════════════════════ -->
+  <header class="shrink-0 sticky top-0 z-20 flex items-center justify-between gap-3 px-4 py-2.5"
+    style="background:rgba(9,9,11,.88); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+           border-bottom:1px solid rgba(255,255,255,.07);">
+
+    <!-- Brand + rec dot -->
+    <div class="flex items-center gap-2">
+      <div class="rec-dot"></div>
+      <div class="leading-none">
+        <div class="text-[11px] font-black tracking-[.2em] text-white">TIVVY</div>
+        <div class="text-[8px] font-semibold tracking-[.16em] text-white/30 mt-[2px]">TACTICAL</div>
+      </div>
+    </div>
+
+    <!-- Event counter -->
+    <div class="flex flex-col items-center">
+      <span id="event-badge"
+        class="bg-amber-500 text-black text-xs font-black tabular-nums px-3 py-0.5 rounded-full min-w-[36px] text-center leading-snug">
+        0
+      </span>
+      <span class="text-[8px] font-semibold tracking-[.14em] text-white/25 mt-[3px]">EVENTS</span>
+    </div>
+
+    <!-- Clock -->
+    <div class="flex items-center gap-2">
+      <div class="font-mono font-black text-[22px] tabular-nums leading-none tracking-wider">
+        <span id="clock-mm">00</span><span class="text-white/35">:</span><span id="clock-ss">00</span>
+      </div>
+      <span id="phase-label" class="phase-pill">—</span>
+    </div>
+  </header>
+
+  <!-- ═══ Clock Controls ══════════════════════════════════════════════════ -->
+  <section class="shrink-0 px-3 py-2.5 no-scrollbar overflow-x-auto"
+    style="border-bottom:1px solid rgba(255,255,255,.06);">
+    <div class="flex gap-2 w-max">
+      <button onclick="startPeriod('1H')"
+        class="btn-inset shrink-0 text-[11px] font-black tracking-[.1em] px-4 py-2.5 rounded-full transition-all duration-150 ease-out active:scale-[0.95]"
+        style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.85);">
+        ▶ START 1H
+      </button>
+      <button onclick="startPeriod('HT')"
+        class="btn-inset shrink-0 text-[11px] font-black tracking-[.1em] px-4 py-2.5 rounded-full transition-all duration-150 ease-out active:scale-[0.95]"
+        style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.85);">
+        ■ HALF TIME
+      </button>
+      <button onclick="startPeriod('2H')"
+        class="btn-inset shrink-0 text-[11px] font-black tracking-[.1em] px-4 py-2.5 rounded-full transition-all duration-150 ease-out active:scale-[0.95]"
+        style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.85);">
+        ▶ START 2H
+      </button>
+      <button onclick="startPeriod('FT')"
+        class="btn-inset shrink-0 text-[11px] font-black tracking-[.1em] px-4 py-2.5 rounded-full transition-all duration-150 ease-out active:scale-[0.95]"
+        style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.85);">
+        ■ FULL TIME
+      </button>
+      <button id="btn-pause" onclick="togglePause()" disabled
+        class="btn-inset shrink-0 text-[11px] font-black tracking-[.1em] px-4 py-2.5 rounded-full transition-all duration-150 ease-out active:scale-[0.95] opacity-30"
+        style="background:rgba(99,102,241,.12); border:1px solid rgba(99,102,241,.25); color:rgba(165,180,252,.9);">
+        ⏸ PAUSE
+      </button>
+    </div>
+  </section>
+
+  <!-- ═══ Roster Strip ════════════════════════════════════════════════════ -->
+  <section class="shrink-0 px-3 py-2 no-scrollbar overflow-x-auto"
+    style="border-bottom:1px solid rgba(255,255,255,.06);">
+    <div id="roster-strip" class="flex gap-1.5 w-max"><!-- JS --></div>
+  </section>
+
+  <!-- ═══ Action Grid ══════════════════════════════════════════════════════ -->
+  <main class="flex-1 px-3 py-3 flex flex-col gap-2.5 overflow-y-auto min-h-0">
+
+    <div class="grid grid-cols-2 gap-2.5">
+
+      <!-- SHOT -->
+      <button onclick="triggerAction('SHOT')"
+        class="act-btn act-shot min-h-[72px] flex flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
+        style="background:linear-gradient(145deg,rgba(159,18,57,.5),rgba(76,5,25,.85)); border:1px solid rgba(251,113,133,.22);">
+        <svg class="w-6 h-6" style="color:#fb7185" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="8"/>
+          <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>
+          <line x1="12" y1="4" x2="12" y2="9.4"/>
+          <line x1="12" y1="14.6" x2="12" y2="20"/>
+          <line x1="4" y1="12" x2="9.4" y2="12"/>
+          <line x1="14.6" y1="12" x2="20" y2="12"/>
+        </svg>
+        <span class="text-[13px] font-black tracking-[.1em] text-white/90">SHOT</span>
+      </button>
+
+      <!-- BOX ENTRY -->
+      <button onclick="triggerAction('BOX_ENTRY')"
+        class="act-btn act-box min-h-[72px] flex flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
+        style="background:linear-gradient(145deg,rgba(8,51,68,.7),rgba(7,30,49,.88)); border:1px solid rgba(34,211,238,.2);">
+        <svg class="w-6 h-6" style="color:#22d3ee" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="13 17 18 12 13 7"/>
+          <line x1="3" y1="12" x2="18" y2="12"/>
+          <path d="M15 5h4a1 1 0 011 1v12a1 1 0 01-1 1h-4"/>
+        </svg>
+        <span class="text-[11px] font-black tracking-[.08em] text-white/90">BOX ENTRY</span>
+      </button>
+
+      <!-- DEF TURNOVER -->
+      <button onclick="triggerAction('DEF_TURNOVER')"
+        class="act-btn act-turn min-h-[72px] flex flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
+        style="background:linear-gradient(145deg,rgba(78,52,0,.7),rgba(41,26,0,.88)); border:1px solid rgba(251,191,36,.18);">
+        <svg class="w-6 h-6" style="color:#fbbf24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+        </svg>
+        <span class="text-[10px] font-black tracking-[.07em] text-white/90">DEF TURNOVER</span>
+      </button>
+
+      <!-- HIGH REGAIN -->
+      <button onclick="triggerAction('HIGH_REGAIN')"
+        class="act-btn act-regain min-h-[72px] flex flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
+        style="background:linear-gradient(145deg,rgba(5,46,22,.7),rgba(2,25,12,.88)); border:1px solid rgba(52,211,153,.2);">
+        <svg class="w-6 h-6" style="color:#34d399" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        <span class="text-[10px] font-black tracking-[.07em] text-white/90">HIGH REGAIN</span>
+      </button>
+    </div>
+
+    <!-- SET PIECE (full width) -->
+    <button onclick="triggerAction('SET_PIECE')"
+      class="act-btn act-set w-full min-h-[68px] flex items-center justify-center gap-3 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
+      style="background:linear-gradient(145deg,rgba(46,16,101,.6),rgba(26,8,62,.88)); border:1px solid rgba(167,139,250,.2);">
+      <svg class="w-6 h-6" style="color:#c084fc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="4" y1="21" x2="4" y2="4"/>
+        <path d="M4 4l14 5-14 5"/>
+      </svg>
+      <span class="text-[13px] font-black tracking-[.1em] text-white/90">SET PIECE</span>
+    </button>
+
+    <!-- Sub-type chip drawer -->
+    <div id="chip-panel" class="hidden">
+      <div class="rounded-2xl p-4"
+        style="background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); backdrop-filter:blur(12px);">
+        <p id="chip-label" class="text-[10px] font-black tracking-[.2em] text-white/30 uppercase mb-3">Select type</p>
+        <div id="chip-row" class="flex gap-2 flex-wrap"></div>
+        <button onclick="dismissChips()" class="mt-3 text-[11px] font-semibold tracking-wider text-white/20">CANCEL</button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ═══ Bottom Dock ══════════════════════════════════════════════════════ -->
+  <footer class="shrink-0 px-3 py-2.5 flex gap-2"
+    style="background:rgba(9,9,11,.75); backdrop-filter:blur(14px); border-top:1px solid rgba(255,255,255,.07);">
+
+    <button onclick="undoLast()"
+      class="btn-inset flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[11px] font-black tracking-[.1em] transition-all duration-150 active:scale-[0.95]"
+      style="background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); color:rgba(255,255,255,.55);">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 14 4 9 9 4"/>
+        <path d="M20 20v-7a4 4 0 00-4-4H4"/>
+      </svg>
+      UNDO
+    </button>
+
+    <button id="btn-copy" onclick="copyJSON()"
+      class="btn-inset flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[11px] font-black tracking-[.1em] transition-all duration-150 active:scale-[0.95]"
+      style="background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); color:rgba(255,255,255,.55);">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2"/>
+        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+      </svg>
+      COPY
+    </button>
+
+    <button onclick="exportJSON()"
+      class="btn-inset flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[11px] font-black tracking-[.1em] transition-all duration-150 active:scale-[0.95]"
+      style="background:rgba(251,191,36,.08); border:1px solid rgba(251,191,36,.22); color:rgba(251,191,36,.85);">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      EXPORT
+    </button>
+  </footer>
+
+  <script>
+    // ── Constants ─────────────────────────────────────────────────────────────
+    const STORAGE_KEY = 'tivvy_macro_events';
+
+    const SUB_TYPES = {
+      SHOT:         { label: 'SHOT TYPE',      chips: ['ON_TARGET', 'OFF_TARGET', 'BLOCKED'] },
+      BOX_ENTRY:    { label: 'ENTRY METHOD',   chips: ['PASS', 'CROSS', 'CARRY'] },
+      SET_PIECE:    { label: 'SET PIECE TYPE', chips: ['ATT_CORNER', 'DEF_CORNER', 'FREE_KICK'] },
+      DEF_TURNOVER: null,
+      HIGH_REGAIN:  null,
+    };
+
+    const CHIP_DISPLAY = {
+      ON_TARGET: 'On Target', OFF_TARGET: 'Off Target', BLOCKED: 'Blocked',
+      PASS: 'Pass', CROSS: 'Cross', CARRY: 'Carry',
+      ATT_CORNER: 'Att Corner', DEF_CORNER: 'Def Corner', FREE_KICK: 'Free Kick',
+    };
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    let events          = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let activePlayer    = null;
+    let activePhase     = '—';
+    let clockRunning    = false;
+    let paused          = false;
+    let phaseStartWall  = null;
+    let elapsedAtPause  = 0;
+    let tickInterval    = null;
+    let pendingAction   = null;
+
+    // ── Clock Engine (drift-free delta timing) ────────────────────────────────
+    function currentElapsedSeconds() {
+      if (!clockRunning || paused) return elapsedAtPause;
+      return elapsedAtPause + Math.floor((Date.now() - phaseStartWall) / 1000);
+    }
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function formatClock(s) {
+      return { mm: pad(Math.floor(s / 60)), ss: pad(s % 60) };
+    }
+
+    function updateClockDisplay() {
+      const { mm, ss } = formatClock(currentElapsedSeconds());
+      document.getElementById('clock-mm').textContent = mm;
+      document.getElementById('clock-ss').textContent = ss;
+      document.getElementById('phase-label').textContent = activePhase;
+    }
+
+    function startTick() {
+      if (tickInterval) clearInterval(tickInterval);
+      tickInterval = setInterval(updateClockDisplay, 100);
+    }
+
+    function startPeriod(phase) {
+      if (clockRunning && !paused) {
+        elapsedAtPause += Math.floor((Date.now() - phaseStartWall) / 1000);
+      }
+      elapsedAtPause = 0;
+      activePhase = phase;
+      paused = false;
+
+      const pauseBtn = document.getElementById('btn-pause');
+
+      if (phase === 'HT' || phase === 'FT') {
+        clockRunning = false;
+        if (tickInterval) clearInterval(tickInterval);
+        pauseBtn.disabled = true;
+        pauseBtn.classList.add('opacity-30');
+      } else {
+        clockRunning = true;
+        phaseStartWall = Date.now();
+        pauseBtn.disabled = false;
+        pauseBtn.classList.remove('opacity-30');
+        pauseBtn.textContent = '⏸ PAUSE';
+        startTick();
+      }
+      updateClockDisplay();
+    }
+
+    function togglePause() {
+      if (!clockRunning) return;
+      const pauseBtn = document.getElementById('btn-pause');
+      if (!paused) {
+        elapsedAtPause += Math.floor((Date.now() - phaseStartWall) / 1000);
+        paused = true;
+        if (tickInterval) clearInterval(tickInterval);
+        pauseBtn.textContent = '▶ RESUME';
+      } else {
+        phaseStartWall = Date.now();
+        paused = false;
+        pauseBtn.textContent = '⏸ PAUSE';
+        startTick();
+      }
+    }
+
+    // ── Roster Strip ──────────────────────────────────────────────────────────
+    function buildRoster() {
+      const strip = document.getElementById('roster-strip');
+      strip.innerHTML = '';
+
+      const makeBtn = (label, val) => {
+        const b = document.createElement('button');
+        b.textContent = label;
+        const isActive = activePlayer === val;
+        b.className = 'shrink-0 min-w-[44px] h-10 rounded-xl text-[13px] font-black transition-all duration-150 active:scale-[0.93]';
+        b.style.cssText = isActive
+          ? 'background:#f59e0b; border:1.5px solid rgba(251,191,36,.8); color:#000; box-shadow:0 0 0 3px rgba(251,191,36,.25), inset 0 1px 0 rgba(255,255,255,.25);'
+          : 'background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.65);';
+        b.addEventListener('click', () => { activePlayer = val; buildRoster(); });
+        return b;
+      };
+
+      strip.appendChild(makeBtn('Team', null));
+      for (let i = 1; i <= 18; i++) strip.appendChild(makeBtn(String(i), i));
+    }
+
+    // ── Action & Chip Logic ───────────────────────────────────────────────────
+    function triggerAction(action) {
+      dismissChips();
+      const def = SUB_TYPES[action];
+      if (def && def.chips) {
+        pendingAction = action;
+        showChips(def.label, def.chips);
+      } else {
+        logEvent(action, null);
+      }
+    }
+
+    function showChips(label, chips) {
+      document.getElementById('chip-label').textContent = label;
+      const row = document.getElementById('chip-row');
+      row.innerHTML = '';
+      chips.forEach(c => {
+        const b = document.createElement('button');
+        b.textContent = CHIP_DISPLAY[c] || c;
+        b.className = 'text-[12px] font-black tracking-wider px-5 py-3 rounded-xl transition-all duration-150 active:scale-[0.95]';
+        b.style.cssText = 'background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); color:rgba(255,255,255,.88); box-shadow:inset 0 1px 0 rgba(255,255,255,.07);';
+        b.addEventListener('click', () => { logEvent(pendingAction, c); dismissChips(); });
+        row.appendChild(b);
+      });
+      document.getElementById('chip-panel').classList.remove('hidden');
+    }
+
+    function dismissChips() {
+      pendingAction = null;
+      document.getElementById('chip-panel').classList.add('hidden');
+    }
+
+    // ── Event Logging ─────────────────────────────────────────────────────────
+    function logEvent(eventType, subType) {
+      const secs = currentElapsedSeconds();
+      const { mm, ss } = formatClock(secs);
+      const ev = {
+        id:            crypto.randomUUID(),
+        period:        activePhase === '—' ? 'PRE' : activePhase,
+        match_seconds: secs,
+        clock_display: `${mm}:${ss}`,
+        player_num:    activePlayer,
+        event_type:    eventType,
+        sub_type:      subType,
+        timestamp_iso: new Date().toISOString(),
+      };
+      events.push(ev);
+      persist();
+      updateBadge();
+      flashBadge();
+    }
+
+    function persist() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    }
+
+    function updateBadge() {
+      document.getElementById('event-badge').textContent = events.length;
+    }
+
+    function flashBadge() {
+      const badge = document.getElementById('event-badge');
+      badge.style.transform = 'scale(1.35)';
+      badge.style.background = '#4ade80';
+      badge.style.color = '#000';
+      setTimeout(() => {
+        badge.style.transform = '';
+        badge.style.background = '';
+        badge.style.color = '';
+      }, 280);
+    }
+
+    // ── Undo ──────────────────────────────────────────────────────────────────
+    function undoLast() {
+      if (!events.length) return;
+      events.pop();
+      persist();
+      updateBadge();
+    }
+
+    // ── Export ────────────────────────────────────────────────────────────────
+    function exportJSON() {
+      const label = activePhase === '—' ? 'PRE' : activePhase;
+      const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `tivvy_events_${label}.json`;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+
+    function copyJSON() {
+      const btn = document.getElementById('btn-copy');
+      const svgCopy = `<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>`;
+      navigator.clipboard.writeText(JSON.stringify(events, null, 2))
+        .then(() => {
+          btn.textContent = '✓ COPIED';
+          setTimeout(() => { btn.innerHTML = `${svgCopy} COPY`; }, 1600);
+        })
+        .catch(() => {
+          btn.textContent = '⚠ USE EXPORT';
+          setTimeout(() => { btn.innerHTML = `${svgCopy} COPY`; }, 2200);
+        });
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    buildRoster();
+    updateBadge();
+    updateClockDisplay();
+  </script>
+</body>
+</html>
