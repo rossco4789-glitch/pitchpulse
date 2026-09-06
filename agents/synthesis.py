@@ -561,10 +561,13 @@ def run_nonleague_agent(ledger: dict, feedback: str = "") -> str:
     frameworks, which are calibrated for technical possession football.
 
     Returns a formatted markdown section covering:
-    - Aerial duel win rate overall and by zone
-    - Second ball recovery rate by zone
-    - Spatial clustering of aerial contests (where the physical battle is being fought)
-    - Transition velocity proxy: second ball to next possession event
+    - Aerial duel win rate overall and by zone third (A / M / D)
+    - Conditional tactical levers based on win rate and dominant third
+    - Second ball recovery rate with dominated / contested / at-risk thresholds
+    - Zone-specific coaching recommendations for each scenario
+
+    NOTE: Sequence chaining (aerial-to-second-ball transition velocity) is a
+    planned future feature and is NOT implemented in this version.
     """
     aerials     = _extract_tags(ledger, "AERIAL_DUEL")
     secondballs = _extract_tags(ledger, "SECOND_BALL")
@@ -762,14 +765,14 @@ def _write_dossier(content: str, match_id: str) -> Path:
 # Human-in-the-Loop CLI approval gate
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run_approval_gate(ledger: dict) -> bool:
+def run_approval_gate(ledger: dict) -> "Path | None":
     """
     Present the draft dossier to the manager and loop until:
-      - 'approve'           → write dossier to disk, return True
+      - 'approve'           → write dossier to disk, return Path
       - 'reject <feedback>' → re-run agents with feedback, repeat (max MAX_REJECTIONS)
-      - 'quit'              → exit without saving, return False
+      - 'quit'              → exit without saving, return None
 
-    Returns True if the dossier was saved, False otherwise.
+    Returns the Path of the written dossier, or None if not saved.
     """
     feedback    = ""
     rejections  = 0
@@ -796,7 +799,7 @@ def run_approval_gate(ledger: dict) -> bool:
             out = _write_dossier(dossier, match_id)
             print(f"  [GATE] Dossier written → {out.relative_to(ROOT)}")
             _rule("═")
-            return True
+            return out
 
         cycle_label = (
             f"  Cycle {rejections + 1} / {MAX_REJECTIONS} max rejections."
@@ -815,7 +818,7 @@ def run_approval_gate(ledger: dict) -> bool:
             raw = input("  > ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\n  [GATE] Interrupted — exiting without saving.")
-            return False
+            return None
 
         if not raw:
             continue
@@ -829,7 +832,7 @@ def run_approval_gate(ledger: dict) -> bool:
             _rule("═")
             print(f"  [GATE] Dossier approved and written → {out.relative_to(ROOT)}")
             _rule("═")
-            return True
+            return out
 
         elif verb == "reject":
             rejections += 1
@@ -845,7 +848,7 @@ def run_approval_gate(ledger: dict) -> bool:
 
         elif verb == "quit":
             print("  [GATE] Draft discarded. No dossier written.")
-            return False
+            return None
 
         else:
             print(f"  [GATE] Unrecognised command: '{raw}'. Type approve, reject, or quit.")

@@ -166,11 +166,11 @@ def step_visuals(ledger_path: Path) -> bool:
 # Step 3 — Tactical agents + approval gate
 # ══════════════════════════════════════════════════════════════════════════════
 
-def step_agents(ledger_path: Path) -> bool:
+def step_agents(ledger_path: Path) -> "Path | None":
     """
     Import agents.synthesis and run the full agent pipeline with CLI approval gate.
     Hard-stops on import failure.
-    Returns True if the dossier was saved.
+    Returns the Path of the written dossier, or None if not saved.
     """
     try:
         from agents.synthesis import run_approval_gate
@@ -182,6 +182,30 @@ def step_agents(ledger_path: Path) -> bool:
         ledger = json.load(f)
 
     return run_approval_gate(ledger)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Step 4 — HTML dossier packager
+# ══════════════════════════════════════════════════════════════════════════════
+
+def step_package(dossier_md_path: Path, plots_dir: Path) -> Path:
+    """
+    Package the approved dossier markdown into a self-contained HTML report
+    with embedded pitch-plot PNGs (base64), OLED dark theme, and A4 print CSS.
+    Returns the path of the written HTML file.
+    """
+    try:
+        from reports.packager import build_html
+    except ImportError as exc:
+        _err(f"Cannot import reports.packager: {exc}")
+        sys.exit(1)
+
+    dossier_md = dossier_md_path.read_text(encoding="utf-8")
+    html_out   = PROC_DIR / "tivvy_tactical_dossier.html"
+    out        = build_html(dossier_md, plots_dir, html_out)
+    size_kb    = round(out.stat().st_size / 1024, 1)
+    _ok(f"HTML dossier → {out.relative_to(ROOT)}  ({size_kb} KB)")
+    return out
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -244,20 +268,26 @@ def main() -> None:
     # ── Step 3: Tactical agents ────────────────────────────────────────────────
     _step_header(3, "TACTICAL ANALYSIS AGENTS + DOSSIER APPROVAL")
 
-    saved = step_agents(ledger_path)
+    dossier_path = step_agents(ledger_path)
+
+    # ── Step 4: HTML packager ──────────────────────────────────────────────────
+    if dossier_path:
+        _step_header(4, "HTML DOSSIER PACKAGER")
+        plots_dir = PROC_DIR / "plots"
+        step_package(dossier_path, plots_dir)
 
     # ── Pipeline summary ───────────────────────────────────────────────────────
     print()
     _rule("═")
     print("  PIPELINE COMPLETE")
-    if saved:
-        _ok("Dossier approved and written.")
+    if dossier_path:
+        _ok("Dossier approved, written, and packaged as HTML.")
     else:
         _warn("Dossier was not saved (quit or pipeline error).")
     _rule("═")
     print()
 
-    sys.exit(0 if saved else 1)
+    sys.exit(0 if dossier_path else 1)
 
 
 if __name__ == "__main__":

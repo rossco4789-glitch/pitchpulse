@@ -72,6 +72,10 @@
       display: block;
       width: 100%;
       height: 100%;
+      aspect-ratio: 360 / 232;   /* CRITICAL: forces element bounds = viewBox ratio,
+                                     eliminates portrait letterbox coordinate drift.
+                                     getBoundingClientRect() now returns the true
+                                     pitch area — LF/RF flanks become reachable. */
     }
 
     /* Chip in overlay: active state */
@@ -260,9 +264,10 @@
   <footer class="shrink-0 px-3 py-2.5 flex gap-2"
     style="background:rgba(9,9,11,.75); backdrop-filter:blur(14px); border-top:1px solid rgba(255,255,255,.07);">
 
-    <button onclick="undoLast()"
+    <button id="btn-undo" onclick="undoLast()"
       class="btn-inset flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[11px] font-black tracking-[.1em] transition-all duration-150 active:scale-[0.95]"
-      style="background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); color:rgba(255,255,255,.55);">
+      style="background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); color:rgba(255,255,255,.55); opacity:.28; cursor:not-allowed;"
+      disabled>
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="9 14 4 9 9 4"/>
         <path d="M20 20v-7a4 4 0 00-4-4H4"/>
@@ -822,6 +827,7 @@
       events.push(ev);
       persist();
       updateBadge();
+      updateUndo();
       flashBadge();
     }
 
@@ -846,13 +852,38 @@
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // Undo
+    // Undo — removes last logged event, updates badge + button, shows toast
     // ══════════════════════════════════════════════════════════════════════
     function undoLast() {
       if (!events.length) return;
       events.pop();
       persist();
       updateBadge();
+      updateUndo();
+      showUndoToast();
+    }
+
+    // Enable/disable #btn-undo based on whether there is anything to undo
+    function updateUndo() {
+      const btn = document.getElementById('btn-undo');
+      if (!btn) return;
+      const empty       = events.length === 0;
+      btn.disabled      = empty;
+      btn.style.opacity = empty ? '0.28' : '1';
+      btn.style.cursor  = empty ? 'not-allowed' : '';
+    }
+
+    // Show the "EVENT REMOVED" toast for 900 ms then fade out
+    function showUndoToast() {
+      const toast = document.getElementById('undo-toast');
+      if (!toast) return;
+      toast.style.opacity   = '1';
+      toast.style.transform = 'translateX(-50%) translateY(0)';
+      clearTimeout(toast._tid);
+      toast._tid = setTimeout(() => {
+        toast.style.opacity   = '0';
+        toast.style.transform = 'translateX(-50%) translateY(10px)';
+      }, 900);
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -887,9 +918,25 @@
     // ══════════════════════════════════════════════════════════════════════
     buildRoster();
     updateBadge();
+    updateUndo();
     updateClockDisplay();
     updateDirButton();
     initPitchEvents();
   </script>
+
+  <!-- ══ UNDO toast ═══════════════════════════════════════════════════════
+       Fixed-position; fades in on undoLast(), auto-fades out after 900 ms.
+       z-index 99 ensures it sits above the pitch overlay (z-index 60).
+  ══════════════════════════════════════════════════════════════════════ -->
+  <div id="undo-toast"
+    style="position:fixed; bottom:78px; left:50%; transform:translateX(-50%) translateY(10px);
+           background:rgba(251,191,36,.13); border:1px solid rgba(251,191,36,.28);
+           color:#fbbf24; font-size:11px; font-weight:900; letter-spacing:.14em;
+           padding:7px 20px; border-radius:9px; z-index:99;
+           opacity:0; transition:opacity .18s ease, transform .18s ease;
+           pointer-events:none; white-space:nowrap;">
+    ↩ EVENT REMOVED
+  </div>
+
 </body>
 </html>

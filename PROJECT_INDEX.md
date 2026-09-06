@@ -12,13 +12,14 @@ PitchPulse/
 ├── requirements.txt           # Python dependencies (pandas, mplsoccer)
 ├── run_matchday.py            # ✅ COMPLETE — Master pipeline runner (reconcile → visuals → agents)
 ├── tagger/
-│   └── index.html             # ✅ COMPLETE (v2) — Broadcast-grade OLED tactical pad; glassmorphic HUD, SVG icons, semantic gradients, drift-free clock
+│   └── index.html             # ✅ COMPLETE (v2.1) — Broadcast-grade OLED tactical pad; SVG aspect-ratio letterbox fix; 1-touch UNDO with toast
 ├── reconcile/
 │   └── sync.py                # ✅ COMPLETE — Post-match reconciliation engine; ±90s temporal match, roster resolution, JSON/TXT feed, ledger output
 ├── cv/
 │   └── zones.py               # ✅ COMPLETE — 18-Zone tactical matrix (105×68m); bbox, centroid, get_zone_by_coords(), get_zone_centroid()
 ├── reports/
-│   └── visualizer.py          # ✅ COMPLETE — OLED-dark mplsoccer engine; shot map, transition map, zonal heatmap → data/processed/plots/
+│   ├── visualizer.py          # ✅ COMPLETE — OLED-dark mplsoccer engine; shot map, transition map, zonal heatmap → data/processed/plots/
+│   └── packager.py            # ✅ COMPLETE — Self-contained HTML dossier packager; base64 PNGs, OLED dark, mobile responsive, iOS Safari A4 print
 ├── agents/
 │   ├── __init__.py            # Package marker
 │   └── synthesis.py           # ✅ COMPLETE — 3-agent UEFA tactical analysis engine + CLI approval gate
@@ -39,10 +40,11 @@ System constitution and persona constraints. Governs all agent behaviour:
 canary drift detection, UEFA Pro tactical standard, ELI5 requirement, token conservation, and zero-budget architecture rules.
 
 ### `run_matchday.py`
-Master matchday orchestration script. Runs the full pipeline in three sequential steps:
+Master matchday orchestration script. Runs the full pipeline in four sequential steps:
 1. `reconcile/sync.py` → `data/processed/match_ledger.json`
 2. `reports/visualizer.py` → `data/processed/plots/*.png`
 3. `agents/synthesis.py` → CLI approval gate → `reports/dossier_<date>.md`
+4. `reports/packager.py` → `data/processed/tivvy_tactical_dossier.html`  *(runs only on approve)*
 
 Flags: `--skip-reconcile`, `--skip-visuals`, `--latest`
 
@@ -55,6 +57,8 @@ Offline-first mobile tap-pad for live match tagging. **v2: 2-step capture flow.*
 Attacking direction auto-sets: `1H → attacking_right=true`, `2H → attacking_right=false`. Manual override via the `→ ATT` toggle button at all times.
 
 Coordinate calculation uses `getBoundingClientRect()` with `touchstart` + `preventDefault()` to block scroll/zoom distortion. Ghost-click suppressed via `lastTouchTime` guard. Coordinates clamped to `[0.0, 1.0]`.
+
+**v2.1 fixes:** `aspect-ratio: 360 / 232` on `#pitch-svg` eliminates portrait-mode SVG letterbox coordinate drift (previously caused all flank taps to mis-map as half-space). 1-touch UNDO button (`#btn-undo`) removes last event from localStorage with amber toast confirmation; disabled when no events are logged.
 
 | Event type     | Sub-types                               | Notes |
 |----------------|-----------------------------------------|-------|
@@ -107,7 +111,8 @@ Produces `shot_map.png`, `transition_map.png`, `zonal_heatmap.png`.
 Multi-agent tactical analysis engine. **v2: all spatial analysis uses real `zone_id` from ledger.**
 Four specialist agents produce a structured markdown dossier, then a human-in-the-loop CLI
 approval gate (`approve` / `reject <feedback>` / `quit`) validates it before writing to disk.
-Max 3 rejection cycles, then forced approval.
+Max 3 rejection cycles, then forced approval. `run_approval_gate()` returns `Path | None`
+(the written dossier Path on approve, `None` on quit/interrupt).
 
 | Agent | Events | UEFA Formal Language |
 |---|---|---|
@@ -119,6 +124,21 @@ Max 3 rejection cycles, then forced approval.
 **Spatial integrity contract:** Zone classification is derived exclusively from `zone_id` stamped
 by `reconcile/sync.py` → `cv.zones.get_zone_by_coords(x_m, y_m)`. No sub-type inference tables.
 Events without `zone_id` (legacy v1 exports) are flagged explicitly in the dossier output.
+
+### `reports/packager.py`
+Self-contained HTML dossier packager. Converts the approved `dossier_*.md` into a fully
+offline HTML file — no CDN, no external fonts, no JavaScript.
+
+- **Inputs:** dossier markdown string, `plots_dir/` containing the three PNGs
+- **Output:** `data/processed/tivvy_tactical_dossier.html`
+- Base64-embeds `shot_map.png`, `transition_map.png`, `zonal_heatmap.png`; renders a
+  styled placeholder `<div>` if any PNG is missing or zero bytes
+- Section mapping: MOMENT 1 → shot map, MOMENT 2 & 3 → transition map, SET PIECE → zonal heatmap, NON-LEAGUE PHYSICS → full-width (no plot)
+- OLED dark theme (`#09090b` / `#f59e0b` gold), 2-column CSS Grid (55 %/45 %)
+- `@media print`: white A4, `break-before: page` per section, `break-inside: avoid` on grids/alerts/blockquotes
+- Regex-only Markdown→HTML conversion: bold, italic, H1/H2, `>` manager notes, emoji alert boxes (🚨 ⚡ ⚠), bar-chart code blocks
+
+ELI5: It turns the text report into a one-file webpage the manager can open on any device — pictures and all — with no internet needed.
 
 ### `analysis/engine.py`
 Legacy local Python analytical engine (pre-reconcile era). Retained for reference.
@@ -141,9 +161,15 @@ Structured template for a 3-bullet UEFA Pro Licence halftime tactical diagnosis.
     │  data/processed/plots/{shot_map,transition_map,zonal_heatmap}.png
     ▼
 [agents/synthesis.py]
-    │  CLI approval gate
+    │  CLI approval gate  (approve / reject / quit)
     ▼
-[reports/dossier_YYYY-MM-DD.md]  →  Manager Briefing
+[reports/dossier_YYYY-MM-DD.md]
+    │
+    ▼
+[reports/packager.py]   ← base64-embeds PNGs; OLED dark + A4 print CSS
+    │
+    ▼
+[data/processed/tivvy_tactical_dossier.html]  →  Manager Briefing (offline, self-contained)
 ```
 
 Single command: `python run_matchday.py`
