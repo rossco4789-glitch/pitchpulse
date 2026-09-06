@@ -134,34 +134,13 @@ def step_visuals(ledger_path: Path) -> bool:
         ledger = json.load(f)
 
     # Flatten all tag events from matched + unmatched for the visualizer.
-    # The visualizer accepts list[dict] events with optional x, y or zone_id keys.
-    # Since the tagger records no spatial data, events render at zone centroids
-    # (the visualizer's coordinate contract handles missing x/y gracefully).
+    # v2 events carry real x_m, y_m and zone_id from reconcile/sync.py.
+    # Legacy v1 events (no spatial data) render at zone centroids if zone_id
+    # is present, or are omitted from position-sensitive plots.
     all_tags: list[dict] = []
     for m in ledger.get("matched", []):
         all_tags.append(m["tag"])
     all_tags.extend(ledger.get("unmatched_tags", []))
-
-    # Annotate events with inferred zone_id for visualizer centroid fallback.
-    # Mirrors the inference logic in agents/synthesis.py.
-    _BOX_ENTRY_ZONE = {"CROSS": "A_LF", "CARRY": "A_LH", "PASS": "A_LC", None: "A_LC"}
-    _SHOT_ZONE      = {"ON_TARGET": "A_LC", "OFF_TARGET": "A_LH", "BLOCKED": "A_RC", None: "A_LC"}
-    _SP_ZONE        = {"ATT_CORNER": "A_LF", "DEF_CORNER": "D_LF", "FREE_KICK": "M_LC", None: "A_LC"}
-
-    for tag in all_tags:
-        et  = tag.get("event_type")
-        sub = tag.get("sub_type")
-        if "zone_id" not in tag:
-            if et == "BOX_ENTRY":
-                tag["zone_id"] = _BOX_ENTRY_ZONE.get(sub, "A_LC")
-            elif et == "SHOT":
-                tag["zone_id"] = _SHOT_ZONE.get(sub, "A_LC")
-            elif et == "SET_PIECE":
-                tag["zone_id"] = _SP_ZONE.get(sub, "A_LC")
-            elif et == "HIGH_REGAIN":
-                tag["zone_id"] = "M_LC"
-            elif et == "DEF_TURNOVER":
-                tag["zone_id"] = "M_LC"
 
     plots_dir = PROC_DIR / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)

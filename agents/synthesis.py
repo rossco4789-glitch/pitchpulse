@@ -47,7 +47,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from cv.zones import ZONES, ZONE_ORDER  # noqa: E402 (after sys.path insert)
+from cv.zones import ZONES, ZONE_ORDER, zones_for_third  # noqa: E402 (after sys.path insert)
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 PROC_DIR    = ROOT / "data" / "processed"
@@ -58,38 +58,23 @@ LEDGER_PATH = PROC_DIR / "match_ledger.json"
 MAX_REJECTIONS = 3           # hard cap on rejection cycles before forced approval
 _COL           = 72          # terminal rule width
 
-# ── Zone inference tables ──────────────────────────────────────────────────────
-# Half-space threshold: ≥ 33% of box entries via CARRY → Qualitative Superiority flag
-_QS_HALF_SPACE_THRESHOLD = 0.33
+# ── Spatial constants — real zone IDs, no sub-type inference ──────────────────
+# Half-space zones (attacking + middle third)
+_HALF_SPACE_ZONES  = {"A_LH", "A_RH", "M_LH", "M_RH"}
+# Zone 14: central attacking channel
+_ZONE_14           = {"A_LC", "A_RC"}
+# Attacking third
+_ATTACKING_THIRD   = {z for z in ZONES if z.startswith("A_")}
+# Middle + attacking = credible "high" pressing zone
+_HIGH_PRESS_ZONES  = {z for z in ZONES if z.startswith("A_") or z.startswith("M_")}
+# Defensive third
+_DEFENSIVE_THIRD   = {z for z in ZONES if z.startswith("D_")}
+# Flank channels
+_FLANK_CHANNELS    = {"LF", "RF"}
 
-# BOX_ENTRY sub_type → corridor label
-_BOX_ENTRY_CORRIDOR: dict[str | None, str] = {
-    "CROSS": "Flank",
-    "CARRY": "Half-Space",
-    "PASS":  "Central (Zone 14)",
-    None:    "Central (Zone 14)",
-}
-# BOX_ENTRY sub_type → half-space flag (used for Qualitative Superiority)
-_BOX_ENTRY_IS_HALF_SPACE: dict[str | None, bool] = {
-    "CROSS": False,
-    "CARRY": True,   # carry through A_LH / A_RH = half-space penetration
-    "PASS":  False,
-    None:    False,
-}
-
-# SET_PIECE sub_type → inferred zone IDs (both lateral variants)
-_SET_PIECE_ZONES: dict[str | None, list[str]] = {
-    "ATT_CORNER": ["A_LF", "A_RF"],
-    "DEF_CORNER": ["D_LF", "D_RF"],
-    "FREE_KICK":  ["M_LC", "M_RC"],
-    None:         ["A_LC"],
-}
-
-# HIGH_REGAIN inferred zone — "high" pressing defined as M/A third
-_HIGH_REGAIN_INFERRED_ZONE = "M_LC"
-
-# DEF_TURNOVER inferred zone — loss of possession, defaulted to middle third
-_DEF_TURNOVER_INFERRED_ZONE = "M_LC"
+# Qualitative Superiority: ≥ 30% of spatially-confirmed box entries in half-space zones.
+# This is now derived from real zone_id, not sub-type.
+_QS_HALF_SPACE_THRESHOLD = 0.30
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -144,43 +129,58 @@ def _match_id_from_ledger(ledger: dict) -> str:
 
 def run_in_possession_agent(ledger: dict, feedback: str = "") -> str:
     """
-    Analyse SHOT and BOX_ENTRY events.
+    Analyse SHOT and BOX_ENTRY events using real zone_id from pitch tap coordinates.
+
+    Zone classification is derived from zone_id stamped by reconcile/sync.py
+    via cv.zones.get_zone_by_coords(x_m, y_m). No sub-type inference is used.
 
     Returns a formatted markdown section covering:
-    - Shot volume and outcome split
-    - Box entry corridor analysis (Flank / Half-Space / Central)
-    - Qualitative Superiority flag (≥33% half-space carries)
-    - Tactical lever recommendations
+    - Shot volume, outcome split, and Zone 14 shot proportion
+    - Box entry corridor analysis by actual zone (Flank / Half-Space / Central)
+    - Qualitative Superiority flag (≥30% confirmed half-space entries)
+    - Spatial coverage note when zone data is missing (legacy v1 exports)
     """
     shots   = _extract_tags(ledger, "SHOT")
     entries = _extract_tags(ledger, "BOX_ENTRY")
 
-    # Shot outcome counts
+    # Shot outcomes
     on_target  = sum(1 for s in shots if s.get("sub_type") == "ON_TARGET")
     off_target = sum(1 for s in shots if s.get("sub_type") == "OFF_TARGET")
     blocked    = sum(1 for s in shots if s.get("sub_type") == "BLOCKED")
     shot_count = len(shots)
 
-    # Box entry corridor split
-    corridor_counts: dict[str, int] = {"Flank": 0, "Half-Space": 0, "Central (Zone 14)": 0}
+    # Zone 14 shots: zone_id in {A_LC, A_RC}
+    zone14_shots = sum(1 for s in shots if s.get("zone_id") in _ZONE_14)
+
+    # Box entry corridor split — from real zone_id
+    corridor_counts: dict[str, int] = {"Flank": 0, "Half-Space": 0, "Central (Zone 14)": 0, "Unknown": 0}
     half_space_count = 0
+    zoned_entries    = 0
 
     for e in entries:
-        sub = e.get("sub_type")
-        corridor = _BOX_ENTRY_CORRIDOR.get(sub, "Central (Zone 14)")
-        corridor_counts[corridor] += 1
-        if _BOX_ENTRY_IS_HALF_SPACE.get(sub, False):
+        zid = e.get("zone_id")
+        if zid is None:
+            corridor_counts["Unknown"] += 1
+            continue
+        zoned_entries += 1
+        channel = ZONES[zid]["channel"] if zid in ZONES else ""
+        if channel in _FLANK_CHANNELS:
+            corridor_counts["Flank"] += 1
+        elif zid in _HALF_SPACE_ZONES:
+            corridor_counts["Half-Space"] += 1
             half_space_count += 1
+        else:
+            corridor_counts["Central (Zone 14)"] += 1
 
-    total_entries = len(entries)
+    total_entries  = len(entries)
     qs_flag = (
-        total_entries > 0
-        and (half_space_count / total_entries) >= _QS_HALF_SPACE_THRESHOLD
+        zoned_entries > 0
+        and (half_space_count / zoned_entries) >= _QS_HALF_SPACE_THRESHOLD
     )
     dominant_corridor = (
-        max(corridor_counts, key=corridor_counts.get)
-        if total_entries > 0
-        else "N/A"
+        max((k for k in corridor_counts if k != "Unknown"), key=lambda k: corridor_counts[k])
+        if zoned_entries > 0
+        else "Insufficient spatial data"
     )
 
     lines: list[str] = []
@@ -194,15 +194,25 @@ def run_in_possession_agent(ledger: dict, feedback: str = "") -> str:
         f"**Shots:** {shot_count}  |  "
         f"On Target: {on_target}  |  "
         f"Off Target: {off_target}  |  "
-        f"Blocked: {blocked}"
+        f"Blocked: {blocked}  |  "
+        f"Zone 14: {zone14_shots}"
     )
-    lines.append(f"**Box Entries:** {total_entries}")
+    lines.append(f"**Box Entries:** {total_entries}  (spatially confirmed: {zoned_entries})")
     lines.append("")
 
-    if total_entries > 0:
-        lines.append("**Entry Corridor Analysis:**")
-        for corridor, n in corridor_counts.items():
-            pct = _safe_pct(n, total_entries)
+    if corridor_counts["Unknown"] > 0:
+        lines.append(
+            f"⚠ {corridor_counts['Unknown']} entry event(s) have no zone data "
+            "(legacy v1 export — no pitch tap recorded). Spatial analysis below "
+            "reflects confirmed events only."
+        )
+        lines.append("")
+
+    if zoned_entries > 0:
+        lines.append("**Entry Corridor Analysis (real pitch coordinates):**")
+        for corridor in ("Flank", "Half-Space", "Central (Zone 14)"):
+            n   = corridor_counts[corridor]
+            pct = _safe_pct(n, zoned_entries)
             bar = "█" * (pct // 10)
             lines.append(f"  {corridor:<22}  {n:>2}  ({pct:>3}%)  {bar}")
         lines.append("")
@@ -211,36 +221,37 @@ def run_in_possession_agent(ledger: dict, feedback: str = "") -> str:
 
         if qs_flag:
             lines.append(
-                "**⚡ QUALITATIVE SUPERIORITY — HALF-SPACE EXPLOITATION DETECTED**"
+                "**⚡ QUALITATIVE SUPERIORITY — HALF-SPACE EXPLOITATION CONFIRMED**"
             )
             lines.append(_wrap(
-                f"Tiverton generated {half_space_count} of {total_entries} box entries "
-                f"({_safe_pct(half_space_count, total_entries)}%) via Carry actions through "
-                "the attacking half-spaces (A_LH / A_RH). This represents a positive "
-                "indicator of Qualitative Superiority — the team is bypassing the "
-                "opposition's defensive block through individual quality in transition "
-                "corridors. Tactical lever: sustain half-space rotation between the #10 "
-                "and the wide midfielder on the strong side."
+                f"Tiverton achieved {half_space_count} of {zoned_entries} spatially-confirmed "
+                f"box entries ({_safe_pct(half_space_count, zoned_entries)}%) in the attacking "
+                "half-spaces (A_LH / A_RH) — confirmed from real pitch coordinates, not "
+                "sub-type inference. This is genuine Qualitative Superiority: individual "
+                "actions bypassing the opposition's defensive block in the most dangerous "
+                "pre-box corridors. Tactical lever: sustain half-space rotation between "
+                "the #10 and the strong-side wide midfielder."
             ))
         else:
-            lines.append("**Half-Space Exploitation:** Below threshold (<33% via Carry)")
+            pct_hs = _safe_pct(half_space_count, zoned_entries) if zoned_entries else 0
+            lines.append(f"**Half-Space Exploitation:** {pct_hs}% (threshold: {int(_QS_HALF_SPACE_THRESHOLD*100)}%)")
             lines.append(_wrap(
-                "Box entries are dominated by flank delivery (CROSS) or direct central "
-                "passes (PASS). Qualitative Superiority through the half-spaces "
-                "(A_LH / A_RH) is under-utilised. Tactical lever: encourage combination "
-                "play to draw the opposition's defensive mid before committing the "
-                "half-space runner — particularly on the weak side of a wide press."
+                "Box entries are concentrated on flanks or through the central channel. "
+                "Qualitative Superiority through A_LH / A_RH is under-exploited. "
+                "Tactical lever: draw the opposition defensive mid with a central "
+                "dummy run before releasing the half-space runner, particularly on "
+                "the weak side when the opposition is overloading the ball."
             ))
     else:
-        lines.append("⚠ No box entries recorded. Check tagger export completeness.")
+        lines.append("⚠ No spatially-confirmed box entries. All events lack zone data.")
 
     lines.append("")
     if shot_count == 0:
-        lines.append("⚠ No shots recorded. Verify tagger data before finalising dossier.")
+        lines.append("⚠ No shots recorded. Verify tagger export completeness.")
     elif on_target == 0:
         lines.append(
-            "⚠ Zero shots on target. In-Possession structure is generating entries "
-            "but the final action quality (Zone 14 finish) is the constraining factor."
+            "⚠ Zero shots on target — Zone 14 penetration is occurring but "
+            "the final-action quality is the constraining factor."
         )
 
     return "\n".join(lines)
@@ -256,13 +267,17 @@ def run_in_possession_agent(ledger: dict, feedback: str = "") -> str:
 
 def run_press_agent(ledger: dict, feedback: str = "") -> str:
     """
-    Analyse HIGH_REGAIN and DEF_TURNOVER events.
+    Analyse HIGH_REGAIN and DEF_TURNOVER events using real zone_id.
+
+    Line of Engagement is now derived from the spatial distribution of
+    HIGH_REGAIN events — where on the pitch Tiverton actually wins the ball —
+    rather than from a volumetric efficiency ratio (which is a different metric).
 
     Returns a formatted markdown section covering:
-    - Counter-Pressing Phase efficiency (high regain rate)
-    - Line of Engagement inference from regain zone distribution
-    - Compactness score from turnover spread
-    - Pressing Trigger recommendation
+    - Counter-Pressing Phase efficiency (regains / total possession changes)
+    - Line of Engagement: median third of HIGH_REGAIN events (spatial)
+    - Compactness: spread of DEF_TURNOVER events across channels (spatial)
+    - Pressing Trigger recommendation anchored to real zone data
     """
     regains   = _extract_tags(ledger, "HIGH_REGAIN")
     turnovers = _extract_tags(ledger, "DEF_TURNOVER")
@@ -271,54 +286,97 @@ def run_press_agent(ledger: dict, feedback: str = "") -> str:
     total_turnovers = len(turnovers)
     total_events    = total_regains + total_turnovers
 
-    # Counter-Pressing efficiency: regains as % of all possession changes
+    # Counter-Pressing Phase efficiency (volume metric, not LoE)
     cp_efficiency = _safe_pct(total_regains, total_events) if total_events else 0
 
-    # Line of Engagement inference
-    # HIGH_REGAIN = pressing win; by definition in the M/A third.
-    # DEF_TURNOVER = possession lost; spread across all thirds.
-    # We flag LoE as "High Block" if CP efficiency ≥ 50%, else "Mid Block".
-    if cp_efficiency >= 60:
-        line_of_engagement = "High Block  (LoE > halfway)"
-        press_trigger_rec  = (
-            "Sustain high press trigger on the opposition GK distribution. "
-            "The ball-side winger sets the trigger; the #8 / #10 cuts the "
-            "central pass lane to force the long ball."
+    # ── Line of Engagement — derived from spatial distribution of HIGH_REGAIN ──
+    # Where Tiverton wins the ball tells us where the press is active.
+    regain_thirds: dict[str, int] = {"A": 0, "M": 0, "D": 0, "unknown": 0}
+    zoned_regains = 0
+    for r in regains:
+        zid = r.get("zone_id")
+        if zid and zid in ZONES:
+            regain_thirds[ZONES[zid]["third"]] += 1
+            zoned_regains += 1
+        else:
+            regain_thirds["unknown"] += 1
+
+    # LoE = third where the majority of regains occur
+    if zoned_regains > 0:
+        dominant_regain_third = max(("A", "M", "D"), key=lambda t: regain_thirds[t])
+        loe_map = {
+            "A": "High Block  (LoE in opposition's Attacking Third — A_* zones)",
+            "M": "Mid Block   (LoE at Halfway — M_* zones)",
+            "D": "Low Block   (LoE in Defensive Third — D_* zones: reactive)",
+        }
+        line_of_engagement = loe_map[dominant_regain_third]
+        high_pct = _safe_pct(regain_thirds["A"] + regain_thirds["M"], zoned_regains)
+    else:
+        line_of_engagement  = "Insufficient spatial data — no zone_id on HIGH_REGAIN events"
+        dominant_regain_third = None
+        high_pct = 0
+
+    # Pressing Trigger recommendation based on confirmed LoE
+    if dominant_regain_third == "A":
+        press_trigger_rec = (
+            "High press confirmed in the A_* zones. Trigger: ball to opposition "
+            "CB under back-pass pressure. Ball-side winger sets the trigger; "
+            "#8 / #10 cuts the central pass lane to force the long ball over the top."
         )
-    elif cp_efficiency >= 35:
-        line_of_engagement = "Mid Block  (LoE at halfway)"
-        press_trigger_rec  = (
-            "Adopt a mid-press trigger on the opposition centre-back receiving "
-            "the ball back from the striker. The #9 sets the press direction; "
-            "the #10 shadows the pivot. Maintain compactness in the 4-4-2 block."
+    elif dominant_regain_third == "M":
+        press_trigger_rec = (
+            "Mid-block press confirmed at halfway. Trigger: opposition pivot "
+            "receiving to feet. The #9 channels the press direction; the #10 "
+            "shadows the pivot. Hold 4-4-2 Block compactness — do not over-commit."
+        )
+    elif dominant_regain_third == "D":
+        press_trigger_rec = (
+            "Regains concentrated in the Defensive Third — the press is disorganised "
+            "or not being executed. The Block is reactive rather than proactive. "
+            "Immediate lever: establish a clear press trigger and compact the mid-block "
+            "to prevent the opposition playing through the M_* zones freely."
         )
     else:
-        line_of_engagement = "Low Block  (LoE inside own half)"
-        press_trigger_rec  = (
-            "The pressing structure is not generating regains efficiently. "
-            "Consider a passive mid-block and discipline the defensive shape "
-            "before committing to a Counter-Pressing Phase trigger. "
-            "Rest Defense priority: protect the space behind the last line."
+        press_trigger_rec = (
+            "Spatial data required for a precision Pressing Trigger recommendation. "
+            "Ensure tagger exports use the v2 pitch tap (x_m, y_m populated)."
         )
 
-    # Compactness score: lower spread of DEF_TURNOVER events = more compact block.
-    # Without x/y we approximate using match_seconds spread (temporal compactness proxy).
-    if total_turnovers >= 2:
-        seconds = sorted(t.get("match_seconds", 0) for t in turnovers)
-        temporal_spread_min = round((seconds[-1] - seconds[0]) / 60, 1)
-        if temporal_spread_min <= 15:
+    # ── Compactness — spatial spread of DEF_TURNOVER across channels ───────────
+    to_channels: set[str] = set()
+    to_thirds:   dict[str, int] = {"A": 0, "M": 0, "D": 0}
+    zoned_to = 0
+    for t in turnovers:
+        zid = t.get("zone_id")
+        if zid and zid in ZONES:
+            to_channels.add(ZONES[zid]["channel"])
+            to_thirds[ZONES[zid]["third"]] += 1
+            zoned_to += 1
+
+    if zoned_to >= 2:
+        channel_spread = len(to_channels)
+        if channel_spread <= 2:
             compactness_note = (
-                f"DEF_TURNOVER events are concentrated within a {temporal_spread_min}-minute "
-                "window — suggests a vulnerable phase rather than systemic compactness issues."
+                f"DEF_TURNOVER events cluster in {channel_spread} channel(s) "
+                f"({', '.join(sorted(to_channels))}) — block is spatially compact."
+            )
+        elif channel_spread <= 4:
+            compactness_note = (
+                f"DEF_TURNOVER events spread across {channel_spread} channels "
+                f"({', '.join(sorted(to_channels))}) — moderate width in the Block. "
+                "Monitor for exploitation of the wide channels in the next phase."
             )
         else:
             compactness_note = (
-                f"DEF_TURNOVER events spread across {temporal_spread_min} minutes — "
-                "indicates recurring compactness breakdown throughout the match, not an isolated "
-                "phase. Structural review of Unit Cohesion in the Block is recommended."
+                f"DEF_TURNOVER events distributed across all {channel_spread} channels "
+                f"({', '.join(sorted(to_channels))}) — the Block is not compact. "
+                "Unit Cohesion is breaking down laterally; tighten horizontal "
+                "distances between the defensive and midfield lines."
             )
+    elif zoned_to == 1:
+        compactness_note = "Single spatially-confirmed DEF_TURNOVER — insufficient for compactness analysis."
     else:
-        compactness_note = "Insufficient DEF_TURNOVER volume for compactness analysis."
+        compactness_note = "No spatially-confirmed DEF_TURNOVER events — compactness analysis unavailable."
 
     lines: list[str] = []
     lines.append("## MOMENT 2 & 3 — OUT OF POSSESSION / PRESSING")
@@ -336,13 +394,19 @@ def run_press_agent(ledger: dict, feedback: str = "") -> str:
         f"**Counter-Pressing Phase Efficiency:** {cp_efficiency}%  "
         f"(regains / total possession changes)"
     )
+    if zoned_regains > 0:
+        lines.append(
+            f"**Regain Zone Distribution:** "
+            f"A_*={regain_thirds['A']}  M_*={regain_thirds['M']}  D_*={regain_thirds['D']}  "
+            f"(High-press rate: {high_pct}%)"
+        )
     lines.append("")
-    lines.append(f"**Line of Engagement:** {line_of_engagement}")
+    lines.append(f"**Line of Engagement (spatial):** {line_of_engagement}")
     lines.append("")
     lines.append("**Pressing Trigger Recommendation:**")
     lines.append(_wrap(press_trigger_rec))
     lines.append("")
-    lines.append("**Compactness Assessment:**")
+    lines.append("**Compactness Assessment (channel spread):**")
     lines.append(_wrap(compactness_note))
     lines.append("")
 
@@ -350,8 +414,8 @@ def run_press_agent(ledger: dict, feedback: str = "") -> str:
         lines.append("⚠ No HIGH_REGAIN or DEF_TURNOVER events found. Verify tagger export.")
     elif cp_efficiency < 35 and total_events >= 5:
         lines.append(
-            "⚠ HIGH ALERT — Counter-Pressing Phase efficiency is critically low. "
-            "The opposition may be exploiting the Defensive Transition phase."
+            "⚠ HIGH ALERT — Counter-Pressing Phase efficiency critically low. "
+            "The opposition is exploiting the Defensive Transition phase."
         )
 
     return "\n".join(lines)
@@ -366,16 +430,19 @@ def run_press_agent(ledger: dict, feedback: str = "") -> str:
 
 def run_set_piece_agent(ledger: dict, feedback: str = "") -> str:
     """
-    Analyse SET_PIECE events by sub_type.
+    Analyse SET_PIECE events using real zone_id from pitch tap coordinates.
+
+    Zone data now replaces the previous inferred zone lookup table.
+    DEF_CORNER events in defensive zones are flagged as Rest Defense exposure.
+    ATT_CORNER delivery zones inform delivery corridor recommendations.
 
     Returns a formatted markdown section covering:
-    - Attacking dead-ball volume and inferred zone (ATT_CORNER → A_LF/A_RF)
-    - Defensive dead-ball exposure (DEF_CORNER → D_LF/D_RF)
-    - Free kick distribution
-    - Rest Defense exposure flag (DEF_CORNER volume as proxy)
+    - Attacking dead-ball zone distribution (real coordinates)
+    - Defensive dead-ball exposure by zone
+    - Rest Defense flag (defensive corners in D_LF / D_RF / D_LC / D_RC)
     - Unit Cohesion recommendation
     """
-    set_pieces = _extract_tags(ledger, "SET_PIECE")
+    set_pieces   = _extract_tags(ledger, "SET_PIECE")
 
     att_corners  = [e for e in set_pieces if e.get("sub_type") == "ATT_CORNER"]
     def_corners  = [e for e in set_pieces if e.get("sub_type") == "DEF_CORNER"]
@@ -383,56 +450,57 @@ def run_set_piece_agent(ledger: dict, feedback: str = "") -> str:
     unclassified = [e for e in set_pieces if e.get("sub_type") not in
                     ("ATT_CORNER", "DEF_CORNER", "FREE_KICK")]
 
-    total_sp      = len(set_pieces)
-    att_total     = len(att_corners)
-    def_total     = len(def_corners)
-    fk_total      = len(free_kicks)
+    total_sp = len(set_pieces)
+    att_total = len(att_corners)
+    def_total = len(def_corners)
+    fk_total  = len(free_kicks)
 
-    # Rest Defense exposure: high DEF_CORNER count relative to ATT_CORNER suggests
-    # the opposition is pinning Tiverton back in their own half via set pieces.
-    rest_defense_flag = (def_total >= 3) or (def_total > att_total and def_total >= 2)
-
-    # Attacking corner inferred zone
-    att_zone_label = (
-        f"{att_total} attacking corner(s) from A_LF / A_RF delivery corridors"
-        if att_total > 0
-        else "No attacking corners recorded."
-    )
-    def_zone_label = (
-        f"{def_total} defensive corner(s) — Rest Defense exposure at D_LF / D_RF"
-        if def_total > 0
-        else "No defensive corners recorded."
+    # Attacking corner zones from real coordinates
+    att_zones = [e.get("zone_id") for e in att_corners if e.get("zone_id")]
+    att_zone_str = (
+        f"{att_total} attacking corner(s)  —  "
+        f"zones: {', '.join(att_zones) if att_zones else 'no spatial data'}"
+        if att_total > 0 else "No attacking corners recorded."
     )
 
-    # Unit Cohesion recommendation based on DEF_CORNER volume
+    # Defensive corner zones — Rest Defense flag if in D_* zones
+    def_zones = [e.get("zone_id") for e in def_corners if e.get("zone_id")]
+    def_in_d_third = [z for z in def_zones if z and z.startswith("D_")]
+    rest_defense_flag = (def_total >= 3) or (len(def_in_d_third) >= 2)
+
+    def_zone_str = (
+        f"{def_total} defensive corner(s)  —  "
+        f"zones: {', '.join(def_zones) if def_zones else 'no spatial data'}"
+        if def_total > 0 else "No defensive corners recorded."
+    )
+
+    # Free kick zones
+    fk_zones = [e.get("zone_id") for e in free_kicks if e.get("zone_id")]
+    fk_note = (
+        f"{fk_total} free kick(s)  —  zones: {', '.join(fk_zones) if fk_zones else 'no spatial data'}. "
+        "Coordinate free kick delivery with a first-post decoy run to disrupt the defensive wall."
+        if fk_total > 0 else "No free kicks recorded."
+    )
+
+    # Unit Cohesion recommendation
     if def_total == 0:
         cohesion_rec = (
-            "No defensive corners conceded — Unit Cohesion under dead-ball pressure "
-            "was not tested. Maintain zonal marking discipline at corners."
+            "No defensive corners — Unit Cohesion under dead-ball pressure was not "
+            "tested this match. Maintain zonal marking discipline in training."
         )
     elif def_total <= 2:
         cohesion_rec = (
-            f"{def_total} defensive corner(s) — manageable. Ensure the defensive "
-            "unit maintains its Block shape in the post-corner Attacking Transition "
-            "phase. The #6 / #5 must hold the back line to prevent transition exposure."
+            f"{def_total} defensive corner(s) — manageable. Ensure the Block "
+            "holds shape in the post-corner Attacking Transition phase. The #5 / #6 "
+            "must anchor the back line to prevent late-runner exploitation."
         )
     else:
         cohesion_rec = (
-            f"⚠ {def_total} defensive corners conceded. REST DEFENSE is under "
-            "sustained pressure. Tactical lever: tighten Unit Cohesion at corners — "
-            "consider a mixed zonal/man-mark scheme with the #4 or #6 assigned to the "
-            "near-post runner. Ensure the #7 / #11 hold width for the counter-press "
-            "trigger on second-ball situations."
+            f"⚠ {def_total} defensive corners conceded. REST DEFENSE under sustained "
+            "pressure. Tactical lever: assign the #4 or #6 to the near-post runner in "
+            "a hybrid zonal/man-mark scheme. The #7 / #11 must hold width for the "
+            "second-ball counter-press trigger on clearances."
         )
-
-    # Free kick note
-    fk_note = (
-        f"{fk_total} free kick(s) recorded (inferred zone: M_LC / M_RC). "
-        "Direct free kick delivery into the attacking third should be coordinated "
-        "with a first-post decoy runner to disrupt the opposition's defensive wall shape."
-        if fk_total > 0
-        else "No free kicks recorded."
-    )
 
     lines: list[str] = []
     lines.append("## SET PIECE ANALYSIS")
@@ -448,23 +516,22 @@ def run_set_piece_agent(ledger: dict, feedback: str = "") -> str:
         f"Free Kicks: {fk_total}"
     )
     if unclassified:
-        lines.append(f"  *(Unclassified SET_PIECE events: {len(unclassified)} — sub_type missing)*")
+        lines.append(f"  *(Unclassified: {len(unclassified)} — sub_type missing)*")
     lines.append("")
 
-    lines.append(f"**Attacking Set Pieces:** {att_zone_label}")
-    lines.append(f"**Defensive Set Pieces:** {def_zone_label}")
+    lines.append(f"**Attacking Set Pieces:** {att_zone_str}")
+    lines.append(f"**Defensive Set Pieces:** {def_zone_str}")
     lines.append("")
 
     if rest_defense_flag:
         lines.append(
-            "**🚨 REST DEFENSE ALERT** — Opposition is generating repeated dead-ball "
-            "situations inside Tiverton's defensive third."
+            "**🚨 REST DEFENSE ALERT** — Repeated defensive corners in the D_* "
+            "zones. Second-ball clearances are elevating counter-attack exposure."
         )
         lines.append(_wrap(
-            "The frequency of defensive corners elevates Rest Defense risk on "
-            "second-ball clearances. The holding midfielder (#4 / #8) must track "
-            "the opposition's late runners from the edge of the box and immediately "
-            "initiate the Attacking Transition counter-press if the ball is cleared."
+            "The holding midfielder (#4 / #8) must track late opposition runners "
+            "from the box edge and trigger the Attacking Transition counter-press "
+            "immediately on clearance. Do not allow the opposition to recycle."
         ))
         lines.append("")
 
@@ -476,6 +543,161 @@ def run_set_piece_agent(ledger: dict, feedback: str = "") -> str:
 
     if total_sp == 0:
         lines.append("\n⚠ No SET_PIECE events tagged. This section may be incomplete.")
+
+    return "\n".join(lines)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Agent 4 — Non-League Physics Agent
+# Moment: ALL FOUR (aerial duels + second balls underpin every moment)
+# Events: AERIAL_DUEL (WON/LOST), SECOND_BALL (WON/LOST)
+# Formal language: Second Ball, Direct Play, Quantitative Superiority
+# ══════════════════════════════════════════════════════════════════════════════
+
+def run_nonleague_agent(ledger: dict, feedback: str = "") -> str:
+    """
+    Analyse AERIAL_DUEL and SECOND_BALL events — the dominant possession-transition
+    mechanism at non-league level. These events are absent from most analysis
+    frameworks, which are calibrated for technical possession football.
+
+    Returns a formatted markdown section covering:
+    - Aerial duel win rate overall and by zone
+    - Second ball recovery rate by zone
+    - Spatial clustering of aerial contests (where the physical battle is being fought)
+    - Transition velocity proxy: second ball to next possession event
+    """
+    aerials     = _extract_tags(ledger, "AERIAL_DUEL")
+    secondballs = _extract_tags(ledger, "SECOND_BALL")
+
+    aerial_won  = [e for e in aerials     if e.get("sub_type") == "WON"]
+    aerial_lost = [e for e in aerials     if e.get("sub_type") == "LOST"]
+    sb_won      = [e for e in secondballs if e.get("sub_type") == "WON"]
+    sb_lost     = [e for e in secondballs if e.get("sub_type") == "LOST"]
+
+    total_aerial = len(aerials)
+    total_sb     = len(secondballs)
+    aerial_wr    = _safe_pct(len(aerial_won), total_aerial) if total_aerial else None
+    sb_wr        = _safe_pct(len(sb_won),     total_sb)     if total_sb     else None
+
+    # Aerial zone distribution (where the physical battle is being fought)
+    aerial_thirds: dict[str, int] = {"A": 0, "M": 0, "D": 0}
+    for e in aerials:
+        zid = e.get("zone_id")
+        if zid and zid in ZONES:
+            aerial_thirds[ZONES[zid]["third"]] += 1
+
+    zoned_aerials = sum(aerial_thirds.values())
+    dominant_aerial_third = (
+        max(aerial_thirds, key=aerial_thirds.get)
+        if zoned_aerials > 0 and max(aerial_thirds.values()) > 0
+        else None
+    )
+
+    # Second ball zone distribution
+    sb_thirds: dict[str, int] = {"A": 0, "M": 0, "D": 0}
+    for e in secondballs:
+        zid = e.get("zone_id")
+        if zid and zid in ZONES:
+            sb_thirds[ZONES[zid]["third"]] += 1
+
+    lines: list[str] = []
+    lines.append("## NON-LEAGUE PHYSICS — AERIAL DUELS & SECOND BALLS")
+
+    if feedback:
+        lines.append(f"> ⚙ Manager note: {feedback.strip()}")
+        lines.append("")
+
+    # Aerial headline
+    if total_aerial > 0:
+        lines.append(
+            f"**Aerial Duels:** {total_aerial} total  |  "
+            f"Won: {len(aerial_won)}  |  Lost: {len(aerial_lost)}  |  "
+            f"Win Rate: {aerial_wr}%"
+        )
+        if zoned_aerials > 0:
+            lines.append(
+                f"**Aerial Zone Distribution:** "
+                f"A_*={aerial_thirds['A']}  M_*={aerial_thirds['M']}  D_*={aerial_thirds['D']}"
+            )
+        if dominant_aerial_third:
+            third_name = {"A": "Attacking Third", "M": "Middle Third", "D": "Defensive Third"}
+            lines.append(
+                f"**Primary Aerial Battle Zone:** {third_name[dominant_aerial_third]}"
+            )
+            lines.append("")
+            if dominant_aerial_third == "D" and aerial_wr is not None and aerial_wr < 50:
+                lines.append(_wrap(
+                    "⚠ Aerial battles concentrated in the Defensive Third with a sub-50% "
+                    "win rate — Tiverton are conceding aerial Quantitative Superiority in "
+                    "the most dangerous zone. Direct balls over the back line are a live "
+                    "threat. Tactical lever: drop the defensive line 5m to contest second "
+                    "balls in the D_LC / D_RC corridors, not on the penalty spot."
+                ))
+            elif dominant_aerial_third == "M" and aerial_wr is not None and aerial_wr >= 55:
+                lines.append(_wrap(
+                    "Aerial dominance confirmed in the Middle Third. Tiverton are winning "
+                    "the physical battle at halfway — a strong platform for direct "
+                    "Attacking Transition. Task the #10 to exploit space behind the "
+                    "aerial contest immediately on second-ball recovery."
+                ))
+            elif dominant_aerial_third == "A":
+                lines.append(_wrap(
+                    f"Aerial contests concentrated in the Attacking Third. "
+                    f"Win rate {aerial_wr}% — "
+                    + ("attacking set piece delivery and long balls over the top are "
+                       "creating Quantitative Superiority in the box." if aerial_wr and aerial_wr >= 50
+                       else "the aerial delivery quality into the box is not generating "
+                            "first-contact wins. Review set piece delivery height and timing.")
+                ))
+    else:
+        lines.append("**Aerial Duels:** Not tagged this match.")
+        lines.append(_wrap(
+            "⚠ AERIAL_DUEL is a critical event type at non-league level. "
+            "Ensure the v2 tagger is used and aerial contests are captured — "
+            "this data drives the second-ball and direct-play analysis."
+        ))
+
+    lines.append("")
+
+    # Second ball headline
+    if total_sb > 0:
+        lines.append(
+            f"**Second Balls:** {total_sb} total  |  "
+            f"Won: {len(sb_won)}  |  Lost: {len(sb_lost)}  |  "
+            f"Recovery Rate: {sb_wr}%"
+        )
+        if sum(sb_thirds.values()) > 0:
+            lines.append(
+                f"**Second Ball Zones:** "
+                f"A_*={sb_thirds['A']}  M_*={sb_thirds['M']}  D_*={sb_thirds['D']}"
+            )
+        lines.append("")
+
+        if sb_wr is not None:
+            if sb_wr >= 60:
+                lines.append(_wrap(
+                    f"Second ball recovery rate of {sb_wr}% — Tiverton are winning the "
+                    "physical contest after first contacts. Transition opportunities from "
+                    "second ball wins should be logged against shot attempts to build a "
+                    "direct play index over time."
+                ))
+            elif sb_wr >= 40:
+                lines.append(_wrap(
+                    f"Second ball recovery rate of {sb_wr}% — contested. Neither side has "
+                    "clear dominance on second balls. The midfield unit must identify the "
+                    "primary delivery zone and pre-position the #8 / #10 ahead of the "
+                    "aerial contest to improve recovery positioning."
+                ))
+            else:
+                lines.append(_wrap(
+                    f"⚠ Second ball recovery rate of {sb_wr}% — opposition is winning the "
+                    "majority of second contacts. This is a systemic risk in direct-play "
+                    "matches: the opposition can sustain pressure phases from second-ball "
+                    "control. Lever: consider a shorter build-out phase to avoid launching "
+                    "aerial balls into unfavourable contest zones."
+                ))
+    else:
+        lines.append("**Second Balls:** Not tagged this match.")
 
     return "\n".join(lines)
 
@@ -505,21 +727,27 @@ def _build_dossier(
     section_ip  = run_in_possession_agent(ledger, feedback)
     section_pr  = run_press_agent(ledger, feedback)
     section_sp  = run_set_piece_agent(ledger, feedback)
+    section_nl  = run_nonleague_agent(ledger, feedback)
 
     summary_stats = ledger.get("summary", {})
+    schema_v      = ledger.get("schema_version", 1)
+    zoned_count   = summary_stats.get("events_with_zone", "—")
     footer = "\n".join([
         "",
         "---",
         "",
         "## DATA QUALITY",
-        f"Matched events: {summary_stats.get('matched', '?')}  |  "
+        f"Schema version: v{schema_v}  |  "
+        f"Matched: {summary_stats.get('matched', '?')}  |  "
         f"Unmatched tags: {summary_stats.get('unmatched_tags', '?')}  |  "
-        f"Unmatched club events: {summary_stats.get('unmatched_club_events', '?')}",
+        f"Unmatched club events: {summary_stats.get('unmatched_club_events', '?')}  |  "
+        f"Events with real zone: {zoned_count}",
         "",
         "_Dossier produced by PitchPulse · Tiverton Town FC · Zero-Budget Performance Stack_",
     ])
 
-    return header + section_ip + "\n\n---\n\n" + section_pr + "\n\n---\n\n" + section_sp + footer
+    sep = "\n\n---\n\n"
+    return header + section_ip + sep + section_pr + sep + section_sp + sep + section_nl + footer
 
 
 def _write_dossier(content: str, match_id: str) -> Path:
@@ -670,10 +898,11 @@ def main() -> None:
         f"Unmatched tags: {summary.get('unmatched_tags', '?')}  |  "
         f"Unmatched club: {summary.get('unmatched_club_events', '?')}"
     )
-    print("\n  Running three specialist agents…\n")
+    print("\n  Running four specialist agents…\n")
     print("    Agent 1: In-Possession Analyst     (SHOT, BOX_ENTRY)")
     print("    Agent 2: Out-of-Possession / Press  (HIGH_REGAIN, DEF_TURNOVER)")
     print("    Agent 3: Set-Piece Analyst          (SET_PIECE)")
+    print("    Agent 4: Non-League Physics         (AERIAL_DUEL, SECOND_BALL)")
     print()
 
     saved = run_approval_gate(ledger)
