@@ -54,8 +54,10 @@ CONTEXT_PATH     = RAW_DIR / "match_context.json"
 DOF_CARD_PATH    = PLOTS_DIR / "dof_match_card.png"
 HTML_REPORT_PATH = PROC_DIR / "tivvy_tactical_dossier.html"
 CALIB_PATH       = RAW_DIR / "camera_calibration.json"
+CLIPS_DIR        = ROOT / "data" / "clips"
+VEO_RAW_DIR      = RAW_DIR / "veo"
 
-for _d in (RAW_DIR, STAGED_DIR, PROC_DIR, PLOTS_DIR, REPORTS_DIR):
+for _d in (RAW_DIR, STAGED_DIR, PROC_DIR, PLOTS_DIR, REPORTS_DIR, CLIPS_DIR, VEO_RAW_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
 # ── Page config ────────────────────────────────────────────────────────────────
@@ -351,6 +353,9 @@ _SS: dict = {
     "video_path": "", "frame_index": 0, "last_click": None,
     "last_pitch_coord": None, "video_events_logged": 0,
     "review_result": None,
+    "clip_offset_1h": 0, "clip_offset_2h": 0,
+    "clip_lead_in": 5, "clip_follow_through": 3,
+    "last_clip_path": None,
 }
 for _k, _v in _SS.items():
     if _k not in st.session_state:
@@ -953,6 +958,250 @@ with tab2:
                 st.success(f"✓  {ev_type}/{sub_type} logged at ({x_m:.1f}m, {y_m:.1f}m)")
             except Exception as exc:
                 st.error(f"Failed: {exc}")
+
+    st.markdown(_divider(), unsafe_allow_html=True)
+
+    # ── Clip Workspace ────────────────────────────────────────────────────────
+    st.markdown(_section_label("Clip Workspace"), unsafe_allow_html=True)
+
+    try:
+        from reports.video_engine import (
+            check_ffmpeg, calculate_clip_bounds, slice_clip,
+            build_clip_path, export_playlist_m3u,
+        )
+        _ffmpeg_ok = check_ffmpeg()
+    except ImportError as _ve:
+        st.error(f"video_engine unavailable: {_ve}")
+        _ffmpeg_ok = False
+
+    if not _ffmpeg_ok:
+        st.warning(
+            "⚠ **FFmpeg not found.** Install it to enable clip export:\n\n"
+            "- **Windows:** `winget install Gyan.FFmpeg`\n"
+            "- **macOS:** `brew install ffmpeg`\n\n"
+            "Restart the app after installation."
+        )
+    else:
+        st.markdown(
+            '<div style="display:inline-flex;align-items:center;gap:8px;'
+            'background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);'
+            'border-radius:8px;padding:5px 13px;margin-bottom:14px">'
+            '<span style="color:#22c55e;font-size:.75rem">●</span>'
+            '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.75rem;'
+            'color:#86efac">FFmpeg ready</span></div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Sync Offsets ──────────────────────────────────────────────────────────
+    st.markdown(
+        '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
+        'font-size:.8rem;letter-spacing:.1em;color:#71717a;margin:10px 0 6px">KICK-OFF SYNC OFFSETS</div>',
+        unsafe_allow_html=True,
+    )
+    sync_col1, sync_col2, sync_col3, sync_col4 = st.columns(4)
+    with sync_col1:
+        off_1h = st.number_input(
+            "1H Kick-Off Offset (s)",
+            min_value=0, max_value=3600,
+            value=st.session_state["clip_offset_1h"],
+            step=1, key="input_offset_1h",
+            help="Seconds into the Veo file when the referee blew the 1st-half kick-off whistle.",
+        )
+        st.session_state["clip_offset_1h"] = off_1h
+    with sync_col2:
+        off_2h = st.number_input(
+            "2H Kick-Off Offset (s)",
+            min_value=0, max_value=7200,
+            value=st.session_state["clip_offset_2h"],
+            step=1, key="input_offset_2h",
+            help="Seconds into the Veo file when the referee blew the 2nd-half restart whistle. "
+                 "Eliminates half-time stoppage drift.",
+        )
+        st.session_state["clip_offset_2h"] = off_2h
+    with sync_col3:
+        lead_in_val = st.slider(
+            "Lead-in (s)", min_value=1, max_value=15,
+            value=st.session_state["clip_lead_in"], key="slider_lead_in",
+        )
+        st.session_state["clip_lead_in"] = lead_in_val
+    with sync_col4:
+        follow_val = st.slider(
+            "Follow-through (s)", min_value=1, max_value=15,
+            value=st.session_state["clip_follow_through"], key="slider_follow",
+        )
+        st.session_state["clip_follow_through"] = follow_val
+
+    st.markdown(
+        '<div style="background:rgba(245,158,11,.07);border-left:3px solid #f59e0b;'
+        'border-radius:4px;padding:6px 12px;font-size:.75rem;color:#fcd34d;margin:8px 0 14px">'
+        '⚠ Sync is calibrated to each half\'s kick-off. '
+        'Second-half clips may drift ±5–15 s if the referee ran significant stoppage. '
+        'Widen lead-in if needed.</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Event table with per-row Clip button ─────────────────────────────────
+    st.markdown(
+        '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
+        'font-size:.8rem;letter-spacing:.1em;color:#71717a;margin:10px 0 6px">KEY MOMENTS — CLIP EXPORT</div>',
+        unsafe_allow_html=True,
+    )
+
+    _ledger = st.session_state.get("ledger")
+    _vpath  = st.session_state.get("video_path", "")
+    _ctx    = st.session_state.get("ctx") or {}
+    _match_date = _ctx.get("match_date", "")
+    _opponent   = _ctx.get("opponent", "Unknown")
+
+    if not _ledger:
+        st.info("Load a match ledger (Tab 1) to see events here.")
+    elif not _vpath:
+        st.info("Enter the Veo file path in the Video Frame Extraction section above.")
+    else:
+        _matched = _ledger.get("matched", [])
+        if not _matched:
+            st.info("No matched events in the current ledger.")
+        else:
+            # Build display rows from matched events
+            _rows = []
+            for _ev_obj in _matched:
+                _tag = _ev_obj.get("tag", {})
+                _rows.append({
+                    "period":        _tag.get("period", "1H"),
+                    "match_seconds": _tag.get("match_seconds", 0),
+                    "event_type":    _tag.get("event_type", ""),
+                    "sub_type":      _tag.get("sub_type", ""),
+                    "zone_id":       _tag.get("zone_id", ""),
+                    "player":        _tag.get("player_num", ""),
+                })
+
+            # Header row
+            st.markdown(
+                '<div style="display:grid;grid-template-columns:50px 70px 90px 130px 110px 80px 90px;'
+                'gap:0;background:#111116;border:1px solid rgba(255,255,255,0.06);'
+                'border-radius:10px 10px 0 0;padding:8px 12px;'
+                'font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
+                'font-size:.72rem;letter-spacing:.09em;color:#71717a">'
+                '<span>#</span><span>MIN</span><span>PERIOD</span>'
+                '<span>EVENT</span><span>SUB-TYPE</span><span>ZONE</span><span></span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+            _export_paths: list[Path] = []
+            _playlist_eligible = _ffmpeg_ok and bool(_vpath)
+
+            for _i, _row in enumerate(_rows):
+                _min_label = f"{_row['match_seconds'] // 60}'"
+                _bg = "rgba(255,255,255,0.015)" if _i % 2 == 0 else "transparent"
+                st.markdown(
+                    f'<div style="display:grid;grid-template-columns:50px 70px 90px 130px 110px 80px 90px;'
+                    f'gap:0;background:{_bg};border-left:1px solid rgba(255,255,255,0.06);'
+                    f'border-right:1px solid rgba(255,255,255,0.06);'
+                    f'border-bottom:1px solid rgba(255,255,255,0.04);'
+                    f'padding:7px 12px;align-items:center;'
+                    f'font-family:\'JetBrains Mono\',monospace;font-size:.72rem;color:#ededf0">'
+                    f'<span style="color:#71717a">{_i+1}</span>'
+                    f'<span style="color:#f59e0b">{_min_label}</span>'
+                    f'<span style="color:#86efac">{_row["period"]}</span>'
+                    f'<span>{_row["event_type"]}</span>'
+                    f'<span style="color:#a1a1aa">{_row["sub_type"]}</span>'
+                    f'<span style="color:#71717a">{_row["zone_id"]}</span>'
+                    f'<span></span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+                _clip_key = f"clip_btn_{_i}"
+                if _ffmpeg_ok and st.button(f"✂ Clip #{_i+1}", key=_clip_key):
+                    _start, _end = calculate_clip_bounds(
+                        match_seconds   = int(_row["match_seconds"]),
+                        period          = _row["period"],
+                        offset_1h       = float(st.session_state["clip_offset_1h"]),
+                        offset_2h       = float(st.session_state["clip_offset_2h"]),
+                        lead_in         = float(st.session_state["clip_lead_in"]),
+                        follow_through  = float(st.session_state["clip_follow_through"]),
+                    )
+                    _out = build_clip_path(
+                        clips_root    = CLIPS_DIR,
+                        match_date    = _match_date or "unknown-date",
+                        opponent      = _opponent,
+                        match_seconds = int(_row["match_seconds"]),
+                        event_type    = _row["event_type"],
+                        sub_type      = _row["sub_type"],
+                        zone_id       = _row["zone_id"],
+                    )
+                    with st.spinner(f"Slicing clip {_i+1} …"):
+                        _ok, _msg = slice_clip(_vpath, _start, _end, _out)
+                    if _ok:
+                        st.session_state["last_clip_path"] = str(_out)
+                        st.toast(f"✓ Clip saved: {_out.name}", icon="✂")
+                    else:
+                        st.error(f"Clip failed: {_msg}")
+
+            st.markdown(
+                '<div style="border:1px solid rgba(255,255,255,0.06);'
+                'border-top:none;border-radius:0 0 10px 10px;height:4px"></div>',
+                unsafe_allow_html=True,
+            )
+
+            # Inline preview of last clip
+            _last_clip = st.session_state.get("last_clip_path")
+            if _last_clip and Path(_last_clip).exists():
+                st.markdown(_divider(), unsafe_allow_html=True)
+                st.markdown(
+                    '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
+                    'font-size:.8rem;letter-spacing:.1em;color:#71717a;margin:10px 0 6px">'
+                    'LAST CLIP PREVIEW</div>',
+                    unsafe_allow_html=True,
+                )
+                st.video(_last_clip)
+
+            # Batch playlist export
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+            if _playlist_eligible and st.button(
+                "📂  Export All Key Moments Playlist",
+                key="btn_export_playlist",
+                disabled=not _ffmpeg_ok,
+            ):
+                _pl_clips: list[Path] = []
+                _pl_errors: list[str] = []
+                _bar = st.progress(0, text="Exporting clips…")
+                for _pi, _row in enumerate(_rows):
+                    _start, _end = calculate_clip_bounds(
+                        match_seconds   = int(_row["match_seconds"]),
+                        period          = _row["period"],
+                        offset_1h       = float(st.session_state["clip_offset_1h"]),
+                        offset_2h       = float(st.session_state["clip_offset_2h"]),
+                        lead_in         = float(st.session_state["clip_lead_in"]),
+                        follow_through  = float(st.session_state["clip_follow_through"]),
+                    )
+                    _out = build_clip_path(
+                        clips_root    = CLIPS_DIR,
+                        match_date    = _match_date or "unknown-date",
+                        opponent      = _opponent,
+                        match_seconds = int(_row["match_seconds"]),
+                        event_type    = _row["event_type"],
+                        sub_type      = _row["sub_type"],
+                        zone_id       = _row["zone_id"],
+                    )
+                    _ok, _msg = slice_clip(_vpath, _start, _end, _out)
+                    if _ok:
+                        _pl_clips.append(_out)
+                    else:
+                        _pl_errors.append(f"Row {_pi+1}: {_msg}")
+                    _bar.progress((_pi + 1) / len(_rows), text=f"Clip {_pi+1}/{len(_rows)}")
+
+                if _pl_clips:
+                    _m3u_dir  = CLIPS_DIR / f"{_match_date or 'unknown'}_{_opponent.lower().replace(' ','-')}"
+                    _m3u_path = _m3u_dir / "playlist.m3u"
+                    export_playlist_m3u(_pl_clips, _m3u_path)
+                    st.success(
+                        f"✓ Playlist exported: {len(_pl_clips)} clips → {_m3u_path}\n\n"
+                        "Open in VLC or mpv for coach presentation."
+                    )
+                if _pl_errors:
+                    st.warning("Some clips failed:\n" + "\n".join(_pl_errors))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
