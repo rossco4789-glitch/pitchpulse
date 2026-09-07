@@ -210,6 +210,87 @@ def _format_lineup_header(ctx: dict) -> str:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Substitution helpers — dynamic player-name resolution
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _build_sub_timeline(ledger: dict) -> list[dict]:
+    """
+    Return substitution events sorted by match_seconds, sourced from the
+    dedicated 'substitutions' ledger key (produced by reconcile/sync.py ≥ v2.1).
+
+    Each entry: {match_seconds, clock_display, period, player_off, player_on,
+                 player_off_name, player_on_name}
+    """
+    subs = ledger.get("substitutions", [])
+    return sorted(subs, key=lambda s: s.get("match_seconds", 0))
+
+
+def _resolve_player(
+    player_num:    int | None,
+    match_seconds: int,
+    sub_timeline:  list[dict],
+    squad:         dict | None = None,
+) -> str:
+    """
+    Resolve a shirt number to a player name, accounting for substitutions.
+
+    Logic
+    -----
+    Shirt numbers are permanent for the match (a sub who wears #14 is #14 for
+    the whole game).  The issue is a tagger operator who keeps tapping the wrong
+    number after a sub.  This function:
+      1. Starts from the SQUAD dict in reconcile/sync.py (static fallback).
+      2. For each SUB event before match_seconds, checks if player_off matches
+         player_num and emits a "(subbed off HH:MM)" annotation — so the dossier
+         flags the data quality issue rather than silently mis-attributing events.
+
+    Returns a name string, annotated when a potential mis-attribution is detected.
+    """
+    # Lazy import to avoid circular dependency (sync.py is not a module package)
+    try:
+        from reconcile.sync import SQUAD as _SQUAD
+        _squad = squad or _SQUAD
+    except ImportError:
+        _squad = squad or {}
+
+    if player_num is None:
+        return "Team (unattributed)"
+
+    try:
+        key = int(player_num)
+    except (TypeError, ValueError):
+        return f"#{player_num} (invalid)"
+
+    name = _squad.get(key, f"#{key} (unknown)")
+
+    # Check if this player was substituted off before this event
+    for sub in sub_timeline:
+        if sub.get("match_seconds", 0) < match_seconds:
+            if sub.get("player_off") == key:
+                clock = sub.get("clock_display", "?")
+                on_num = sub.get("player_on")
+                on_name = _squad.get(on_num, f"#{on_num}") if on_num else "?"
+                name += f" ⚠subbed off {clock}′ — #{on_num} {on_name} entered"
+    return name
+
+
+def _format_subs_line(sub_timeline: list[dict]) -> str:
+    """
+    Format a one-line substitutions string from the tagger-confirmed sub events.
+    Returns empty string if no subs recorded.
+    """
+    if not sub_timeline:
+        return ""
+    parts = []
+    for s in sub_timeline:
+        off_name = s.get("player_off_name", f"#{s.get('player_off','?')}")
+        on_name  = s.get("player_on_name",  f"#{s.get('player_on','?')}")
+        clock    = s.get("clock_display", "?")
+        parts.append(f"#{s.get('player_off','?')} {off_name} → #{s.get('player_on','?')} {on_name} ({clock})")
+    return "  ·  ".join(parts)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Agent 1 — In-Possession Agent
 # Moment: IN POSSESSION
 # Events: SHOT, BOX_ENTRY
@@ -920,6 +1001,10 @@ def _build_dossier(
     tiv_scorers = _scorer_str(ctx.get("scorers", {}).get("tiverton", []))
     opp_scorers = _scorer_str(ctx.get("scorers", {}).get("opponent", []))
 
+    # Build sub timeline from ledger (tagger-confirmed subs)
+    sub_timeline = _build_sub_timeline(ledger)
+    subs_line    = _format_subs_line(sub_timeline)
+
     if opponent:
         match_line   = f"Tiverton Town {tiv_g}–{opp_g} {opponent}"
         result_line  = (
@@ -946,6 +1031,8 @@ def _build_dossier(
         header_lines.append(scorers_line)
     if lineup_line:
         header_lines.append(lineup_line)
+    if subs_line:
+        header_lines.append(f"**Tagger-confirmed Subs:** {subs_line}")
     header_lines += [
         f"**Generated:** {generated}  |  Tactical Analysis Framework | 4 Moments of the Game",
         "",
@@ -971,7 +1058,8 @@ def _build_dossier(
         f"Matched: {summary_stats.get('matched', '?')}  |  "
         f"Unmatched tags: {summary_stats.get('unmatched_tags', '?')}  |  "
         f"Unmatched club events: {summary_stats.get('unmatched_club_events', '?')}  |  "
-        f"Events with real zone: {zoned_count}",
+        f"Events with real zone: {zoned_count}  |  "
+        f"Substitutions: {summary_stats.get('substitutions', 0)}",
         "",
         "_PitchPulse Tactical Intelligence · Tiverton Town FC Performance Analysis_",
     ])

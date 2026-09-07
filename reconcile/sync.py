@@ -310,6 +310,9 @@ def reconcile_events(
 
     for tag in tag_events:
         if tag.get("event_type") not in RECONCILABLE_TAGS:
+            # Pass through — SUB and any future non-spatial event types go
+            # straight to unmatched_tags; no club-feed matching attempted.
+            unmatched_tags.append(tag)
             continue
 
         t_secs     = tag.get("match_seconds", 0)
@@ -378,35 +381,47 @@ def build_ledger(
     unmatched_tags:  list[dict],
     unmatched_club:  list[dict],
 ) -> dict:
-    # Stamp zone_id onto every tag event that carries real coordinates.
-    # Operates on the tag dict directly (matched entries reference their tag).
+    # ── Extract substitution events before zone-stamping ──────────────────
+    # SUB events carry no spatial data; keep them in a dedicated top-level
+    # list so synthesis.py can build a dynamic player-name timeline.
+    substitutions = [t for t in unmatched_tags if t.get("event_type") == "SUB"]
+    spatial_tags  = [t for t in unmatched_tags if t.get("event_type") != "SUB"]
+
+    # Enrich each sub record with resolved player names
+    for sub in substitutions:
+        sub["player_off_name"] = resolve_player(sub.get("player_off"))
+        sub["player_on_name"]  = resolve_player(sub.get("player_on"))
+
+    # ── Stamp zone_id onto every spatial tag event ────────────────────────
     _zoned: set[int] = set()
     for m in matched:
         tag_id = id(m["tag"])
         if tag_id not in _zoned:
             _stamp_zone(m["tag"])
             _zoned.add(tag_id)
-    for tag in unmatched_tags:
+    for tag in spatial_tags:
         _stamp_zone(tag)
 
     zoned_count = sum(
         1 for m in matched if m["tag"].get("zone_id") is not None
     ) + sum(
-        1 for t in unmatched_tags if t.get("zone_id") is not None
+        1 for t in spatial_tags if t.get("zone_id") is not None
     )
 
     return {
         "generated_at":            datetime.now(timezone.utc).isoformat(),
         "reconciliation_window_s": RECON_WINDOW_S,
-        "schema_version":          2,          # v2: real spatial coordinates
+        "schema_version":          2,
         "summary": {
             "matched":               len(matched),
-            "unmatched_tags":        len(unmatched_tags),
+            "unmatched_tags":        len(spatial_tags),
             "unmatched_club_events": len(unmatched_club),
             "events_with_zone":      zoned_count,
+            "substitutions":         len(substitutions),
         },
         "matched":               matched,
-        "unmatched_tags":        unmatched_tags,
+        "unmatched_tags":        spatial_tags,
+        "substitutions":         substitutions,       # ← new dedicated key
         "unmatched_club_events": unmatched_club,
     }
 
@@ -436,6 +451,7 @@ def print_audit(ledger: dict) -> None:
     print(f"  {'UNMATCHED TAGS':<32} {s['unmatched_tags']:>4}  ⚠")
     print(f"  {'UNMATCHED CLUB EVENTS':<32} {s['unmatched_club_events']:>4}  ⚠")
     print(f"  {'EVENTS WITH REAL ZONE (v2)':<32} {s.get('events_with_zone', '—'):>4}  📍")
+    print(f"  {'SUBSTITUTIONS':<32} {s.get('substitutions', 0):>4}  ↔")
     _rule()
 
     if ledger["matched"]:

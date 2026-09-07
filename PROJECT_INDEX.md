@@ -12,7 +12,7 @@ PitchPulse/
 ├── requirements.txt           # Python dependencies (pandas, mplsoccer)
 ├── run_matchday.py            # ✅ COMPLETE — Master pipeline runner (reconcile → visuals → agents)
 ├── tagger/
-│   └── index.html             # ✅ COMPLETE (v2.1) — Broadcast-grade OLED tactical pad; SVG aspect-ratio letterbox fix; 1-touch UNDO with toast
+│   └── index.html             # ✅ COMPLETE (v2.2) — Broadcast-grade OLED tactical pad; SVG letterbox fix; UNDO toast; ↔ SUB modal with player-off/on selects
 ├── reconcile/
 │   └── sync.py                # ✅ COMPLETE — Post-match reconciliation engine; ±90s temporal match, roster resolution, JSON/TXT feed, ledger output
 ├── cv/
@@ -55,7 +55,7 @@ Master matchday orchestration script. Runs the full pipeline in four sequential 
 Flags: `--skip-reconcile`, `--skip-visuals`, `--latest`
 
 ### `tagger/index.html`
-Offline-first mobile tap-pad for live match tagging. **v2: 2-step capture flow.**
+Offline-first mobile tap-pad for live match tagging. **v2.2: SUB event added.**
 
 **Step 1:** Select player chip + tap action button.  
 **Step 2:** Full-screen SVG pitch overlay appears — optional sub-type chip, then **tap pitch** to record real spatial coordinates. Auto-dismisses on pitch tap.
@@ -75,6 +75,9 @@ Coordinate calculation uses `getBoundingClientRect()` with `touchstart` + `preve
 | `SET_PIECE`    | `ATT_CORNER`, `DEF_CORNER`, `FREE_KICK` | |
 | `AERIAL_DUEL`  | `WON`, `LOST`                           | **Non-league physics** |
 | `SECOND_BALL`  | `WON`, `LOST`                           | **Non-league physics** |
+| `SUB`          | *(none — uses `player_off` + `player_on`)* | No pitch tap; inline modal |
+
+**SUB event** is logged via `logSubEvent(playerOff, playerOn)` — no pitch overlay, no spatial data. Taps `↔ SUB` button → inline centred modal with two native `<select>` dropdowns (#1–#18) → `LOG SUB` confirms. Guard: same shirt both ends → red border flash, no log.
 
 **v2 event object schema** (additions in bold):
 
@@ -103,6 +106,14 @@ using a ±90 s temporal window. Resolves shirt numbers to player names. Writes `
 - `_stamp_zone(tag)`: for every tag event with `x_m`, `y_m`, calls `cv.zones.get_zone_by_coords()`
   and stamps `zone_id` + `zone_name` in-place. Legacy events without spatial data get `zone_id: null`.
 - Ledger carries `schema_version: 2` and `summary.events_with_zone` count.
+
+**v2.2 additions (substitution support):**
+- `reconcile_events()`: non-`RECONCILABLE_TAGS` events (e.g. `SUB`) now pass through to
+  `unmatched_tags` instead of being silently dropped.
+- `build_ledger()`: extracts `SUB` events into a dedicated top-level `"substitutions"` list;
+  stamps `player_off_name` / `player_on_name` via `resolve_player()`; keeps `unmatched_tags`
+  spatial-events-only. `summary.substitutions` count added.
+- `print_audit()`: shows substitution count in the terminal audit table.
 
 ### `cv/zones.py`
 18-Zone tactical matrix on a 105 × 68 m FIFA pitch.
@@ -193,6 +204,16 @@ Four specialist agents produce a structured markdown dossier, then a human-in-th
 approval gate (`approve` / `reject <feedback>` / `quit`) validates it before writing to disk.
 Max 3 rejection cycles, then forced approval. `run_approval_gate()` returns `Path | None`
 (the written dossier Path on approve, `None` on quit/interrupt).
+
+**v2.2 additions (substitution support):**
+- `_build_sub_timeline(ledger)`: reads `ledger["substitutions"]`, returns list sorted by `match_seconds`.
+- `_resolve_player(player_num, match_seconds, sub_timeline)`: resolves shirt number to name; emits
+  `⚠subbed off HH:MM′ — #N Name entered` annotation on any event tagged after that player's exit —
+  data quality flag, not a correction.
+- `_format_subs_line(sub_timeline)`: formats `#9 D. Waters → #14 N. Aves (67:00)` strings for the
+  dossier header.
+- `_build_dossier()`: adds `**Tagger-confirmed Subs:**` line when substitutions present; shows sub
+  count in DATA QUALITY footer.
 
 | Agent | Events | UEFA Formal Language | v3 Context Layer |
 |---|---|---|---|

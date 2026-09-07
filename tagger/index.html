@@ -42,6 +42,7 @@
     .act-set:active     { box-shadow: 0 0 0 2px rgba(192,132,252,.5), inset 0 1px 0 rgba(255,255,255,.09) !important; }
     .act-aerial:active  { box-shadow: 0 0 0 2px rgba(251,146,60,.5),  inset 0 1px 0 rgba(255,255,255,.09) !important; }
     .act-2ndball:active { box-shadow: 0 0 0 2px rgba(129,140,248,.5), inset 0 1px 0 rgba(255,255,255,.09) !important; }
+    .act-sub:active     { box-shadow: 0 0 0 2px rgba(74,222,128,.5),  inset 0 1px 0 rgba(255,255,255,.09) !important; }
 
     /* Clock digit glow */
     #clock-mm, #clock-ss { text-shadow: 0 0 22px rgba(255,255,255,.18); }
@@ -258,6 +259,17 @@
       </button>
     </div>
 
+    <!-- SUB — full width, no pitch tap, opens inline modal -->
+    <button onclick="triggerSub()"
+      class="act-btn act-sub w-full min-h-[60px] flex items-center justify-center gap-3 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
+      style="background:linear-gradient(145deg,rgba(5,46,22,.55),rgba(2,25,12,.85)); border:1px solid rgba(74,222,128,.22);">
+      <svg class="w-5 h-5" style="color:#4ade80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 16V4m0 0L3 8m4-4l4 4"/>
+        <path d="M17 8v12m0 0l4-4m-4 4l-4-4"/>
+      </svg>
+      <span class="text-[13px] font-black tracking-[.1em] text-white/90">↔ SUB</span>
+    </button>
+
   </main>
 
   <!-- ═══ Bottom Dock ══════════════════════════════════════════════════════ -->
@@ -296,6 +308,66 @@
       EXPORT
     </button>
   </footer>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SUB MODAL
+       Fixed centred card — no pitch tap needed.
+       Two number selects (player off / player on) + LOG SUB confirm.
+       z-index 70 (above pitch overlay at 60).
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div id="sub-modal"
+    style="position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center;
+           background:rgba(9,9,11,.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+           opacity:0; pointer-events:none; transition:opacity .15s ease;">
+    <div style="width:calc(100% - 48px); max-width:320px; background:#18181b;
+                border:1px solid rgba(74,222,128,.22); border-radius:20px; padding:24px 20px 20px;">
+
+      <div style="font-size:11px; font-weight:900; letter-spacing:.18em; color:#4ade80;
+                  margin-bottom:20px; text-align:center;">
+        ↔ SUBSTITUTION
+      </div>
+
+      <!-- Player OFF -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:9px; font-weight:900; letter-spacing:.2em;
+                    color:rgba(255,255,255,.3); margin-bottom:8px;">PLAYER OFF</div>
+        <select id="sub-off"
+          style="width:100%; background:#09090b; border:1px solid rgba(255,255,255,.12);
+                 border-radius:10px; color:#f8fafc; font-size:16px; font-weight:700;
+                 padding:12px 14px; -webkit-appearance:none; appearance:none; text-align:center;">
+        </select>
+      </div>
+
+      <!-- Player ON -->
+      <div style="margin-bottom:22px;">
+        <div style="font-size:9px; font-weight:900; letter-spacing:.2em;
+                    color:rgba(255,255,255,.3); margin-bottom:8px;">PLAYER ON</div>
+        <select id="sub-on"
+          style="width:100%; background:#09090b; border:1px solid rgba(255,255,255,.12);
+                 border-radius:10px; color:#f8fafc; font-size:16px; font-weight:700;
+                 padding:12px 14px; -webkit-appearance:none; appearance:none; text-align:center;">
+        </select>
+      </div>
+
+      <!-- Action buttons -->
+      <div style="display:flex; gap:10px;">
+        <button onclick="closeSubModal()"
+          style="flex:1; padding:13px; border-radius:12px; border:1px solid rgba(255,255,255,.09);
+                 background:rgba(255,255,255,.04); color:rgba(255,255,255,.35);
+                 font-size:11px; font-weight:900; letter-spacing:.12em;">
+          CANCEL
+        </button>
+        <button onclick="confirmSub()"
+          style="flex:2; padding:13px; border-radius:12px; border:1px solid rgba(74,222,128,.3);
+                 background:rgba(74,222,128,.12); color:#4ade80;
+                 font-size:11px; font-weight:900; letter-spacing:.12em;">
+          LOG SUB
+        </button>
+      </div>
+
+    </div>
+  </div>
 
 
   <!-- ═══════════════════════════════════════════════════════════════════════
@@ -911,6 +983,92 @@
           btn.textContent = '⚠ USE EXPORT';
           setTimeout(() => { btn.innerHTML = `${svgCopy} COPY`; }, 2200);
         });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Substitution modal
+    // No pitch tap — subs have no spatial location.
+    // Logs a SUB event with player_off + player_on shirt numbers.
+    // ══════════════════════════════════════════════════════════════════════
+
+    function _populateSubSelects() {
+      ['sub-off', 'sub-on'].forEach(id => {
+        const sel = document.getElementById(id);
+        sel.innerHTML = '';
+        for (let i = 1; i <= 18; i++) {
+          const opt = document.createElement('option');
+          opt.value       = i;
+          opt.textContent = `#${i}`;
+          sel.appendChild(opt);
+        }
+      });
+      // Sensible defaults: off = active player (or #1), on = next shirt
+      const off = document.getElementById('sub-off');
+      const on  = document.getElementById('sub-on');
+      off.value = activePlayer || 1;
+      on.value  = activePlayer ? (activePlayer % 18) + 1 : 2;
+    }
+
+    function triggerSub() {
+      _populateSubSelects();
+      openSubModal();
+    }
+
+    function openSubModal() {
+      const m = document.getElementById('sub-modal');
+      m.style.opacity       = '1';
+      m.style.pointerEvents = 'all';
+    }
+
+    function closeSubModal() {
+      const m = document.getElementById('sub-modal');
+      m.style.opacity       = '0';
+      m.style.pointerEvents = 'none';
+    }
+
+    function confirmSub() {
+      const playerOff = parseInt(document.getElementById('sub-off').value);
+      const playerOn  = parseInt(document.getElementById('sub-on').value);
+
+      // Guard: same shirt number is a data error
+      if (playerOff === playerOn) {
+        ['sub-off', 'sub-on'].forEach(id => {
+          const el = document.getElementById(id);
+          el.style.borderColor = 'rgba(251,113,133,.65)';
+          setTimeout(() => { el.style.borderColor = 'rgba(255,255,255,.12)'; }, 800);
+        });
+        return;
+      }
+
+      logSubEvent(playerOff, playerOn);
+      closeSubModal();
+    }
+
+    function logSubEvent(playerOff, playerOn) {
+      const secs        = currentElapsedSeconds();
+      const { mm, ss }  = formatClock(secs);
+      const ev = {
+        id:              crypto.randomUUID(),
+        period:          activePhase === '—' ? 'PRE' : activePhase,
+        match_seconds:   secs,
+        clock_display:   `${mm}:${ss}`,
+        player_num:      null,          // SUB is a team event; no active player
+        event_type:      'SUB',
+        sub_type:        null,
+        player_off:      playerOff,     // shirt number leaving the pitch
+        player_on:       playerOn,      // shirt number entering the pitch
+        x_pct:           null,
+        y_pct:           null,
+        x_m:             null,
+        y_m:             null,
+        attacking_right: attackingRight,
+        timestamp_iso:   new Date().toISOString(),
+      };
+      events.push(ev);
+      persist();
+      updateBadge();
+      updateUndo();
+      flashBadge();
     }
 
     // ══════════════════════════════════════════════════════════════════════
