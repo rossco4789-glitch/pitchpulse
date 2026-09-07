@@ -1,1 +1,26 @@
-.venv/ 
+# Virtual environment
+.venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Claude Code internals
+.claude/
+
+# Large binary / generated outputs (do not commit)
+data/clips/
+data/raw/veo/
+data/processed/plots/
+data/archive/
+
+# Generated reports & dossiers (rebuilt each matchday)
+data/processed/tivvy_tactical_dossier.html
+reports/dossier_*.md
+
+# Sample data & ledger (committed for demo; swap for real data)
+# data/raw/match_context.json   ← keep tracked
+# data/raw/tivvy_x_feed.json    ← keep tracked
+# data/raw/tivvy_events_v2_sample.json ← keep tracked
+# data/processed/match_ledger.json     ← keep tracked (sample run)

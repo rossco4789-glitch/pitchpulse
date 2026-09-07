@@ -1,0 +1,195 @@
+{
+  "date": "Saturday September 5th",
+  "competition": "FA Cup 1st Round Qualifying",
+  "venue": "Blaise Park",
+  "home_game": false,
+  "opponent": "St Blazey",
+  "score": {
+    "tiverton": 2,
+    "opponent": 1
+  },
+  "result": "W",
+  "scorers": {
+    "tiverton": [
+      {
+        "player": "Slough",
+        "minute": 77,
+        "minute_raw": "77"
+      },
+      {
+        "player": "Hall",
+        "minute": 85,
+        "minute_raw": "85"
+      }
+    ],
+    "opponent": [
+      {
+        "player": "Redd",
+        "minute": 48,
+        "minute_raw": "45+3"
+      }
+    ]
+  },
+  "lineup": [
+    {
+      "player": "Smith",
+      "role": "GK",
+      "captain": false,
+      "subbed_off": null
+    },
+    {
+      "player": "Winter",
+      "role": null,
+      "captain": false,
+      "subbed_off": null
+    },
+    {
+      "player": "Wood",
+      "role": null,
+      "captain": false,
+      "subbed_off": 65
+    },
+    {
+      "player": "Palmer",
+      "role": null,
+      "captain": true,
+      "subbed_off": null
+    },
+    {
+      "player": "Slough",
+      "role": null,
+      "captain": false,
+      "subbed_off": null
+    },
+    {
+      "player": "Kennell",
+      "role": null,
+      "captain": false,
+      "subbed_off": 65
+    },
+    {
+      "player": "A.Wellington",
+      "role": null,
+      "captain": false,
+      "subbed_off": null
+    },
+    {
+      "player": "Hall",
+      "role": null,
+      "captain": false,
+      "subbed_off": null
+    },
+    {
+      "player": "J.Wellington",
+      "role": null,
+      "captain": false,
+      "subbed_off": null
+    },
+    {
+      "player": "Keates",
+      "role": null,
+      "captain": false,
+      "subbed_off": 86
+    },
+    {
+      "player": "Howe",
+      "role": null,
+      "captain": false,
+      "subbed_off": null
+    }
+  ],
+  "subs": [
+    {
+      "player": "Horne",
+      "minute": 65,
+      "used": true
+    },
+    {
+      "player": "Coulibaly",
+      "minute": 65,
+      "used": true
+    },
+    {
+      "player": "Koerner",
+      "minute": 86,
+      "used": true
+    },
+    {
+      "player": "Pryce-Hall",
+      "minute": null,
+      "used": false
+    }
+  ],
+  "minute_events": [
+    {
+      "minute": 17,
+      "context": "We continued to press and probe and look the more likely. Although a lapse of concentration in the 17th minute, saw a Blazey forward in open space over on our right. The Yellows' were able to get back to nullify the initial danger, but the home side "
+    },
+    {
+      "minute": 31,
+      "context": "In the 31st minute, the hosts countered and cut inside into a threatening area. Fortunately for Asa Hall’s men, the shot that followed was watched over his crossbar by Louis Smith."
+    },
+    {
+      "minute": 53,
+      "context": "Then in the 53rd minute Winter overlapped and hung a ball up in the area for Owen Howe whose thumping header rebounded off of the bar. Asa Hall’s men were determined to get on level terms and were firmly in the ascendancy."
+    },
+    {
+      "minute": 65,
+      "context": "An opportunist strike from Howe then went through a cluster of bodies, but also drifted wide and out for a goal kick. In the 65th minute a double substitution took place. Steve Orchard and David Steele going ultra positive, in bringing on attackers A"
+    },
+    {
+      "minute": 85,
+      "context": "From one of those corners with time running out, in the 85th minute Hall stole in just beyond the back post and produced a moment of quality and composure. His superb technical header went back where it came from and rifled into the back of the net. "
+    }
+  ],
+  "tactical_keywords": [
+    "press",
+    "counter",
+    "corner",
+    "free kick",
+    "cross",
+    "direct",
+    "aerial",
+    "overlap",
+    "wide",
+    "flank",
+    "block",
+    "regain"
+  ],
+  "narrative_paragraphs": [
+    "Tiverton became the first side to beat St Blazey, since their 2026/27 campaign began, but more significantly proceeded through a second round, in the FA Cup. Overturning a half time deficit, this is the first time the Yellows’ have progressed through two rounds of the competition, since 2005.",
+    "It was a stirring display and a much deserved victory, in which the Yellows' got their rewards for having kept plugging away. When a bit of quality and composure was needed, their player-manager provided it, in front of a jubilant and impassioned away support.",
+    "For the trip to Cornwall, Asa Hall and his coaching team of Steve Orchard and David Steele made a few changes to their starting line up and Karim Coulibaly was available, to take his place amongst the replacements.",
+    "Beginning the game with an unchanged defensive unit, with both Finn Roberts and Billy Tucker being unavailable. Into the matchday eleven came Aaron Wellington who returned to the centre of midfield and Ryan Keates who played off of Owen Howe, up top.",
+    "The Green and Blacks’ team included three players who have worn the yellow of Tivvy; defenders Jordan and Aaron Bentley, along with Wideman Teigan Rosenquest.",
+    "The game got underway on a plush green surface, with Tiverton settling into a good rhythm and seeing more of the ball in the opening exchanges. Their positive intent was illustrated by the sight of Ed Palmer in the third minute tricking his way into the box, as he cut in from the corner flag, over on St Blazey's left.",
+    "The hosts prevented him from pulling the ball back, but he was able to find the advancing Hall. The former Torquay man wasn’t able to get a clean strike on the ball though and with two players doubling up on him, his effort went behind.",
+    "The Yellows' looked a lot more convincing playing through the team, than they have done in recent weeks and we're finding their passes. However, the final pass or final decision, meant that former Plymouth Parkway keeper Kyle Moore was relatively untroubled.",
+    "We continued to press and probe and look the more likely. Although a lapse of concentration in the 17th minute, saw a Blazey forward in open space over on our right. The Yellows' were able to get back to nullify the initial danger, but the home side worked the ball well to the edge of the box and a powerful attempt whistled past the upright.",
+    "This was the start of a good five minute spell of pressure from the Green and Blacks’ and it was clear to see why they  beat Barnstaple in an earlier round and high spending Western League Premier promotion favourites Clevedon in the game prior to this one. They have good technical players and are well drilled opponents.",
+    "A flowing, slick piece of football from the home side culminated in a dangerous cross, being fired into our box. Palmer though was on hand to relieve the threat. Intercepting and calmly retaining possession.",
+    "A nimble bit of footwork from Aaron Wellington at the midway point of the half, meant that it briefly opened up for him. But a half block on his well struck effort saw the ball arrive awkwardly at keeper Moore, who wasn’t able to gather and it needed a couple of bites of the cherry whilst on the floor, to hold onto the ball and prevent a Tivvy corner.",
+    "The busy Keates was then forcefully upended, as the Yellows' poured into Blazey’s half. Play was waved on and then brought back for the free- kick, after the move fizzled out. No physio was called for, yet as he climbed slowly to his feet, Keates was bizarrely asked to go off under the new ruling and had to return a minute later.",
+    "In the 31st minute, the hosts countered and cut inside into a threatening area. Fortunately for Asa Hall’s men, the shot that followed was watched over his crossbar by Louis Smith.",
+    "Sustained pressure from Tiverton in the final ten minutes of the half, had Jacob Wellington leaving three or four Green and Blacks’ trailing in his wake, as he skilfully weaved his way in and out of Blazey players with a full repertoire of tricks. Drawing a foul in a good crossing position.",
+    "The resulting free kick brought the big men up from the back and they remained in the box, as the ball was then put out for a corner. Louie Slough got good aerial contact on Keates’s delivery, but he couldn’t quite find the target.",
+    "Continuing to press for and hoping to take an advantage into the interval, the combative Kennell appeared to be brought down, just outside the Cornwall side’s area. The Referee wasn’t in agreement and play continued. Mason Winter then drove a cross into the mix and his inviting ball in, saw a pressured Keates miss from close range, much to his frustration.",
+    "A third chance in five minutes then fell to J. Wellington, but he was unable to steer his attempt under the crossbar having cleverly peeled off round the back, after a good ball in from the opposing flank.",
+    "Then against the run of play, deep into stoppage time, it was our hosts who went ahead. A combination of good, enterprising play from the second placed Western League Premier team and some switching off from Tivvy being at the heart of Blazey’s goal.",
+    "A pacy break, took full advantage of some questionable tracking back and defending from the team as a unit.",
+    "Some neat interplay ended with Olly Redd being slid in and Smith being left exposed. The Blazey winger supplied a clinical finish and with just enough time to restart the game before the half time whistle sounded, a different half time team talk from the one prepared was I'm sure delivered.",
+    "A fired up yellows’ returned for the second half and started to play in the green and Blacks' territory, forcing a succession of throw-ins, over on the home side’s right. From one of those throw-ins the ball came to Hall inside the area, but it was just slightly behind him and it got caught under his feet.",
+    "Then in the 53rd minute Winter overlapped and hung a ball up in the area for Owen Howe whose thumping header rebounded off of the bar. Asa Hall’s men were determined to get on level terms and were firmly in the ascendancy.",
+    "A few minutes further into the game, a clear handball was missed by the Referee and the hosts had the ball in the net and were awarded a goal. At least the Referee’s assistant had seen the player push the ball on to his team mate and the goal was rightfully chalked off.",
+    "An opportunist strike from Howe then went through a cluster of bodies, but also drifted wide and out for a goal kick. In the 65th minute a double substitution took place. Steve Orchard and David Steele going ultra positive, in bringing on attackers Aiden Horne and Karim Coulibaly. Kennell and Wood who had both made good contributions, making way.",
+    "That introduction gave us impetus and additional pace. Coulibaly quickly into the action with a quick shift out of his feet and teasing a cross in, gave the Green and Blacks’ a totally different proposition. Though, although they hastily cleared away for a corner, from the delivery in, nothing came from it.",
+    "With twenty minutes remaining it was the Yellows' who were continuing to knock on the door, but when Blazey did break, midfielder Tallan Mitchell who was influential for our hosts was a willing runner who spread possession nicely, delivering accurate passes out wide for the lively Rosenquest.",
+    "From a free kick, a little way inside the Green and Blacks' half, the ball ricocheted off a few players and fortuitously hurried through to hit a scrambling Moore’s post. First to react was Slough who found the back of the net from point blank range and the Yellows' were level, with 77 minutes gone.",
+    "The momentum was definitely with a rampant yellows and Coulibaly started to give Blazey a torrid time on their left hand side. The directness to his play getting him past his marker/ markers on a handful of occasions. Delivering some tantalising balls in and winning corners. Horne’s lively running also pushing the home-side back.",
+    "From one of those corners with time running out, in the 85th minute Hall stole in just beyond the back post and produced a moment of quality and composure. His superb technical header went back where it came from and rifled into the back of the net. 2-1 to the player-manager’s men.",
+    "Wild celebrations followed, but the team quickly had to regain their focus, with time still remaining for our hosts to take us back to the Slee Blackwell Solicitors Stadium, for a replay. Corey Koerner came on to replace Keates who had worked tirelessly. Another piece of skilful wing-play from Coulibaly, forced a corner and kept the Green and Blacks’ in their half.",
+    "With little time left to play, Blazey forced a corner of their own, but despite their desperate efforts to force the ball home, Tivvy stood firm and Man of the Match Ed Palmer, made an all important clearance in the closing stages.",
+    "A euphoric yellows met the final whistle with continued wild celebrations and were delightfully received by their sizeable away contingent. A fantastic day for all concerned and a display of total character and some really good football from each and everyone of the players.",
+    "It was a real team affair and credit to Asa and his coaching team for their undoubted input into the performance. The Yellows' are back on home soil on Saturday, when divisional rivals Larkhall will be the visitors in the next round of the FA Trophy. It was a superb day that had been 21 years in the making and the team will be hoping for more cup success at the weekend."
+  ]
+}

@@ -1415,6 +1415,9 @@ with tab2:
                 "🎬  Export Tactical Sections",
                 key="btn_section_export",
             ):
+                import importlib, sys
+                if "reports.video_engine" in sys.modules:
+                    importlib.reload(sys.modules["reports.video_engine"])
                 from reports.video_engine import export_tactical_sections
                 _opp_slug = re.sub(r"[^\w]+", "-", _opponent.lower()).strip("-")
                 _sec_dir = CLIPS_DIR / f"{_match_date or 'unknown'}_{_opp_slug}" / "sections"

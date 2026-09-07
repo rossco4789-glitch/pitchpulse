@@ -1,0 +1,201 @@
+{
+  "generated_at": "2026-09-07T17:03:28.254639+00:00",
+  "reconciliation_window_s": 90,
+  "schema_version": 2,
+  "summary": {
+    "matched": 2,
+    "unmatched_tags": 6,
+    "unmatched_club_events": 4,
+    "events_with_zone": 8,
+    "substitutions": 0,
+    "opponent_events": 0
+  },
+  "matched": [
+    {
+      "tag": {
+        "id": "7",
+        "period": "2H",
+        "match_seconds": 4620,
+        "clock_display": "77:00",
+        "player_num": 5,
+        "event_type": "SHOT",
+        "sub_type": "ON_TARGET",
+        "x_pct": 0.91,
+        "y_pct": 0.52,
+        "x_m": 95.5,
+        "y_m": 35.4,
+        "attacking_right": false,
+        "timestamp_iso": "2026-09-05T16:32:00Z",
+        "zone_id": "A_RC",
+        "zone_name": "Attacking Third · Right Central (Zone 14)"
+      },
+      "club_event": {
+        "elapsed_s": 4620,
+        "type": "GOAL",
+        "detail": "GOAL! Slough scores for Tiverton Town! (2-1)",
+        "raw_text": "77' GOAL! Slough scores for Tiverton Town! (2-1)"
+      },
+      "delta_s": 0,
+      "player_name": "J. Manley"
+    },
+    {
+      "tag": {
+        "id": "8",
+        "period": "2H",
+        "match_seconds": 5100,
+        "clock_display": "85:00",
+        "player_num": 8,
+        "event_type": "SHOT",
+        "sub_type": "ON_TARGET",
+        "x_pct": 0.86,
+        "y_pct": 0.38,
+        "x_m": 90.3,
+        "y_m": 25.8,
+        "attacking_right": false,
+        "timestamp_iso": "2026-09-05T16:40:00Z",
+        "zone_id": "A_LC",
+        "zone_name": "Attacking Third · Left Central (Zone 14)"
+      },
+      "club_event": {
+        "elapsed_s": 5100,
+        "type": "GOAL",
+        "detail": "GOAL! Hall scores for Tiverton Town! (2-1)",
+        "raw_text": "85' GOAL! Hall scores for Tiverton Town! (2-1)"
+      },
+      "delta_s": 0,
+      "player_name": "A. Fewings"
+    }
+  ],
+  "unmatched_tags": [
+    {
+      "id": "1",
+      "period": "1H",
+      "match_seconds": 420,
+      "clock_display": "07:00",
+      "player_num": 9,
+      "event_type": "SHOT",
+      "sub_type": "ON_TARGET",
+      "x_pct": 0.88,
+      "y_pct": 0.48,
+      "x_m": 92.4,
+      "y_m": 32.6,
+      "attacking_right": true,
+      "timestamp_iso": "2026-09-05T15:07:00Z",
+      "zone_id": "A_LC",
+      "zone_name": "Attacking Third · Left Central (Zone 14)"
+    },
+    {
+      "id": "2",
+      "period": "1H",
+      "match_seconds": 850,
+      "clock_display": "14:10",
+      "player_num": 7,
+      "event_type": "BOX_ENTRY",
+      "sub_type": "CROSS",
+      "x_pct": 0.78,
+      "y_pct": 0.12,
+      "x_m": 81.9,
+      "y_m": 8.2,
+      "attacking_right": true,
+      "timestamp_iso": "2026-09-05T15:14:10Z",
+      "zone_id": "A_LF",
+      "zone_name": "Attacking Third · Left Flank"
+    },
+    {
+      "id": "3",
+      "period": "1H",
+      "match_seconds": 1100,
+      "clock_display": "18:20",
+      "player_num": 4,
+      "event_type": "DEF_TURNOVER",
+      "sub_type": null,
+      "x_pct": 0.32,
+      "y_pct": 0.45,
+      "x_m": 33.6,
+      "y_m": 30.6,
+      "attacking_right": true,
+      "timestamp_iso": "2026-09-05T15:18:20Z",
+      "zone_id": "D_LC",
+      "zone_name": "Defensive Third · Left Central"
+    },
+    {
+      "id": "4",
+      "period": "1H",
+      "match_seconds": 1450,
+      "clock_display": "24:10",
+      "player_num": 8,
+      "event_type": "HIGH_REGAIN",
+      "sub_type": null,
+      "x_pct": 0.68,
+      "y_pct": 0.72,
+      "x_m": 71.4,
+      "y_m": 49.0,
+      "attacking_right": true,
+      "timestamp_iso": "2026-09-05T15:24:10Z",
+      "zone_id": "A_RH",
+      "zone_name": "Attacking Third · Right Half-Space"
+    },
+    {
+      "id": "5",
+      "period": "1H",
+      "match_seconds": 1820,
+      "clock_display": "30:20",
+      "player_num": 5,
+      "event_type": "AERIAL_DUEL",
+      "sub_type": "WON",
+      "x_pct": 0.52,
+      "y_pct": 0.5,
+      "x_m": 54.6,
+      "y_m": 34.0,
+      "attacking_right": true,
+      "timestamp_iso": "2026-09-05T15:30:20Z",
+      "zone_id": "M_RC",
+      "zone_name": "Middle Third · Right Central"
+    },
+    {
+      "id": "6",
+      "period": "1H",
+      "match_seconds": 1824,
+      "clock_display": "30:24",
+      "player_num": 8,
+      "event_type": "SECOND_BALL",
+      "sub_type": "WON",
+      "x_pct": 0.56,
+      "y_pct": 0.52,
+      "x_m": 58.8,
+      "y_m": 35.4,
+      "attacking_right": true,
+      "timestamp_iso": "2026-09-05T15:30:24Z",
+      "zone_id": "M_RC",
+      "zone_name": "Middle Third · Right Central"
+    }
+  ],
+  "substitutions": [],
+  "opponent_events": [],
+  "unmatched_club_events": [
+    {
+      "elapsed_s": 2880,
+      "type": "OPP_GOAL",
+      "detail": "GOAL! Redd scores for St Blazey.",
+      "raw_text": "45+3' GOAL! Redd scores for St Blazey."
+    },
+    {
+      "elapsed_s": 3900,
+      "type": "SUBSTITUTION",
+      "detail": "Sub: Horne comes on.",
+      "raw_text": "65' Sub: Horne comes on."
+    },
+    {
+      "elapsed_s": 3900,
+      "type": "SUBSTITUTION",
+      "detail": "Sub: Coulibaly comes on.",
+      "raw_text": "65' Sub: Coulibaly comes on."
+    },
+    {
+      "elapsed_s": 5160,
+      "type": "SUBSTITUTION",
+      "detail": "Sub: Koerner comes on.",
+      "raw_text": "86' Sub: Koerner comes on."
+    }
+  ]
+}
