@@ -497,73 +497,60 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 with tab1:
 
-    # ── How it works ──────────────────────────────────────────────────────────
+    # ── How it works — 4 columns, one st.markdown() per step (avoids CSS grid issues) ──
+    def _workflow_step(icon: str, title: str, body: str,
+                       icon_bg: str = "rgba(245,158,11,.12)",
+                       icon_border: str = "rgba(245,158,11,.3)",
+                       border_left: bool = False) -> str:
+        bl = "border-left:1px solid rgba(255,255,255,0.055);" if border_left else ""
+        return f"""
+        <div style="padding:0 14px;{bl}text-align:center">
+          <div style="width:42px;height:42px;border-radius:50%;background:{icon_bg};
+                      border:1px solid {icon_border};margin:0 auto 12px;
+                      line-height:42px;text-align:center;font-size:1.1rem">{icon}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;
+                      letter-spacing:.06em;text-transform:uppercase;color:#ededf0;
+                      margin-bottom:6px">{title}</div>
+          <div style="font-family:'Inter',sans-serif;font-size:.75rem;color:#71717a;
+                      line-height:1.55">{body}</div>
+        </div>"""
+
     st.markdown("""
-    <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
-                border-radius:12px;padding:24px 28px;margin-bottom:28px">
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.85rem;
-                  letter-spacing:.14em;text-transform:uppercase;color:#71717a;margin-bottom:16px">
-        HOW IT WORKS
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0">
-
-        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 12px">
-          <div style="width:44px;height:44px;border-radius:50%;background:rgba(245,158,11,.12);
-                      border:1px solid rgba(245,158,11,.3);display:flex;align-items:center;
-                      justify-content:center;font-size:1.2rem;margin-bottom:12px">📱</div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem;
-                      letter-spacing:.04em;color:#ededf0;margin-bottom:6px">TAG LIVE</div>
-          <div style="font-family:'Inter',sans-serif;font-size:.75rem;color:#71717a;line-height:1.5">
-            Tap events on your phone during the match — every shot, box entry, press, and sub
-          </div>
-        </div>
-
-        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;
-                    padding:0 12px;border-left:1px solid rgba(255,255,255,0.055)">
-          <div style="width:44px;height:44px;border-radius:50%;background:rgba(245,158,11,.12);
-                      border:1px solid rgba(245,158,11,.3);display:flex;align-items:center;
-                      justify-content:center;font-size:1.2rem;margin-bottom:12px">📤</div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem;
-                      letter-spacing:.04em;color:#ededf0;margin-bottom:6px">UPLOAD HERE</div>
-          <div style="font-family:'Inter',sans-serif;font-size:.75rem;color:#71717a;line-height:1.5">
-            Drop the tagger JSON + the club Word report + your Veo video on this page
-          </div>
-        </div>
-
-        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;
-                    padding:0 12px;border-left:1px solid rgba(255,255,255,0.055)">
-          <div style="width:44px;height:44px;border-radius:50%;background:rgba(245,158,11,.12);
-                      border:1px solid rgba(245,158,11,.3);display:flex;align-items:center;
-                      justify-content:center;font-size:1.2rem;margin-bottom:12px">▶</div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem;
-                      letter-spacing:.04em;color:#ededf0;margin-bottom:6px">RUN PIPELINE</div>
-          <div style="font-family:'Inter',sans-serif;font-size:.75rem;color:#71717a;line-height:1.5">
-            One click — reconcile events, generate visuals, run 4 tactical agents automatically
-          </div>
-        </div>
-
-        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;
-                    padding:0 12px;border-left:1px solid rgba(255,255,255,0.055)">
-          <div style="width:44px;height:44px;border-radius:50%;background:rgba(34,197,94,.12);
-                      border:1px solid rgba(34,197,94,.3);display:flex;align-items:center;
-                      justify-content:center;font-size:1.2rem;margin-bottom:12px">📊</div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem;
-                      letter-spacing:.04em;color:#ededf0;margin-bottom:6px">DOSSIER OUT</div>
-          <div style="font-family:'Inter',sans-serif;font-size:.75rem;color:#71717a;line-height:1.5">
-            UEFA-standard tactical report + DoF WhatsApp card, approved and downloaded in seconds
-          </div>
-        </div>
-
-      </div>
-    </div>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.8rem;
+                letter-spacing:.14em;text-transform:uppercase;color:#3f3f46;
+                margin-bottom:10px;padding-top:4px">MATCHDAY WORKFLOW</div>
     """, unsafe_allow_html=True)
+
+    wf_cols = st.columns(4)
+    _STEPS = [
+        ("📱", "Matchday Tagging",
+         "From the dugout, log actions on your phone — shots, box entries, aerials, subs. "
+         "The tagger runs entirely offline.",
+         "rgba(245,158,11,.12)", "rgba(245,158,11,.3)", False),
+        ("📄", "Sync Match Data",
+         "Upload your tagger JSON and the club's post-match report. "
+         "The parser extracts the XI, scorers, and timeline automatically.",
+         "rgba(245,158,11,.12)", "rgba(245,158,11,.3)", True),
+        ("▶", "Run & Review",
+         "One click reconciles tags, generates pitch maps, and runs all four "
+         "tactical agents. Review each section before signing off.",
+         "rgba(245,158,11,.12)", "rgba(245,158,11,.3)", True),
+        ("📊", "Dossier & DoF Card",
+         "Approve the draft to produce the full HTML report and the "
+         "1080×1920 WhatsApp card for the Director of Football.",
+         "rgba(34,197,94,.12)", "rgba(34,197,94,.3)", True),
+    ]
+    for col, (icon, title, body, ibg, iborder, bl) in zip(wf_cols, _STEPS):
+        col.markdown(_workflow_step(icon, title, body, ibg, iborder, bl), unsafe_allow_html=True)
+
+    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
     col_left, col_right = st.columns([1, 1], gap="large")
 
     with col_left:
         st.markdown(_section_label("Tagger Exports"), unsafe_allow_html=True)
         json_files = st.file_uploader(
-            "JSON exports — one per period (1H, 2H)",
+            "Tagger JSON — one file per period (export from phone after the match)",
             type="json", accept_multiple_files=True, key="json_uploader",
         )
         if json_files:
@@ -585,7 +572,7 @@ with tab1:
         st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
         st.markdown(_section_label("Match Report"), unsafe_allow_html=True)
         docx_file = st.file_uploader(
-            "Club Word report (.docx) — extracts scorers, XI, competition",
+            "Post-match Word report (.docx) — scorers, lineup, competition, venue",
             type=["docx"], key="docx_uploader",
         )
         if docx_file:
@@ -735,8 +722,9 @@ with tab2:
     st.markdown(_section_label("Video Frame Extraction"), unsafe_allow_html=True)
     st.markdown(
         '<div style="font-family:\'Inter\',sans-serif;font-size:.8rem;color:#71717a;'
-        'margin-bottom:16px">Point to your local Veo .mp4. '
-        'Click the frame in the viewer to record pixel coordinates for calibration or event picking.</div>',
+        'margin-bottom:16px">Enter the path to your local Veo file. '
+        'Scrub to a frame with clear pitch markings, click the image to pick a pixel, '
+        'then use it to calibrate the camera or log a video-assisted event.</div>',
         unsafe_allow_html=True,
     )
 
@@ -864,7 +852,7 @@ with tab2:
 
         col_comp, col_load = st.columns(2)
         with col_comp:
-            if st.button("⚙  Compute & Save H", type="primary", disabled=(n_pts < 4), key="btn_compute_h"):
+            if st.button("⚙  Compute Calibration", type="primary", disabled=(n_pts < 4), key="btn_compute_h"):
                 with st.spinner("RANSAC homography…"):
                     try:
                         ref_pts = [ReferencePoint(tuple(p["pixel"]), tuple(p["world"]), p["label"])
@@ -872,7 +860,7 @@ with tab2:
                         H = calibrate_pitch(ref_pts)
                         save_calibration(H, ref_pts)
                         st.session_state["H"] = H
-                        st.success(f"✓  H computed from {n_pts} points — saved to data/raw/")
+                        st.success(f"✓  Calibration computed from {n_pts} points — saved to data/raw/")
                     except Exception as exc:
                         st.error(f"Failed: {exc}")
         with col_load:
@@ -981,9 +969,9 @@ with tab3:
         Run Full Pipeline
       </div>
       <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#71717a;max-width:520px">
-        Reconciles tagger events with the club feed, generates shot map &amp; heatmaps,
-        runs all four tactical agents (In Possession · Press · Set Pieces · Non-League Physics),
-        and builds the draft dossier for your approval.
+        Matches tagger tags against the club feed, produces the shot map and zone heatmaps,
+        then runs all four agents — In Possession, Press &amp; LoE, Set Pieces, Non-League Physics.
+        Review each section and sign off before the dossier is written to disk.
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1125,7 +1113,7 @@ with tab3:
         <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
                     border-radius:12px;padding:40px;text-align:center">
           <div style="font-family:'Inter',sans-serif;font-size:.82rem;color:#71717a">
-            Run the pipeline first to unlock the approval gate.
+            Run the pipeline above — the approval gate unlocks once all four agents have run.
           </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1154,8 +1142,8 @@ with tab3:
             st.markdown("""
             <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#71717a;
                         margin-bottom:12px">
-              Approve the draft to write the dossier to disk, generate the HTML report,
-              and produce the DoF WhatsApp card.
+              Happy with the analysis? Approve to write the dossier, package the HTML report,
+              and generate the DoF match card ready for WhatsApp.
             </div>
             """, unsafe_allow_html=True)
             if st.button("✅  Approve Dossier", type="primary", key="btn_approve", use_container_width=True):
@@ -1190,14 +1178,14 @@ with tab3:
             st.markdown(f"""
             <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#71717a;
                         margin-bottom:12px">
-              Reject with feedback and all four agents re-run with your notes injected.
-              Cycle {rejection_count} / 3 maximum.
+              Not right? Add your note and all four agents re-run with it in context.
+              Cycle {rejection_count} / 3.
             </div>
             """, unsafe_allow_html=True)
             feedback_text = st.text_area(
-                "Manager feedback", value=st.session_state.get("rejection_feedback", ""),
+                "Your note to the agents", value=st.session_state.get("rejection_feedback", ""),
                 height=80, key="feedback_input",
-                placeholder="e.g. Focus on right-flank press triggers; disregard Zone 14 data.",
+                placeholder="e.g. Weight the right-flank press more heavily — we conceded three times in that channel.",
             )
             reject_disabled = rejection_count >= 3
             if st.button("🔁  Reject & Re-run", type="secondary", disabled=reject_disabled,
@@ -1259,7 +1247,7 @@ with tab4:
                         border-radius:12px;padding:40px;text-align:center">
               <div style="font-size:2rem;margin-bottom:10px">🖼</div>
               <div style="font-family:'Inter',sans-serif;font-size:.78rem;color:#71717a">
-                Approve the dossier to generate the DoF card.
+                Sign off the dossier in the Agent Cockpit tab — the card generates on approval.
               </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1318,8 +1306,8 @@ with tab4:
               </div>
               <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#71717a;
                           max-width:320px;margin:0 auto;line-height:1.6">
-                Run the pipeline in the Agent Cockpit tab, review the four agent outputs,
-                and approve to generate all deliverables.
+                Head to the Agent Cockpit tab, run the pipeline, read through each section,
+                and approve — the HTML report and DoF card land here.
               </div>
             </div>
             """, unsafe_allow_html=True)
