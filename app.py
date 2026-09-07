@@ -358,6 +358,7 @@ _SS: dict = {
     "clip_offset_1h": 0, "clip_offset_2h": 0,
     "clip_lead_in": 5, "clip_follow_through": 3,
     "last_clip_path": None,
+    "checklist": {},
 }
 for _k, _v in _SS.items():
     if _k not in st.session_state:
@@ -778,6 +779,98 @@ with tab1:
                     <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
                                 border-radius:10px;padding:12px 14px">{rows}</div>
                     """, unsafe_allow_html=True)
+
+    # ── Matchday Checklist ────────────────────────────────────────────────────
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    st.markdown(_divider(), unsafe_allow_html=True)
+    st.markdown(_section_label("Matchday Checklist"), unsafe_allow_html=True)
+    st.markdown(
+        '<div style="font-family:\'Inter\',sans-serif;font-size:.77rem;color:#71717a;'
+        'margin-bottom:14px">Work through each phase in order. Ticks persist across tab '
+        'switches for this session. Reset all when starting a new matchday.</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Checklist definition — (phase, key, label)
+    _CL_ITEMS = [
+        # ── PRE-MATCH ──────────────────────────────────────────────────────
+        ("🕐  PRE-MATCH", "pm_tagger_charged",    "Phone charged ≥ 80% and tagger loaded in browser"),
+        ("🕐  PRE-MATCH", "pm_tagger_test",        "Test SUB, SHOT and AERIAL_DUEL buttons — badge increments correctly"),
+        ("🕐  PRE-MATCH", "pm_roster_set",         "Tagger roster set: shirt numbers + player names entered"),
+        ("🕐  PRE-MATCH", "pm_veo_downloaded",     "Veo match file downloaded to local machine (data/raw/veo/)"),
+        ("🕐  PRE-MATCH", "pm_calib_loaded",       "Camera calibration loaded in Tab 2 (or new calibration captured)"),
+        ("🕐  PRE-MATCH", "pm_context_entered",    "Match context entered: opponent, competition, venue, date"),
+        ("🕐  PRE-MATCH", "pm_workspace_clear",    "Previous match archived & workspace is clean"),
+        # ── DURING MATCH ──────────────────────────────────────────────────
+        ("⚽  DURING MATCH", "dm_direction_set",   "Attacking direction confirmed on tagger before kick-off"),
+        ("⚽  DURING MATCH", "dm_tagging_live",    "Tagging live: SHOT, BOX_ENTRY, HIGH_REGAIN, DEF_TURNOVER, SET_PIECE"),
+        ("⚽  DURING MATCH", "dm_aerials_2ndballs","Logging AERIAL_DUEL + SECOND_BALL in contact zones"),
+        ("⚽  DURING MATCH", "dm_subs_logged",     "All substitutions logged via ↔ SUB (player off + player on)"),
+        ("⚽  DURING MATCH", "dm_ht_direction",    "Half-time: flip attacking direction on tagger before 2H kick-off"),
+        ("⚽  DURING MATCH", "dm_ht_offset_noted", "Half-time: note 2H kick-off time on Veo for offset calibration"),
+        # ── POST-MATCH ────────────────────────────────────────────────────
+        ("📦  POST-MATCH", "post_export_json",     "Export tagger JSON from phone (one file — all events)"),
+        ("📦  POST-MATCH", "post_upload_json",     "Upload tagger JSON in Tab 1 → Tagger Exports"),
+        ("📦  POST-MATCH", "post_upload_docx",     "Upload post-match .docx report + Parse Report"),
+        ("📦  POST-MATCH", "post_run_pipeline",    "Tab 3: run pipeline — Reconcile → Visuals → Agents"),
+        ("📦  POST-MATCH", "post_review_agents",   "Read all 4 agent sections; reject/refine if needed"),
+        ("📦  POST-MATCH", "post_approve",         "Approve dossier — HTML report + DoF card generated"),
+        ("📦  POST-MATCH", "post_veo_offsets",     "Tab 2: set 1H + 2H kick-off offsets from Veo file"),
+        ("📦  POST-MATCH", "post_sections",        "Tab 2: export tactical sections (4 windows) for manager review"),
+        ("📦  POST-MATCH", "post_deliver",         "Send HTML dossier + DoF card to manager / Director of Football"),
+        ("📦  POST-MATCH", "post_archive",         "Tab 4: Archive & Clear workspace"),
+        ("📦  POST-MATCH", "post_ledger_check",    "Confirm ledger_DD-MM-YYYY.json exists in data/processed/ (auto-stamped on archive)"),
+    ]
+
+    # Group by phase
+    _phases: dict[str, list[tuple[str, str]]] = {}
+    for phase, key, label in _CL_ITEMS:
+        _phases.setdefault(phase, []).append((key, label))
+
+    _cl = st.session_state["checklist"]
+    _total = len(_CL_ITEMS)
+    _done  = sum(1 for _, key, _ in _CL_ITEMS if _cl.get(key, False))
+
+    # Overall progress bar
+    st.progress(_done / _total, text=f"{_done} / {_total} complete")
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+    for _phase, _items in _phases.items():
+        _phase_done = sum(1 for k, _ in _items if _cl.get(k, False))
+        _phase_total = len(_items)
+        _phase_color = "#22c55e" if _phase_done == _phase_total else "#f59e0b"
+
+        with st.expander(
+            f"{_phase}  —  {_phase_done}/{_phase_total}",
+            expanded=(_phase_done < _phase_total),
+        ):
+            for _ck, _clabel in _items:
+                _checked = _cl.get(_ck, False)
+                _new = st.checkbox(
+                    _clabel,
+                    value=_checked,
+                    key=f"cl_{_ck}",
+                )
+                if _new != _checked:
+                    st.session_state["checklist"][_ck] = _new
+
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+    _cl_col1, _cl_col2 = st.columns([1, 3])
+    with _cl_col1:
+        if st.button("↺  Reset Checklist", key="btn_reset_checklist"):
+            st.session_state["checklist"] = {}
+            st.rerun()
+
+    if _done == _total:
+        st.markdown(
+            '<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);'
+            'border-radius:8px;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;'
+            'font-weight:700;font-size:.9rem;letter-spacing:.06em;color:#86efac;margin-top:8px">'
+            '✓  ALL CHECKS COMPLETE — MATCHDAY DONE'
+            '</div>',
+            unsafe_allow_html=True,
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
