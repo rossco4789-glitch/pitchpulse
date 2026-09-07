@@ -10,7 +10,7 @@ PitchPulse/
 ├── CLAUDE.md                  # System constitution & persona constraints
 ├── PROJECT_INDEX.md           # This file — master map of the stack
 ├── requirements.txt           # Python dependencies (pandas, mplsoccer, opencv-python, streamlit)
-├── app.py                     # ✅ COMPLETE — Streamlit desktop dashboard; 5 tabs; OLED dark; local-only
+├── app.py                     # ✅ COMPLETE — Streamlit desktop dashboard; 5 tabs; OLED dark; local-only; Tab 2 Clip Workspace added
 ├── .streamlit/config.toml     # Streamlit theme: OLED #09090b bg, Tivvy Amber #f59e0b primary
 ├── run_matchday.py            # ✅ COMPLETE — Master pipeline runner (reconcile → visuals → agents)
 ├── tagger/
@@ -27,7 +27,8 @@ PitchPulse/
 │   ├── visualizer.py          # ✅ COMPLETE — OLED-dark mplsoccer engine; shot map, transition map, zonal heatmap; multi_match_shot_map/heatmap added
 │   ├── packager.py            # ✅ COMPLETE — Self-contained HTML dossier packager; base64 PNGs, OLED dark, mobile responsive, iOS Safari A4 print
 │   ├── dof_card.py            # ✅ COMPLETE — 1080×1920 DoF match card PNG; OLED dark, Tivvy amber, KPI tiles, pitch miniatures, exec bullets
-│   └── progress_review.py     # ✅ COMPLETE — Longitudinal tactical review engine; rolling 4–8 game window; CLI + Streamlit Tab 5
+│   ├── progress_review.py     # ✅ COMPLETE — Longitudinal tactical review engine; rolling 4–8 game window; CLI + Streamlit Tab 5
+│   └── video_engine.py        # ✅ COMPLETE — FFmpeg clip engine; dual kick-off offset sync; stream-copy slicing; M3U playlist export
 ├── agents/
 │   ├── __init__.py            # Package marker
 │   └── synthesis.py           # ✅ COMPLETE — 3-agent UEFA tactical analysis engine + CLI approval gate
@@ -61,7 +62,7 @@ Opens at `http://localhost:8501`. Local only — no cloud, no external traffic.
 | Tab | Purpose |
 |-----|---------|
 | 📥 Match Ingestion | Upload tagger JSONs + .docx; auto-parse to match_context.json + tivvy_x_feed.json |
-| 🎥 Veo Video Lab | Local video frame extraction; Plotly click-picker; homography calibration; video event logging |
+| 🎥 Veo Video Lab | Local video frame extraction; Plotly click-picker; homography calibration; video event logging; **Clip Workspace** — dual kick-off sync offsets, per-event ✂ Clip buttons, inline `st.video()` preview, M3U playlist export |
 | 🧠 Agent Cockpit | Run reconcile→visuals→agents pipeline; review 4 agent outputs; direct approve/reject gate (bypasses terminal `input()`) |
 | 📦 Deliverables Hub | Preview DoF card + HTML dossier; download buttons |
 
@@ -213,6 +214,26 @@ ground truth at ±0.15 m tolerance.
 | `save/load` | 2 | H round-trip within fp tolerance, FileNotFoundError on missing |
 
 Run: `python cv/tests/test_homography.py`  or  `python -m pytest cv/tests/test_homography.py -v`
+
+### `reports/video_engine.py`
+FFmpeg-based match clip slicing engine. Local-only; no cloud, no re-encoding.
+
+**Sync model — dual kick-off offsets:**
+| Period | Formula |
+|--------|---------|
+| 1H | `veo_t = offset_1h + match_seconds` |
+| 2H / ET | `veo_t = offset_2h + (match_seconds − 2700)` |
+
+`offset_1h` = seconds into the Veo file at the 1H whistle; `offset_2h` = seconds into the Veo file at the 2H restart whistle. Eliminates half-time stoppage drift without per-event manual correction.
+
+**Key functions:**
+- `check_ffmpeg() → bool` — `shutil.which("ffmpeg")` guard; UI surfaces install instructions if absent
+- `calculate_clip_bounds(match_seconds, period, offset_1h, offset_2h, lead_in=5, follow_through=3) → (start_s, end_s)` — clamped to `≥ 0`
+- `slice_clip(video_path, start_s, end_s, output_path) → (bool, str)` — `ffmpeg -ss {start} -to {end} -i {input} -c copy -y {output}`; near-instant stream copy
+- `build_clip_path(clips_root, match_date, opponent, match_seconds, event_type, sub_type, zone_id) → Path` — e.g. `data/clips/15-08-2026_st-blazey/72m_a-lc_shot_on-target.mp4`
+- `export_playlist_m3u(clip_paths, m3u_path)` — extended M3U for VLC / mpv coach presentation
+
+**Output directory:** `data/clips/{DD-MM-YYYY}_{opponent-slug}/`
 
 ### `reports/visualizer.py`
 OLED-dark mplsoccer pitch rendering engine. Accepts a `list[dict]` of events with optional
