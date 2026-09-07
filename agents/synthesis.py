@@ -50,9 +50,10 @@ if str(ROOT) not in sys.path:
 from cv.zones import ZONES, ZONE_ORDER, zones_for_third  # noqa: E402 (after sys.path insert)
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-PROC_DIR    = ROOT / "data" / "processed"
-REPORTS_DIR = ROOT / "reports"
-LEDGER_PATH = PROC_DIR / "match_ledger.json"
+PROC_DIR      = ROOT / "data" / "processed"
+REPORTS_DIR   = ROOT / "reports"
+LEDGER_PATH   = PROC_DIR / "match_ledger.json"
+CONTEXT_PATH  = ROOT / "data" / "raw" / "match_context.json"
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 MAX_REJECTIONS = 3           # hard cap on rejection cycles before forced approval
@@ -121,13 +122,101 @@ def _match_id_from_ledger(ledger: dict) -> str:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Match context helpers — load, score timeline, player resolution
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _load_match_context() -> dict:
+    """
+    Load data/raw/match_context.json produced by data/parse_report.py.
+    Returns an empty dict with a diagnostic notice if the file is absent.
+    """
+    if not CONTEXT_PATH.exists():
+        print(
+            f"  [CTX] match_context.json not found at {CONTEXT_PATH.relative_to(ROOT)}\n"
+            "  [CTX] Run: python data/parse_report.py <report.docx>\n"
+            "  [CTX] Falling back to ledger-only analysis (no squad/score-state context)."
+        )
+        return {}
+    with open(CONTEXT_PATH, encoding="utf-8") as f:
+        ctx = json.load(f)
+    opponent = ctx.get("opponent", "Unknown")
+    result   = ctx.get("result", "?")
+    score    = ctx.get("score", {})
+    print(
+        f"  [CTX] Loaded match context: {result} | {opponent} "
+        f"{score.get('opponent','?')}–{score.get('tiverton','?')} Tiverton"
+    )
+    return ctx
+
+
+def _build_score_timeline(ctx: dict) -> list:
+    """
+    Build a sorted list of score-state checkpoints from ctx['scorers'].
+    Each entry: {"minute_second": int, "tiverton": int, "opponent": int}
+    Timeline starts implicitly at 0-0.
+    """
+    events = []
+    scorers = ctx.get("scorers", {})
+    for s in scorers.get("tiverton", []):
+        events.append({"minute_second": s["minute"] * 60, "team": "tiverton"})
+    for s in scorers.get("opponent", []):
+        events.append({"minute_second": s["minute"] * 60, "team": "opponent"})
+    events.sort(key=lambda e: e["minute_second"])
+
+    timeline = []
+    tiv, opp = 0, 0
+    for e in events:
+        if e["team"] == "tiverton":
+            tiv += 1
+        else:
+            opp += 1
+        timeline.append({"minute_second": e["minute_second"], "tiverton": tiv, "opponent": opp})
+    return timeline
+
+
+def _score_at_second(timeline: list, match_seconds: int) -> dict:
+    """Return the live score at a given match_seconds from the score timeline."""
+    tiv, opp = 0, 0
+    for checkpoint in timeline:
+        if checkpoint["minute_second"] <= match_seconds:
+            tiv = checkpoint["tiverton"]
+            opp = checkpoint["opponent"]
+        else:
+            break
+    return {"tiverton": tiv, "opponent": opp}
+
+
+def _format_lineup_header(ctx: dict) -> str:
+    """Format a one-line XI string from match_context lineup."""
+    lineup = ctx.get("lineup", [])
+    if not lineup:
+        return "Lineup data unavailable — run parse_report.py"
+    parts = []
+    for p in lineup:
+        name = p["player"]
+        ann  = []
+        if p.get("role") == "GK":
+            ann.append("GK")
+        if p.get("captain"):
+            ann.append("C")
+        if p.get("subbed_off"):
+            ann.append(f"off {p['subbed_off']}'")
+        parts.append(f"{name}({', '.join(ann)})" if ann else name)
+    subs = [s for s in ctx.get("subs", []) if s.get("used")]
+    subs_str = "  ·  Subs: " + " · ".join(
+        f"{s['player']}({s['minute']}')" for s in subs
+    ) if subs else ""
+    return " · ".join(parts) + subs_str
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Agent 1 — In-Possession Agent
 # Moment: IN POSSESSION
 # Events: SHOT, BOX_ENTRY
 # Formal language: Half-Spaces, Qualitative Superiority, Zone 14, Corridor
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run_in_possession_agent(ledger: dict, feedback: str = "") -> str:
+def run_in_possession_agent(ledger: dict, feedback: str = "", ctx: dict | None = None) -> str:
     """
     Analyse SHOT and BOX_ENTRY events using real zone_id from pitch tap coordinates.
 
@@ -265,7 +354,7 @@ def run_in_possession_agent(ledger: dict, feedback: str = "") -> str:
 #                  Pressing Trigger, Block
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run_press_agent(ledger: dict, feedback: str = "") -> str:
+def run_press_agent(ledger: dict, feedback: str = "", ctx: dict | None = None) -> str:
     """
     Analyse HIGH_REGAIN and DEF_TURNOVER events using real zone_id.
 
@@ -418,6 +507,81 @@ def run_press_agent(ledger: dict, feedback: str = "") -> str:
             "The opposition is exploiting the Defensive Transition phase."
         )
 
+    # ── Score-state layer (requires match_context) ─────────────────────────────
+    if ctx:
+        timeline = _build_score_timeline(ctx)
+        if timeline:
+            lines.append("")
+            lines.append("**Score-State Defensive Analysis:**")
+
+            # Split events into leading / level / trailing phases
+            leading_regains   = 0
+            leading_turnovers = 0
+            other_regains     = 0
+            other_turnovers   = 0
+
+            for r in regains:
+                sc = _score_at_second(timeline, r.get("match_seconds", 0))
+                if sc["tiverton"] > sc["opponent"]:
+                    leading_regains += 1
+                else:
+                    other_regains += 1
+            for t in turnovers:
+                sc = _score_at_second(timeline, t.get("match_seconds", 0))
+                if sc["tiverton"] > sc["opponent"]:
+                    leading_turnovers += 1
+                else:
+                    other_turnovers += 1
+
+            score = ctx.get("score", {})
+            tiv_goals = score.get("tiverton", 0)
+            opp_goals = score.get("opponent", 0)
+            opponent  = ctx.get("opponent", "Opposition")
+
+            # Narrate score phases from timeline
+            phase_desc = []
+            prev_sec = 0
+            tiv_r, opp_r = 0, 0
+            for cp in timeline:
+                mins_from = prev_sec // 60
+                mins_to   = cp["minute_second"] // 60
+                tiv_r, opp_r = cp["tiverton"], cp["opponent"]
+                phase_desc.append(f"{mins_from}'–{mins_to}' ({tiv_r-( 1 if cp['tiverton']>tiv_r else 0)}-{opp_r-(1 if cp['opponent']>opp_r else 0)}→{tiv_r}-{opp_r})")
+                prev_sec = cp["minute_second"]
+
+            lines.append(
+                f"  Final: Tiverton {tiv_goals}–{opp_goals} {opponent}"
+            )
+
+            if leading_regains + leading_turnovers > 0:
+                lead_total = leading_regains + leading_turnovers
+                lead_eff   = _safe_pct(leading_regains, lead_total) if lead_total else 0
+                lines.append(
+                    f"  Whilst leading — Regains: {leading_regains}  |  Turnovers: {leading_turnovers}  "
+                    f"|  Efficiency: {lead_eff}%"
+                )
+                if leading_turnovers > leading_regains:
+                    lines.append(_wrap(
+                        "⚠ More possession losses than regains whilst protecting a lead. "
+                        "The Block is not holding compactness under reduced pressing intensity. "
+                        "Tactical lever: drop the Line of Engagement 5–8m when leading; "
+                        "prioritise Rest Defense shape over counter-pressing triggers."
+                    ))
+                else:
+                    lines.append(_wrap(
+                        "Pressing efficiency held whilst leading — the team maintained "
+                        "Counter-Pressing Phase discipline without over-committing. "
+                        "Sustain this balance: press the trigger, recover the Block quickly."
+                    ))
+
+            if other_regains + other_turnovers > 0:
+                other_total = other_regains + other_turnovers
+                other_eff   = _safe_pct(other_regains, other_total) if other_total else 0
+                lines.append(
+                    f"  Level/trailing phase — Regains: {other_regains}  |  Turnovers: {other_turnovers}  "
+                    f"|  Efficiency: {other_eff}%"
+                )
+
     return "\n".join(lines)
 
 
@@ -428,7 +592,7 @@ def run_press_agent(ledger: dict, feedback: str = "") -> str:
 # Formal language: Rest Defense, Unit Cohesion, Attacking Transition
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run_set_piece_agent(ledger: dict, feedback: str = "") -> str:
+def run_set_piece_agent(ledger: dict, feedback: str = "", ctx: dict | None = None) -> str:
     """
     Analyse SET_PIECE events using real zone_id from pitch tap coordinates.
 
@@ -544,6 +708,25 @@ def run_set_piece_agent(ledger: dict, feedback: str = "") -> str:
     if total_sp == 0:
         lines.append("\n⚠ No SET_PIECE events tagged. This section may be incomplete.")
 
+    # ── Opposition & competition context ───────────────────────────────────────
+    if ctx:
+        opponent    = ctx.get("opponent", "")
+        competition = ctx.get("competition", "")
+        keywords    = ctx.get("tactical_keywords", [])
+        if opponent or competition:
+            lines.append("")
+            lines.append("**Match Context:**")
+            if opponent and competition:
+                lines.append(_wrap(
+                    f"Set piece exposure assessed in the context of {competition} "
+                    f"against {opponent}. "
+                    + ("Direct play and aerial delivery are elevated in this competition; "
+                       "anticipate increased dead-ball volume in the opposition half "
+                       "and prioritise second-ball positioning on all deliveries."
+                       if any(k in keywords for k in ["direct", "aerial", "cross"])
+                       else "Standard set piece preparation applies for this fixture.")
+                ))
+
     return "\n".join(lines)
 
 
@@ -554,7 +737,7 @@ def run_set_piece_agent(ledger: dict, feedback: str = "") -> str:
 # Formal language: Second Ball, Direct Play, Quantitative Superiority
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run_nonleague_agent(ledger: dict, feedback: str = "") -> str:
+def run_nonleague_agent(ledger: dict, feedback: str = "", ctx: dict | None = None) -> str:
     """
     Analyse AERIAL_DUEL and SECOND_BALL events — the dominant possession-transition
     mechanism at non-league level. These events are absent from most analysis
@@ -711,26 +894,70 @@ def run_nonleague_agent(ledger: dict, feedback: str = "") -> str:
 
 def _build_dossier(
     ledger:   dict,
-    feedback: str = "",
+    feedback: str  = "",
+    ctx:      dict | None = None,
 ) -> str:
-    """Run all three agents and concatenate their output into a full dossier."""
+    """Run all four agents and concatenate their output into a full dossier."""
+    if ctx is None:
+        ctx = {}
     match_id  = _match_id_from_ledger(ledger)
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-    header = "\n".join([
+    # ── Rich header from match context ─────────────────────────────────────────
+    score   = ctx.get("score", {})
+    tiv_g   = score.get("tiverton", "?")
+    opp_g   = score.get("opponent",  "?")
+    opponent    = ctx.get("opponent",    "")
+    competition = ctx.get("competition", "")
+    venue       = ctx.get("venue",       "")
+    home_game   = ctx.get("home_game",   True)
+    date_str    = ctx.get("date",        match_id)
+    result      = ctx.get("result",      "")
+
+    def _scorer_str(scorers: list) -> str:
+        return "  ·  ".join(f"{s['player']} {s.get('minute_raw', s['minute'])}′" for s in scorers) or "none"
+
+    tiv_scorers = _scorer_str(ctx.get("scorers", {}).get("tiverton", []))
+    opp_scorers = _scorer_str(ctx.get("scorers", {}).get("opponent", []))
+
+    if opponent:
+        match_line   = f"Tiverton Town {tiv_g}–{opp_g} {opponent}"
+        result_line  = (
+            f"**Result:** {result}  |  **Competition:** {competition}  |  "
+            f"**Venue:** {venue} ({'home' if home_game else 'away'})"
+        )
+        scorers_line = (
+            f"**Tiverton Scorers:** {tiv_scorers}  |  "
+            f"**{opponent} Scorers:** {opp_scorers}"
+        )
+        lineup_line  = f"**XI:** {_format_lineup_header(ctx)}"
+    else:
+        match_line   = f"Match Date: {match_id}"
+        result_line  = f"**Generated:** {generated}  |  **Standard:** UEFA Pro Licence"
+        scorers_line = ""
+        lineup_line  = ""
+
+    header_lines = [
         "# TIVERTON TOWN FC — TACTICAL ANALYSIS DOSSIER",
-        f"**Match Date:** {match_id}",
-        f"**Generated:**  {generated}",
-        f"**Standard:**   UEFA Pro Licence | 4 Moments of the Game",
+        f"**{match_line}**",
+        f"**Date:** {date_str}  |  {result_line}",
+    ]
+    if scorers_line:
+        header_lines.append(scorers_line)
+    if lineup_line:
+        header_lines.append(lineup_line)
+    header_lines += [
+        f"**Generated:** {generated}  |  UEFA Pro Licence | 4 Moments of the Game",
         "",
         "---",
         "",
-    ])
+    ]
+    header = "\n".join(header_lines)
 
-    section_ip  = run_in_possession_agent(ledger, feedback)
-    section_pr  = run_press_agent(ledger, feedback)
-    section_sp  = run_set_piece_agent(ledger, feedback)
-    section_nl  = run_nonleague_agent(ledger, feedback)
+    section_ip  = run_in_possession_agent(ledger, feedback, ctx=ctx)
+    section_pr  = run_press_agent(ledger, feedback, ctx=ctx)
+    section_sp  = run_set_piece_agent(ledger, feedback, ctx=ctx)
+    section_nl  = run_nonleague_agent(ledger, feedback, ctx=ctx)
 
     summary_stats = ledger.get("summary", {})
     schema_v      = ledger.get("schema_version", 1)
@@ -777,9 +1004,10 @@ def run_approval_gate(ledger: dict) -> "Path | None":
     feedback    = ""
     rejections  = 0
     match_id    = _match_id_from_ledger(ledger)
+    ctx         = _load_match_context()
 
     while True:
-        dossier = _build_dossier(ledger, feedback)
+        dossier = _build_dossier(ledger, feedback, ctx=ctx)
 
         print()
         _rule("═")
@@ -799,7 +1027,7 @@ def run_approval_gate(ledger: dict) -> "Path | None":
             out = _write_dossier(dossier, match_id)
             print(f"  [GATE] Dossier written → {out.relative_to(ROOT)}")
             _rule("═")
-            return out
+            return out  # forced approval path
 
         cycle_label = (
             f"  Cycle {rejections + 1} / {MAX_REJECTIONS} max rejections."

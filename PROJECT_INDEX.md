@@ -25,6 +25,7 @@ PitchPulse/
 │   └── synthesis.py           # ✅ COMPLETE — 3-agent UEFA tactical analysis engine + CLI approval gate
 ├── data/
 │   ├── raw/                   # Drop zone: tagger JSON exports + club feed files
+│   ├── parse_report.py        # ✅ COMPLETE — Parses .docx match report → match_context.json + tivvy_x_feed.json
 │   └── processed/             # Output: match_ledger.json + plots/ + dossier_*.md
 └── analysis/
     ├── engine.py              # Local Python engine — shot maps, turnover maps, box entries
@@ -108,18 +109,27 @@ OLED-dark mplsoccer pitch rendering engine. Accepts a `list[dict]` of events wit
 Produces `shot_map.png`, `transition_map.png`, `zonal_heatmap.png`.
 
 ### `agents/synthesis.py`
-Multi-agent tactical analysis engine. **v2: all spatial analysis uses real `zone_id` from ledger.**
+Multi-agent tactical analysis engine. **v3: context-aware — loads `data/raw/match_context.json`
+produced by `data/parse_report.py` to enrich every agent with match facts.**
 Four specialist agents produce a structured markdown dossier, then a human-in-the-loop CLI
 approval gate (`approve` / `reject <feedback>` / `quit`) validates it before writing to disk.
 Max 3 rejection cycles, then forced approval. `run_approval_gate()` returns `Path | None`
 (the written dossier Path on approve, `None` on quit/interrupt).
 
-| Agent | Events | UEFA Formal Language |
-|---|---|---|
-| In-Possession | `SHOT`, `BOX_ENTRY` | Half-Spaces, Qualitative Superiority, Zone 14 |
-| Out-of-Possession / Press | `HIGH_REGAIN`, `DEF_TURNOVER` | Counter-Pressing Phase, Line of Engagement (spatial), Compactness (channel spread) |
-| Set-Piece | `SET_PIECE` | Rest Defense, Unit Cohesion, Attacking Transition |
-| Non-League Physics | `AERIAL_DUEL`, `SECOND_BALL` | Second Ball, Direct Play, Quantitative Superiority |
+| Agent | Events | UEFA Formal Language | v3 Context Layer |
+|---|---|---|---|
+| In-Possession | `SHOT`, `BOX_ENTRY` | Half-Spaces, Qualitative Superiority, Zone 14 | — |
+| Out-of-Possession / Press | `HIGH_REGAIN`, `DEF_TURNOVER` | Counter-Pressing Phase, Line of Engagement (spatial), Compactness (channel spread) | **Score-state split**: leading vs level/trailing phase efficiency |
+| Set-Piece | `SET_PIECE` | Rest Defense, Unit Cohesion, Attacking Transition | Opposition name, competition, tactical keyword context |
+| Non-League Physics | `AERIAL_DUEL`, `SECOND_BALL` | Second Ball, Direct Play, Quantitative Superiority | — |
+
+**Dossier header (v3):** Full match facts from `match_context.json` — opponent, competition,
+venue (home/away), scoreline, scorer names with minute_raw display, full XI with sub windows,
+subs used. Gracefully falls back to ledger-only mode if `match_context.json` is absent.
+
+**Score timeline:** Built from `ctx['scorers']` → `_build_score_timeline()`. Each tagged event
+is annotated with the live score at its `match_seconds` via `_score_at_second()`. Agent 2 splits
+possession-change events into leading vs level/trailing phases for state-conditional analysis.
 
 **Spatial integrity contract:** Zone classification is derived exclusively from `zone_id` stamped
 by `reconcile/sync.py` → `cv.zones.get_zone_by_coords(x_m, y_m)`. No sub-type inference tables.
