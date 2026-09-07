@@ -3,10 +3,12 @@
 run_matchday.py
 Master matchday orchestration pipeline for Tiverton Town FC.
 
-Connects the three pipeline stages in sequence:
+Connects the pipeline stages in sequence:
   Step 1 — reconcile/sync.py       : ingest tagger + feed → match_ledger.json
   Step 2 — reports/visualizer.py   : render shot map, transition map, heatmap → plots/
-  Step 3 — agents/synthesis.py     : run three tactical agents → CLI gate → dossier_*.md
+  Step 3 — agents/synthesis.py     : run four tactical agents → CLI gate → dossier_*.md
+  Step 4 — reports/packager.py     : HTML dossier with embedded PNGs
+  Step 5 — reports/dof_card.py     : 1080×1920 DoF match card PNG (WhatsApp-ready)
 
 Usage:
   python run_matchday.py                          # auto-detect newest ledger, run all steps
@@ -209,6 +211,43 @@ def step_package(dossier_md_path: Path, plots_dir: Path) -> Path:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Step 5 — DoF match card
+# ══════════════════════════════════════════════════════════════════════════════
+
+def step_dof_card(ledger_path: Path, plots_dir: Path) -> Path | None:
+    """
+    Render the 1080×1920 DoF summary card PNG.
+    Non-blocking — warns on failure.
+    Returns the output Path or None on failure.
+    """
+    try:
+        from reports.dof_card import build_dof_card, CONTEXT_PATH, OUT_PATH
+    except ImportError as exc:
+        _warn(f"Cannot import reports.dof_card: {exc}")
+        return None
+
+    with open(ledger_path, encoding="utf-8") as f:
+        ledger = json.load(f)
+
+    ctx: dict = {}
+    if CONTEXT_PATH.exists():
+        with open(CONTEXT_PATH, encoding="utf-8") as f:
+            ctx = json.load(f)
+    else:
+        _warn("match_context.json not found — DoF card will render without match context.")
+
+    try:
+        out      = build_dof_card(ledger, ctx, plots_dir, OUT_PATH)
+        size_kb  = round(out.stat().st_size / 1024, 1)
+        _ok(f"DoF card → {out.relative_to(ROOT)}  ({size_kb} KB  |  1080×1920 px)")
+        return out
+    except Exception:
+        _warn("DoF card render failed:")
+        traceback.print_exc()
+        return None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Orchestrator
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -270,20 +309,25 @@ def main() -> None:
 
     dossier_path = step_agents(ledger_path)
 
+    plots_dir = PROC_DIR / "plots"
+
     # ── Step 4: HTML packager ──────────────────────────────────────────────────
     if dossier_path:
         _step_header(4, "HTML DOSSIER PACKAGER")
-        plots_dir = PROC_DIR / "plots"
         step_package(dossier_path, plots_dir)
+
+    # ── Step 5: DoF match card ─────────────────────────────────────────────────
+    _step_header(5, "DOF MATCH CARD  (1080×1920 WhatsApp PNG)")
+    step_dof_card(ledger_path, plots_dir)
 
     # ── Pipeline summary ───────────────────────────────────────────────────────
     print()
     _rule("═")
     print("  PIPELINE COMPLETE")
     if dossier_path:
-        _ok("Dossier approved, written, and packaged as HTML.")
+        _ok("Dossier approved, packaged as HTML, and DoF card rendered.")
     else:
-        _warn("Dossier was not saved (quit or pipeline error).")
+        _warn("Dossier was not saved (quit or pipeline error). DoF card still rendered.")
     _rule("═")
     print()
 

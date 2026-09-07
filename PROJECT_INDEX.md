@@ -19,14 +19,15 @@ PitchPulse/
 │   └── zones.py               # ✅ COMPLETE — 18-Zone tactical matrix (105×68m); bbox, centroid, get_zone_by_coords(), get_zone_centroid()
 ├── reports/
 │   ├── visualizer.py          # ✅ COMPLETE — OLED-dark mplsoccer engine; shot map, transition map, zonal heatmap → data/processed/plots/
-│   └── packager.py            # ✅ COMPLETE — Self-contained HTML dossier packager; base64 PNGs, OLED dark, mobile responsive, iOS Safari A4 print
+│   ├── packager.py            # ✅ COMPLETE — Self-contained HTML dossier packager; base64 PNGs, OLED dark, mobile responsive, iOS Safari A4 print
+│   └── dof_card.py            # ✅ COMPLETE — 1080×1920 DoF match card PNG; OLED dark, Tivvy amber, KPI tiles, pitch miniatures, exec bullets
 ├── agents/
 │   ├── __init__.py            # Package marker
 │   └── synthesis.py           # ✅ COMPLETE — 3-agent UEFA tactical analysis engine + CLI approval gate
 ├── data/
 │   ├── raw/                   # Drop zone: tagger JSON exports + club feed files
 │   ├── parse_report.py        # ✅ COMPLETE — Parses .docx match report → match_context.json + tivvy_x_feed.json
-│   └── processed/             # Output: match_ledger.json + plots/ + dossier_*.md
+│   └── processed/             # Output: match_ledger.json + plots/ + dossier_*.md + dof_match_card.png
 └── analysis/
     ├── engine.py              # Local Python engine — shot maps, turnover maps, box entries
     └── report_prompt.md       # Tactical briefing template — 3-bullet UEFA Pro halftime diagnosis
@@ -149,6 +150,28 @@ offline HTML file — no CDN, no external fonts, no JavaScript.
 - Regex-only Markdown→HTML conversion: bold, italic, H1/H2, `>` manager notes, emoji alert boxes (🚨 ⚡ ⚠), bar-chart code blocks
 
 ELI5: It turns the text report into a one-file webpage the manager can open on any device — pictures and all — with no internet needed.
+
+### `reports/dof_card.py`
+Director of Football matchday summary card. Renders a 1080×1920 px (9:16 portrait) OLED-dark
+PNG at `data/processed/plots/dof_match_card.png` — sized for immediate WhatsApp delivery.
+
+**Layout sections (top to bottom):**
+1. **Top Banner** — club crest, scoreline (large), result badge, teams, competition, venue/date
+2. **KPI Tiles (2×2)** — Box Entries (dominant corridor), Press Efficiency %, Aerial Win %, Second Ball Recovery %
+3. **Pitch Miniatures** — inset shot map (attacking actions) + transition map (press & turnovers)
+4. **Tactical Takeaways** — 3 rule-based UEFA Pro bullets (In Possession / Pressing / Priority Lever)
+5. **Data Quality** — schema version, matched/zoned event counts
+
+**RAG system:** Green ≥ threshold, Amber = contested, Red = alert. Thresholds: Press ≥60%/40%,
+Aerial ≥55%/45%, Second Ball ≥55%/40%. Half-space box entry dominance → green.
+
+**Fallbacks:** Missing crest → amber "TT" circle. Missing plots → labelled placeholder. Missing
+`match_context.json` → banner shows ledger date only; all KPI tiles still render.
+
+**Step 5 in `run_matchday.py`** — runs unconditionally after HTML packaging (non-blocking).
+Also callable standalone: `python reports/dof_card.py`
+
+ELI5: It makes one picture with all the important numbers so the DoF can see everything on their phone without opening any files.
 
 ### `analysis/engine.py`
 Legacy local Python analytical engine (pre-reconcile era). Retained for reference.
