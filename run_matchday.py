@@ -274,7 +274,7 @@ def main() -> None:
     print()
     _rule("═")
     print("  PITCHPULSE — MATCHDAY PIPELINE")
-    print("  Tiverton Town FC | UEFA Pro Licence Standard")
+    print("  Tiverton Town FC | Tactical Performance Intelligence")
     print(f"  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     _rule("═")
 

@@ -1,5 +1,5 @@
 # PitchPulse — Project Index
-## Tiverton Town FC | Zero-Budget Performance Stack
+## Tiverton Town FC | Tactical Performance Platform
 
 ---
 
@@ -30,7 +30,7 @@ PitchPulse/
 │   └── processed/             # Output: match_ledger.json + plots/ + dossier_*.md + dof_match_card.png
 └── analysis/
     ├── engine.py              # Local Python engine — shot maps, turnover maps, box entries
-    └── report_prompt.md       # Tactical briefing template — 3-bullet UEFA Pro halftime diagnosis
+    └── report_prompt.md       # Tactical briefing template — 3-bullet halftime diagnosis (4 Moments framework)
 ```
 
 ---
@@ -39,7 +39,7 @@ PitchPulse/
 
 ### `CLAUDE.md`
 System constitution and persona constraints. Governs all agent behaviour:
-canary drift detection, UEFA Pro tactical standard, ELI5 requirement, token conservation, and zero-budget architecture rules.
+canary drift detection, tactical analysis framework, ELI5 requirement, token conservation, and local-first architecture rules.
 
 ### `run_matchday.py`
 Master matchday orchestration script. Runs the full pipeline in four sequential steps:
@@ -159,7 +159,7 @@ PNG at `data/processed/plots/dof_match_card.png` — sized for immediate WhatsAp
 1. **Top Banner** — club crest, scoreline (large), result badge, teams, competition, venue/date
 2. **KPI Tiles (2×2)** — Box Entries (dominant corridor), Press Efficiency %, Aerial Win %, Second Ball Recovery %
 3. **Pitch Miniatures** — inset shot map (attacking actions) + transition map (press & turnovers)
-4. **Tactical Takeaways** — 3 rule-based UEFA Pro bullets (In Possession / Pressing / Priority Lever)
+4. **Tactical Takeaways** — 3 rule-based tactical bullets (In Possession / Pressing / Priority Lever)
 5. **Data Quality** — schema version, matched/zoned event counts
 
 **RAG system:** Green ≥ threshold, Amber = contested, Red = alert. Thresholds: Press ≥60%/40%,
@@ -177,7 +177,7 @@ ELI5: It makes one picture with all the important numbers so the DoF can see eve
 Legacy local Python analytical engine (pre-reconcile era). Retained for reference.
 
 ### `analysis/report_prompt.md`
-Structured template for a 3-bullet UEFA Pro Licence halftime tactical diagnosis.
+Structured template for a 3-bullet halftime tactical diagnosis (4 Moments framework).
 
 ---
 

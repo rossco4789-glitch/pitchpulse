@@ -933,7 +933,7 @@ def _build_dossier(
         lineup_line  = f"**XI:** {_format_lineup_header(ctx)}"
     else:
         match_line   = f"Match Date: {match_id}"
-        result_line  = f"**Generated:** {generated}  |  **Standard:** UEFA Pro Licence"
+        result_line  = f"**Generated:** {generated}  |  **Framework:** Tactical Analysis"
         scorers_line = ""
         lineup_line  = ""
 
@@ -947,7 +947,7 @@ def _build_dossier(
     if lineup_line:
         header_lines.append(lineup_line)
     header_lines += [
-        f"**Generated:** {generated}  |  UEFA Pro Licence | 4 Moments of the Game",
+        f"**Generated:** {generated}  |  Tactical Analysis Framework | 4 Moments of the Game",
         "",
         "---",
         "",
@@ -973,7 +973,7 @@ def _build_dossier(
         f"Unmatched club events: {summary_stats.get('unmatched_club_events', '?')}  |  "
         f"Events with real zone: {zoned_count}",
         "",
-        "_Dossier produced by PitchPulse · Tiverton Town FC · Zero-Budget Performance Stack_",
+        "_PitchPulse Tactical Intelligence · Tiverton Town FC Performance Analysis_",
     ])
 
     sep = "\n\n---\n\n"
@@ -1113,7 +1113,7 @@ def main() -> None:
     print()
     _rule("═")
     print("  PITCHPULSE — MULTI-AGENT TACTICAL ANALYSIS ENGINE")
-    print("  Tiverton Town FC | UEFA Pro Licence Standard")
+    print("  Tiverton Town FC | Tactical Performance Intelligence")
     _rule("═")
     print(f"\n  Loading ledger: {ledger_path.relative_to(ROOT)}")
 

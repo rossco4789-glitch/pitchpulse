@@ -1,5 +1,5 @@
 # PitchPulse — Project Constitution
-## Tiverton Town FC | UEFA Pro Licence Standards
+## Tiverton Town FC | Tactical Analysis Standards
 
 ---
 
@@ -15,9 +15,9 @@ If this marker is missing from any response, the core persona has drifted and mu
 
 ---
 
-## 2. UEFA PRO TACTICAL STANDARD
+## 2. TACTICAL ANALYSIS FRAMEWORK
 
-All event analysis, pattern recognition, and system design must be evaluated through the **4 Moments of the Game**:
+All event analysis, pattern recognition, and system design must be evaluated through the **4 Moments of the Game** (benchmarked to UEFA Pro tactical principles):
 
 - **In Possession** — Organisation and structure when the team controls the ball
 - **Defensive Transition** — Immediate response to losing possession (Counter-Pressing Phase)
@@ -50,12 +50,12 @@ Format: `ELI5: <one sentence>`
 
 ---
 
-## 5. ZERO-BUDGET ARCHITECTURE
+## 5. LOCAL-FIRST ARCHITECTURE
 
 - **Compute:** Local Python only (no cloud functions, no paid runtime)
 - **Frontend:** Lightweight, offline-first client-side web technologies (vanilla JS, HTML/CSS, or minimal frameworks)
 - **Data:** Local files (CSV, JSON, SQLite) — no paid databases
-- **APIs:** Zero paid external APIs or heavy SaaS services
+- **APIs:** No paid external APIs or heavy SaaS services
 - **AI/ML:** Local models or rule-based logic only
 
 ---

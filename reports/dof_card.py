@@ -488,7 +488,7 @@ def _draw_footer(fig: plt.Figure, ledger: dict, ctx: dict) -> None:
     fig.text(0.5, 0.048, dq_text, ha="center", va="center",
              fontsize=8.5, color=MUTED)
 
-    fig.text(0.5, 0.012, "PitchPulse  ·  Tiverton Town FC  ·  UEFA Pro Licence Standard",
+    fig.text(0.5, 0.012, "PitchPulse Tactical Intelligence  ·  Tiverton Town FC",
              ha="center", va="center", fontsize=8, color=GOLD_DIM)
 
 
