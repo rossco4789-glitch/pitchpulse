@@ -77,6 +77,50 @@ _FLANK_CHANNELS    = {"LF", "RF"}
 # This is now derived from real zone_id, not sub-type.
 _QS_HALF_SPACE_THRESHOLD = 0.30
 
+# ── Human-readable zone translation ────────────────────────────────────────────
+_ZONE_LABELS: dict[str, str] = {
+    "D_LF": "defensive left flank",     "D_LH": "defensive inside-left",
+    "D_LC": "defensive inside channel", "D_RC": "defensive inside channel",
+    "D_RH": "defensive inside-right",   "D_RF": "defensive right flank",
+    "M_LF": "left flank at halfway",    "M_LH": "inside-left at halfway",
+    "M_LC": "central midfield",         "M_RC": "central midfield",
+    "M_RH": "inside-right at halfway",  "M_RF": "right flank at halfway",
+    "A_LF": "wide left of the box",     "A_LH": "inside-left channel",
+    "A_LC": "central (Zone 14)",        "A_RC": "central (Zone 14)",
+    "A_RH": "inside-right channel",     "A_RF": "wide right of the box",
+}
+_THIRD_LABELS: dict[str, str] = {
+    "A": "attacking third", "M": "middle third", "D": "defensive third"
+}
+_CH_LABELS: dict[str, str] = {
+    "LF": "wide left", "LH": "inside-left", "LC": "central",
+    "RC": "central",   "RH": "inside-right", "RF": "wide right",
+}
+
+
+def _zone_label(zone_id: str) -> str:
+    """Human-readable description for a zone_id. Falls back to the raw code."""
+    return _ZONE_LABELS.get(zone_id, zone_id)
+
+
+def _summarise_zones(zone_ids: list[str]) -> str:
+    """
+    Collapse a list of zone_ids into a compact English phrase.
+    Repeated zones are counted.  e.g. ['A_LH','A_LH','A_RF'] →
+    'inside-left channel (×2), wide right of the box'
+    """
+    if not zone_ids:
+        return "no location data"
+    counts: dict[str, int] = {}
+    for z in zone_ids:
+        label = _zone_label(z)
+        counts[label] = counts.get(label, 0) + 1
+    parts = [
+        f"{label} (×{n})" if n > 1 else label
+        for label, n in sorted(counts.items(), key=lambda x: -x[1])
+    ]
+    return ", ".join(parts)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Shared helpers
@@ -361,25 +405,28 @@ def run_in_possession_agent(ledger: dict, feedback: str = "", ctx: dict | None =
         lines.append("")
 
     lines.append(
-        f"**Shots:** {shot_count}  |  "
-        f"On Target: {on_target}  |  "
-        f"Off Target: {off_target}  |  "
-        f"Blocked: {blocked}  |  "
-        f"Zone 14: {zone14_shots}"
+        f"Tiverton registered **{shot_count} shot{'s' if shot_count != 1 else ''}** — "
+        f"{on_target} on target, {off_target} off target, {blocked} blocked"
+        + (f", {zone14_shots} from Zone 14" if zone14_shots > 0 else "")
+        + "."
     )
-    lines.append(f"**Box Entries:** {total_entries}  (spatially confirmed: {zoned_entries})")
+    lines.append(
+        f"**{total_entries} box {'entries' if total_entries != 1 else 'entry'}** logged"
+        + (f" ({zoned_entries} with pitch coordinates)" if 0 < zoned_entries < total_entries else "")
+        + "."
+    )
     lines.append("")
 
     if corridor_counts["Unknown"] > 0:
         lines.append(
-            f"⚠ {corridor_counts['Unknown']} entry event(s) have no zone data "
-            "(legacy v1 export — no pitch tap recorded). Spatial analysis below "
-            "reflects confirmed events only."
+            f"⚠ {corridor_counts['Unknown']} entry event(s) have no location data "
+            "(logged without a pitch tap — legacy export). Spatial analysis below "
+            "reflects tagged events only."
         )
         lines.append("")
 
     if zoned_entries > 0:
-        lines.append("**Entry Corridor Analysis (real pitch coordinates):**")
+        lines.append("**Entry Corridor Breakdown:**")
         for corridor in ("Flank", "Half-Space", "Central (Zone 14)"):
             n   = corridor_counts[corridor]
             pct = _safe_pct(n, zoned_entries)
@@ -394,34 +441,36 @@ def run_in_possession_agent(ledger: dict, feedback: str = "", ctx: dict | None =
                 "**⚡ QUALITATIVE SUPERIORITY — HALF-SPACE EXPLOITATION CONFIRMED**"
             )
             lines.append(_wrap(
-                f"Tiverton achieved {half_space_count} of {zoned_entries} spatially-confirmed "
-                f"box entries ({_safe_pct(half_space_count, zoned_entries)}%) in the attacking "
-                "half-spaces (A_LH / A_RH) — confirmed from real pitch coordinates, not "
-                "sub-type inference. This is genuine Qualitative Superiority: individual "
-                "actions bypassing the opposition's defensive block in the most dangerous "
-                "pre-box corridors. Tactical lever: sustain half-space rotation between "
+                f"Tiverton achieved {half_space_count} of {zoned_entries} confirmed "
+                f"box entries ({_safe_pct(half_space_count, zoned_entries)}%) through "
+                "the inside-left and inside-right channels — the most dangerous pre-box "
+                "corridors, confirmed from real pitch coordinates. This is genuine "
+                "Qualitative Superiority: individual actions bypassing the defensive block "
+                "before the final line. Tactical lever: sustain half-space rotation between "
                 "the #10 and the strong-side wide midfielder."
             ))
         else:
             pct_hs = _safe_pct(half_space_count, zoned_entries) if zoned_entries else 0
             lines.append(f"**Half-Space Exploitation:** {pct_hs}% (threshold: {int(_QS_HALF_SPACE_THRESHOLD*100)}%)")
             lines.append(_wrap(
-                "Box entries are concentrated on flanks or through the central channel. "
-                "Qualitative Superiority through A_LH / A_RH is under-exploited. "
-                "Tactical lever: draw the opposition defensive mid with a central "
-                "dummy run before releasing the half-space runner, particularly on "
-                "the weak side when the opposition is overloading the ball."
+                "Box entries are concentrated on the flanks or through the central "
+                "channel. The inside channels are under-exploited — this is the highest-"
+                "value pre-box space at non-league level. Tactical lever: draw the "
+                "opposition defensive mid with a central dummy run before releasing the "
+                "half-space runner, particularly on the weak side when the opposition "
+                "is overloading the ball."
             ))
     else:
-        lines.append("⚠ No spatially-confirmed box entries. All events lack zone data.")
+        lines.append("⚠ No location data on box entries. All events lack pitch coordinates.")
 
     lines.append("")
     if shot_count == 0:
         lines.append("⚠ No shots recorded. Verify tagger export completeness.")
     elif on_target == 0:
         lines.append(
-            "⚠ Zero shots on target — Zone 14 penetration is occurring but "
-            "the final-action quality is the constraining factor."
+            "⚠ Zero shots on target — entries are reaching the box but the "
+            "final action is the constraining factor. Focus on the quality of the "
+            "final pass and the striker's arrival angle."
         )
 
     return "\n".join(lines)
@@ -475,41 +524,42 @@ def run_press_agent(ledger: dict, feedback: str = "", ctx: dict | None = None) -
     if zoned_regains > 0:
         dominant_regain_third = max(("A", "M", "D"), key=lambda t: regain_thirds[t])
         loe_map = {
-            "A": "High Block  (LoE in opposition's Attacking Third — A_* zones)",
-            "M": "Mid Block   (LoE at Halfway — M_* zones)",
-            "D": "Low Block   (LoE in Defensive Third — D_* zones: reactive)",
+            "A": "High Block — ball wins concentrated in the opposition's attacking third",
+            "M": "Mid Block — ball wins concentrated around halfway",
+            "D": "Low Block — ball wins concentrated in Tiverton's defensive third (reactive)",
         }
         line_of_engagement = loe_map[dominant_regain_third]
         high_pct = _safe_pct(regain_thirds["A"] + regain_thirds["M"], zoned_regains)
     else:
-        line_of_engagement  = "Insufficient spatial data — no zone_id on HIGH_REGAIN events"
+        line_of_engagement  = "Insufficient spatial data — no pitch coordinates on ball-win events"
         dominant_regain_third = None
         high_pct = 0
 
     # Pressing Trigger recommendation based on confirmed LoE
     if dominant_regain_third == "A":
         press_trigger_rec = (
-            "High press confirmed in the A_* zones. Trigger: ball to opposition "
-            "CB under back-pass pressure. Ball-side winger sets the trigger; "
-            "#8 / #10 cuts the central pass lane to force the long ball over the top."
+            "High press confirmed in the opposition's attacking third. Trigger: ball to "
+            "the opposition centre-back under back-pass pressure. Ball-side winger sets "
+            "the trigger; the #8 / #10 cuts the central pass lane to force the long "
+            "ball over the top."
         )
     elif dominant_regain_third == "M":
         press_trigger_rec = (
-            "Mid-block press confirmed at halfway. Trigger: opposition pivot "
-            "receiving to feet. The #9 channels the press direction; the #10 "
-            "shadows the pivot. Hold 4-4-2 Block compactness — do not over-commit."
+            "Mid-block press confirmed at halfway. Trigger: opposition pivot receiving "
+            "to feet. The #9 channels the press direction; the #10 shadows the pivot. "
+            "Hold 4-4-2 block compactness — do not over-commit."
         )
     elif dominant_regain_third == "D":
         press_trigger_rec = (
-            "Regains concentrated in the Defensive Third — the press is disorganised "
-            "or not being executed. The Block is reactive rather than proactive. "
+            "Ball wins concentrated in the defensive third — the press is disorganised "
+            "or not being executed. The block is reactive rather than proactive. "
             "Immediate lever: establish a clear press trigger and compact the mid-block "
-            "to prevent the opposition playing through the M_* zones freely."
+            "to prevent the opposition playing through the middle of the pitch freely."
         )
     else:
         press_trigger_rec = (
-            "Spatial data required for a precision Pressing Trigger recommendation. "
-            "Ensure tagger exports use the v2 pitch tap (x_m, y_m populated)."
+            "Pitch coordinate data is required for a precision pressing trigger "
+            "recommendation. Ensure the v2 tagger is used with a pitch tap on every event."
         )
 
     # ── Compactness — spatial spread of DEF_TURNOVER across channels ───────────
@@ -525,28 +575,28 @@ def run_press_agent(ledger: dict, feedback: str = "", ctx: dict | None = None) -
 
     if zoned_to >= 2:
         channel_spread = len(to_channels)
+        ch_str = ", ".join(_CH_LABELS.get(c, c) for c in sorted(to_channels))
         if channel_spread <= 2:
             compactness_note = (
-                f"DEF_TURNOVER events cluster in {channel_spread} channel(s) "
-                f"({', '.join(sorted(to_channels))}) — block is spatially compact."
+                f"Possession losses cluster in {channel_spread} channel{'s' if channel_spread > 1 else ''} "
+                f"({ch_str}) — the block is holding shape well laterally."
             )
         elif channel_spread <= 4:
             compactness_note = (
-                f"DEF_TURNOVER events spread across {channel_spread} channels "
-                f"({', '.join(sorted(to_channels))}) — moderate width in the Block. "
-                "Monitor for exploitation of the wide channels in the next phase."
+                f"Possession losses spread across {channel_spread} channels ({ch_str}) — "
+                "moderate width in the block. Monitor for exploitation of the wide "
+                "channels in the next defensive phase."
             )
         else:
             compactness_note = (
-                f"DEF_TURNOVER events distributed across all {channel_spread} channels "
-                f"({', '.join(sorted(to_channels))}) — the Block is not compact. "
-                "Unit Cohesion is breaking down laterally; tighten horizontal "
-                "distances between the defensive and midfield lines."
+                f"Possession losses distributed across all {channel_spread} channels ({ch_str}) "
+                "— the block is not compact laterally. Unit Cohesion is breaking down; "
+                "tighten horizontal distances between the defensive and midfield lines."
             )
     elif zoned_to == 1:
-        compactness_note = "Single spatially-confirmed DEF_TURNOVER — insufficient for compactness analysis."
+        compactness_note = "Single tracked possession loss — too few events to read the block shape."
     else:
-        compactness_note = "No spatially-confirmed DEF_TURNOVER events — compactness analysis unavailable."
+        compactness_note = "No location data on possession losses — compactness analysis unavailable."
 
     lines: list[str] = []
     lines.append("## MOMENT 2 & 3 — OUT OF POSSESSION / PRESSING")
@@ -556,19 +606,21 @@ def run_press_agent(ledger: dict, feedback: str = "", ctx: dict | None = None) -
         lines.append("")
 
     lines.append(
-        f"**HIGH_REGAIN (Pressing Wins):** {total_regains}  |  "
-        f"**DEF_TURNOVER (Losses):** {total_turnovers}  |  "
+        f"**Ball Wins:** {total_regains}  ·  "
+        f"**Possession Losses:** {total_turnovers}  ·  "
         f"**Total Possession Changes:** {total_events}"
     )
     lines.append(
         f"**Counter-Pressing Phase Efficiency:** {cp_efficiency}%  "
-        f"(regains / total possession changes)"
+        f"(ball wins as a share of all possession changes)"
     )
     if zoned_regains > 0:
         lines.append(
-            f"**Regain Zone Distribution:** "
-            f"A_*={regain_thirds['A']}  M_*={regain_thirds['M']}  D_*={regain_thirds['D']}  "
-            f"(High-press rate: {high_pct}%)"
+            f"**Ball Win Locations:** "
+            f"attacking third: {regain_thirds['A']}  ·  "
+            f"middle third: {regain_thirds['M']}  ·  "
+            f"defensive third: {regain_thirds['D']}  "
+            f"(high-press rate: {high_pct}%)"
         )
     lines.append("")
     lines.append(f"**Line of Engagement (spatial):** {line_of_engagement}")
@@ -581,7 +633,7 @@ def run_press_agent(ledger: dict, feedback: str = "", ctx: dict | None = None) -
     lines.append("")
 
     if total_regains == 0 and total_turnovers == 0:
-        lines.append("⚠ No HIGH_REGAIN or DEF_TURNOVER events found. Verify tagger export.")
+        lines.append("⚠ No ball wins or possession losses found. Verify tagger export.")
     elif cp_efficiency < 35 and total_events >= 5:
         lines.append(
             "⚠ HIGH ALERT — Counter-Pressing Phase efficiency critically low. "
@@ -638,8 +690,8 @@ def run_press_agent(ledger: dict, feedback: str = "", ctx: dict | None = None) -
                 lead_total = leading_regains + leading_turnovers
                 lead_eff   = _safe_pct(leading_regains, lead_total) if lead_total else 0
                 lines.append(
-                    f"  Whilst leading — Regains: {leading_regains}  |  Turnovers: {leading_turnovers}  "
-                    f"|  Efficiency: {lead_eff}%"
+                    f"  Whilst leading — Ball Wins: {leading_regains}  |  "
+                    f"Possession Losses: {leading_turnovers}  |  Efficiency: {lead_eff}%"
                 )
                 if leading_turnovers > leading_regains:
                     lines.append(_wrap(
@@ -659,8 +711,8 @@ def run_press_agent(ledger: dict, feedback: str = "", ctx: dict | None = None) -
                 other_total = other_regains + other_turnovers
                 other_eff   = _safe_pct(other_regains, other_total) if other_total else 0
                 lines.append(
-                    f"  Level/trailing phase — Regains: {other_regains}  |  Turnovers: {other_turnovers}  "
-                    f"|  Efficiency: {other_eff}%"
+                    f"  Level/trailing — Ball Wins: {other_regains}  |  "
+                    f"Possession Losses: {other_turnovers}  |  Efficiency: {other_eff}%"
                 )
 
     return "\n".join(lines)
@@ -703,26 +755,27 @@ def run_set_piece_agent(ledger: dict, feedback: str = "", ctx: dict | None = Non
     # Attacking corner zones from real coordinates
     att_zones = [e.get("zone_id") for e in att_corners if e.get("zone_id")]
     att_zone_str = (
-        f"{att_total} attacking corner(s)  —  "
-        f"zones: {', '.join(att_zones) if att_zones else 'no spatial data'}"
+        f"{att_total} attacking {'corner' if att_total == 1 else 'corners'}  —  "
+        f"delivery locations: {_summarise_zones(att_zones)}"
         if att_total > 0 else "No attacking corners recorded."
     )
 
-    # Defensive corner zones — Rest Defense flag if in D_* zones
+    # Defensive corner zones — Rest Defense flag if in defensive third
     def_zones = [e.get("zone_id") for e in def_corners if e.get("zone_id")]
     def_in_d_third = [z for z in def_zones if z and z.startswith("D_")]
     rest_defense_flag = (def_total >= 3) or (len(def_in_d_third) >= 2)
 
     def_zone_str = (
-        f"{def_total} defensive corner(s)  —  "
-        f"zones: {', '.join(def_zones) if def_zones else 'no spatial data'}"
+        f"{def_total} defensive {'corner' if def_total == 1 else 'corners'}  —  "
+        f"delivery locations: {_summarise_zones(def_zones)}"
         if def_total > 0 else "No defensive corners recorded."
     )
 
     # Free kick zones
     fk_zones = [e.get("zone_id") for e in free_kicks if e.get("zone_id")]
     fk_note = (
-        f"{fk_total} free kick(s)  —  zones: {', '.join(fk_zones) if fk_zones else 'no spatial data'}. "
+        f"{fk_total} free {'kick' if fk_total == 1 else 'kicks'}  —  "
+        f"locations: {_summarise_zones(fk_zones)}. "
         "Coordinate free kick delivery with a first-post decoy run to disrupt the defensive wall."
         if fk_total > 0 else "No free kicks recorded."
     )
@@ -761,7 +814,7 @@ def run_set_piece_agent(ledger: dict, feedback: str = "", ctx: dict | None = Non
         f"Free Kicks: {fk_total}"
     )
     if unclassified:
-        lines.append(f"  *(Unclassified: {len(unclassified)} — sub_type missing)*")
+        lines.append(f"  *(Unclassified: {len(unclassified)} — no sub-type recorded)*")
     lines.append("")
 
     lines.append(f"**Attacking Set Pieces:** {att_zone_str}")
@@ -770,8 +823,8 @@ def run_set_piece_agent(ledger: dict, feedback: str = "", ctx: dict | None = Non
 
     if rest_defense_flag:
         lines.append(
-            "**🚨 REST DEFENSE ALERT** — Repeated defensive corners in the D_* "
-            "zones. Second-ball clearances are elevating counter-attack exposure."
+            "**🚨 REST DEFENSE ALERT** — Repeated defensive corners in the defensive "
+            "third. Second-ball clearances are elevating counter-attack exposure."
         )
         lines.append(_wrap(
             "The holding midfielder (#4 / #8) must track late opposition runners "
@@ -877,14 +930,16 @@ def run_nonleague_agent(ledger: dict, feedback: str = "", ctx: dict | None = Non
     # Aerial headline
     if total_aerial > 0:
         lines.append(
-            f"**Aerial Duels:** {total_aerial} total  |  "
-            f"Won: {len(aerial_won)}  |  Lost: {len(aerial_lost)}  |  "
-            f"Win Rate: {aerial_wr}%"
+            f"**Aerial Duels:** {total_aerial} total — "
+            f"{len(aerial_won)} won, {len(aerial_lost)} lost "
+            f"(win rate: {aerial_wr}%)"
         )
         if zoned_aerials > 0:
             lines.append(
-                f"**Aerial Zone Distribution:** "
-                f"A_*={aerial_thirds['A']}  M_*={aerial_thirds['M']}  D_*={aerial_thirds['D']}"
+                f"**Aerial Battle Zones:** "
+                f"attacking third: {aerial_thirds['A']}  ·  "
+                f"middle third: {aerial_thirds['M']}  ·  "
+                f"defensive third: {aerial_thirds['D']}"
             )
         if dominant_aerial_third:
             third_name = {"A": "Attacking Third", "M": "Middle Third", "D": "Defensive Third"}
@@ -894,22 +949,22 @@ def run_nonleague_agent(ledger: dict, feedback: str = "", ctx: dict | None = Non
             lines.append("")
             if dominant_aerial_third == "D" and aerial_wr is not None and aerial_wr < 50:
                 lines.append(_wrap(
-                    "⚠ Aerial battles concentrated in the Defensive Third with a sub-50% "
+                    "⚠ Aerial battles concentrated in the defensive third with a sub-50% "
                     "win rate — Tiverton are conceding aerial Quantitative Superiority in "
                     "the most dangerous zone. Direct balls over the back line are a live "
                     "threat. Tactical lever: drop the defensive line 5m to contest second "
-                    "balls in the D_LC / D_RC corridors, not on the penalty spot."
+                    "balls in front of the box, not on the penalty spot."
                 ))
             elif dominant_aerial_third == "M" and aerial_wr is not None and aerial_wr >= 55:
                 lines.append(_wrap(
-                    "Aerial dominance confirmed in the Middle Third. Tiverton are winning "
+                    "Aerial dominance confirmed in the middle third. Tiverton are winning "
                     "the physical battle at halfway — a strong platform for direct "
                     "Attacking Transition. Task the #10 to exploit space behind the "
                     "aerial contest immediately on second-ball recovery."
                 ))
             elif dominant_aerial_third == "A":
                 lines.append(_wrap(
-                    f"Aerial contests concentrated in the Attacking Third. "
+                    f"Aerial contests concentrated in the attacking third. "
                     f"Win rate {aerial_wr}% — "
                     + ("attacking set piece delivery and long balls over the top are "
                        "creating Quantitative Superiority in the box." if aerial_wr and aerial_wr >= 50
@@ -919,7 +974,7 @@ def run_nonleague_agent(ledger: dict, feedback: str = "", ctx: dict | None = Non
     else:
         lines.append("**Aerial Duels:** Not tagged this match.")
         lines.append(_wrap(
-            "⚠ AERIAL_DUEL is a critical event type at non-league level. "
+            "⚠ Aerial duels are a critical data point at non-league level. "
             "Ensure the v2 tagger is used and aerial contests are captured — "
             "this data drives the second-ball and direct-play analysis."
         ))
@@ -929,14 +984,16 @@ def run_nonleague_agent(ledger: dict, feedback: str = "", ctx: dict | None = Non
     # Second ball headline
     if total_sb > 0:
         lines.append(
-            f"**Second Balls:** {total_sb} total  |  "
-            f"Won: {len(sb_won)}  |  Lost: {len(sb_lost)}  |  "
-            f"Recovery Rate: {sb_wr}%"
+            f"**Second Balls:** {total_sb} total — "
+            f"{len(sb_won)} won, {len(sb_lost)} lost "
+            f"(recovery rate: {sb_wr}%)"
         )
         if sum(sb_thirds.values()) > 0:
             lines.append(
                 f"**Second Ball Zones:** "
-                f"A_*={sb_thirds['A']}  M_*={sb_thirds['M']}  D_*={sb_thirds['D']}"
+                f"attacking third: {sb_thirds['A']}  ·  "
+                f"middle third: {sb_thirds['M']}  ·  "
+                f"defensive third: {sb_thirds['D']}"
             )
         lines.append("")
 
