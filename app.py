@@ -797,8 +797,7 @@ with tab1:
         ("🕐  PRE-MATCH", "pm_tagger_charged",    "Phone charged ≥ 80% and tagger loaded in browser"),
         ("🕐  PRE-MATCH", "pm_tagger_test",        "Test SUB, SHOT and AERIAL_DUEL buttons — badge increments correctly"),
         ("🕐  PRE-MATCH", "pm_roster_set",         "Tagger roster set: shirt numbers + player names entered"),
-        ("🕐  PRE-MATCH", "pm_veo_downloaded",     "Veo match file downloaded to local machine (data/raw/veo/)"),
-        ("🕐  PRE-MATCH", "pm_calib_loaded",       "Camera calibration loaded in Tab 2 (or new calibration captured)"),
+        ("🕐  PRE-MATCH", "pm_calib_loaded",       "Same venue as last match? Load saved calibration in Tab 2 — check green CALIBRATION ACTIVE badge"),
         ("🕐  PRE-MATCH", "pm_context_entered",    "Match context entered: opponent, competition, venue, date"),
         ("🕐  PRE-MATCH", "pm_workspace_clear",    "Previous match archived & workspace is clean"),
         # ── DURING MATCH ──────────────────────────────────────────────────
@@ -815,6 +814,8 @@ with tab1:
         ("📦  POST-MATCH", "post_run_pipeline",    "Tab 3: run pipeline — Reconcile → Visuals → Agents"),
         ("📦  POST-MATCH", "post_review_agents",   "Read all 4 agent sections; reject/refine if needed"),
         ("📦  POST-MATCH", "post_approve",         "Approve dossier — HTML report + DoF card generated"),
+        ("📦  POST-MATCH", "post_veo_download",    "Download Veo match file to data/raw/veo/ (~30–60 min after final whistle)"),
+        ("📦  POST-MATCH", "post_calibration",     "Tab 2: capture calibration from Veo frame (or load saved if same venue + camera angle)"),
         ("📦  POST-MATCH", "post_veo_offsets",     "Tab 2: set 1H + 2H kick-off offsets from Veo file"),
         ("📦  POST-MATCH", "post_sections",        "Tab 2: export tactical sections (4 windows) for manager review"),
         ("📦  POST-MATCH", "post_deliver",         "Send HTML dossier + DoF card to manager / Director of Football"),
