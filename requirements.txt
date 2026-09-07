@@ -1,2 +1,3 @@
 pandas
 mplsoccer
+opencv-python        # cv/calibration.py, cv/picker.py — Tier 1 homography (CPU only)

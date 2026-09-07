@@ -16,7 +16,11 @@ PitchPulse/
 ├── reconcile/
 │   └── sync.py                # ✅ COMPLETE — Post-match reconciliation engine; ±90s temporal match, roster resolution, JSON/TXT feed, ledger output
 ├── cv/
-│   └── zones.py               # ✅ COMPLETE — 18-Zone tactical matrix (105×68m); bbox, centroid, get_zone_by_coords(), get_zone_centroid()
+│   ├── zones.py               # ✅ COMPLETE — 18-Zone tactical matrix (105×68m); bbox, centroid, get_zone_by_coords(), get_zone_centroid()
+│   ├── calibration.py         # ✅ COMPLETE — Tier 1: planar homography computation; interactive anchor picker; save/load camera_calibration.json
+│   ├── picker.py              # ✅ COMPLETE — Tier 1: pixel_to_pitch(); build_video_event(); append_video_event() → ledger; CLI + frame picker
+│   └── tests/
+│       └── test_homography.py # ✅ COMPLETE — 21-test synthetic suite; no image/GPU required; 21/21 passing
 ├── reports/
 │   ├── visualizer.py          # ✅ COMPLETE — OLED-dark mplsoccer engine; shot map, transition map, zonal heatmap → data/processed/plots/
 │   ├── packager.py            # ✅ COMPLETE — Self-contained HTML dossier packager; base64 PNGs, OLED dark, mobile responsive, iOS Safari A4 print
@@ -103,6 +107,79 @@ using a ±90 s temporal window. Resolves shirt numbers to player names. Writes `
 ### `cv/zones.py`
 18-Zone tactical matrix on a 105 × 68 m FIFA pitch.
 Zone ID convention: `{THIRD}_{CHANNEL}` — e.g. `A_LH` (attacking left half-space), `A_LC` / `A_RC` (Zone 14).
+
+### `cv/calibration.py`
+Tier 1 homography calibration — standalone midweek utility, not part of `run_matchday.py`.
+
+Computes the 3×3 planar homography matrix **H** that maps camera pixel coordinates `(u, v)` to
+real-world pitch coordinates `(x_m, y_m)` on the 105 × 68 m pitch.
+
+**Core functions:**
+- `calibrate_pitch(reference_points, pitch_dims) → np.ndarray` — calls `cv2.findHomography` (RANSAC) on ≥4 anchor pairs
+- `reprojection_error(reference_points, H) → float` — mean pixel error across all reference points
+- `save_calibration(H, reference_points, out_path, reprojection_error_px) → Path` — writes `camera_calibration.json`
+- `load_calibration(calib_path) → np.ndarray` — returns H from JSON
+- `load_calibration_meta(calib_path) → dict` — full JSON payload
+
+**13 standard anchors** defined in `ANCHORS[]` (penalty spots, penalty area corners, halfway-line intersections).
+Reprojection quality bands: GOOD < 3 px · WARN < 8 px · POOR ≥ 8 px.
+
+**CLI modes:**
+```bash
+# Interactive — click anchors on a still frame in matplotlib:
+python cv/calibration.py --image data/raw/frame.jpg --anchors 1 2 3 4 5
+
+# Non-interactive — supply pre-mapped pairs as JSON:
+python cv/calibration.py --points-json data/raw/my_points.json --out data/raw/camera_calibration.json
+
+# Verify an existing calibration:
+python cv/calibration.py --verify data/raw/camera_calibration.json
+```
+
+ELI5: It teaches the computer where the pitch lines are in the camera view so it can convert pixel positions to real metres.
+
+### `cv/picker.py`
+Tier 1 pixel-to-pitch converter and ledger amendment tool — standalone midweek utility.
+
+**Core functions:**
+- `pixel_to_pitch(u, v, H) → (x_m, y_m)` — homogeneous matrix multiply; clamped to `[0, 105] × [0, 68]`
+- `resolve_zone(x_m, y_m) → (zone_id, zone_name)` — delegates to `cv.zones.get_zone_by_coords()` (spatial integrity contract upheld)
+- `build_video_event(u, v, H, event_type, ...) → dict` — v2-compatible event with `source="video_assisted"`
+- `append_video_event(ledger_path, event) → Path` — appends to `unmatched_tags` in `match_ledger.json`; increments `summary.video_assisted_events`
+
+**Spatial integrity contract:** zone_id is derived exclusively via `cv.zones.get_zone_by_coords()` — no sub-type inference from pixel position.
+
+**v2 event additions:** `source`, `zone_id`, `zone_name`, `pixel_u`, `pixel_v`, `video_timestamp_s`.
+
+**CLI modes:**
+```bash
+# Supply pixel coordinate directly:
+python cv/picker.py --pixel 540 320 --event-type SHOT --sub-type ON_TARGET \
+  --match-seconds 4620 --period 2H --ledger data/processed/match_ledger.json
+
+# Click a video frame interactively:
+python cv/picker.py --frame data/raw/frame.jpg --event-type BOX_ENTRY --sub-type CARRY \
+  --match-seconds 2830 --period 1H --ledger data/processed/match_ledger.json
+```
+
+ELI5: It takes a pixel you click on a video still, works out where that is on the real pitch in metres, and saves it to the match data file.
+
+### `cv/tests/test_homography.py`
+21-test synthetic unit suite. No image file, no camera, no GPU required.
+
+A fixed synthetic perspective matrix generates pixel coordinates from known world points.
+`calibrate_pitch()` is asked to recover the mapping; `pixel_to_pitch()` is verified against
+ground truth at ±0.15 m tolerance.
+
+| Test group | Tests | Key assertions |
+|---|---|---|
+| `calibrate_pitch` | 4 | 3×3 float64, raises on <4 pts, reprojection error < 1 px |
+| `pixel_to_pitch` | 4 | ±15 cm accuracy, clamp high/low, degenerate w≈0 fallback |
+| `resolve_zone` | 5 | Centre=M_*, pen spot=A_*C*, out of bounds=None, Zone 14 LC+RC |
+| `build_video_event` | 6 | Required keys, source, clock_display, x_pct range, zone_id, video_ts |
+| `save/load` | 2 | H round-trip within fp tolerance, FileNotFoundError on missing |
+
+Run: `python cv/tests/test_homography.py`  or  `python -m pytest cv/tests/test_homography.py -v`
 
 ### `reports/visualizer.py`
 OLED-dark mplsoccer pitch rendering engine. Accepts a `list[dict]` of events with optional
