@@ -28,7 +28,7 @@ PitchPulse/
 │   ├── packager.py            # ✅ COMPLETE — Self-contained HTML dossier packager; base64 PNGs, OLED dark, mobile responsive, iOS Safari A4 print
 │   ├── dof_card.py            # ✅ COMPLETE — 1080×1920 DoF match card PNG; OLED dark, Tivvy amber, KPI tiles, pitch miniatures, exec bullets
 │   ├── progress_review.py     # ✅ COMPLETE — Longitudinal tactical review engine; rolling 4–8 game window; CLI + Streamlit Tab 5
-│   └── video_engine.py        # ✅ COMPLETE — FFmpeg clip engine; dual kick-off offset sync; stream-copy slicing; M3U playlist export
+│   └── video_engine.py        # ✅ COMPLETE — FFmpeg clip engine; dual kick-off offset sync; stream-copy slicing; M3U playlist; tactical section export (4 windows)
 ├── agents/
 │   ├── __init__.py            # Package marker
 │   └── synthesis.py           # ✅ COMPLETE — 3-agent UEFA tactical analysis engine + CLI approval gate
@@ -62,7 +62,7 @@ Opens at `http://localhost:8501`. Local only — no cloud, no external traffic.
 | Tab | Purpose |
 |-----|---------|
 | 📥 Match Ingestion | Upload tagger JSONs + .docx; auto-parse to match_context.json + tivvy_x_feed.json |
-| 🎥 Veo Video Lab | Local video frame extraction; Plotly click-picker; homography calibration; video event logging; **Clip Workspace** — dual kick-off sync offsets, per-event ✂ Clip buttons, inline `st.video()` preview, M3U playlist export |
+| 🎥 Veo Video Lab | Local video frame extraction; Plotly click-picker; homography calibration; video event logging; **Clip Workspace** — dual kick-off sync offsets, per-event ✂ Clip buttons, inline `st.video()` preview, M3U playlist export; **Tactical Section Export** — 4 fixed windows (Opening 15, 1H Final 15, 2H Opening 15, Final 20) sliced to `sections/` with M3U for manager review |
 | 🧠 Agent Cockpit | Run reconcile→visuals→agents pipeline; review 4 agent outputs; direct approve/reject gate (bypasses terminal `input()`) |
 | 📦 Deliverables Hub | Preview DoF card + HTML dossier; download buttons; **Archive & Clear** — auto-stamps `ledger_DD-MM-YYYY.json` for Progress Review, moves working files to `data/archive/{date}_{opponent}/`, resets session state, leaves clips untouched |
 
@@ -232,8 +232,20 @@ FFmpeg-based match clip slicing engine. Local-only; no cloud, no re-encoding.
 - `slice_clip(video_path, start_s, end_s, output_path) → (bool, str)` — `ffmpeg -ss {start} -to {end} -i {input} -c copy -y {output}`; near-instant stream copy
 - `build_clip_path(clips_root, match_date, opponent, match_seconds, event_type, sub_type, zone_id) → Path` — e.g. `data/clips/15-08-2026_st-blazey/72m_a-lc_shot_on-target.mp4`
 - `export_playlist_m3u(clip_paths, m3u_path)` — extended M3U for VLC / mpv coach presentation
+- `_section_windows(offset_1h, offset_2h) → list[(label, start_s, end_s)]` — 4 fixed tactical windows in Veo file time
+- `export_tactical_sections(video_path, output_dir, offset_1h, offset_2h) → (succeeded, errors)` — slices full match into 4 analytical windows; writes `tactical_sections.m3u`
 
-**Output directory:** `data/clips/{DD-MM-YYYY}_{opponent-slug}/`
+**Tactical sections:**
+| # | Label | Match time |
+|---|---|---|
+| 01 | Opening 15 min | Kick-off → 15′ |
+| 02 | 1H Final 15 min | 30′ → 45′ |
+| 03 | 2H Opening 15 min | 2H restart → 60′ |
+| 04 | Final 20 min | 70′ → 90′ |
+
+**Output directories:**
+- Event clips: `data/clips/{DD-MM-YYYY}_{opponent-slug}/`
+- Tactical sections: `data/clips/{DD-MM-YYYY}_{opponent-slug}/sections/`
 
 ### `reports/visualizer.py`
 OLED-dark mplsoccer pitch rendering engine. Accepts a `list[dict]` of events with optional
