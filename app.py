@@ -1342,11 +1342,11 @@ with tab5:
         if review_mode == "Date range":
             dr_col1, dr_col2 = st.columns(2)
             with dr_col1:
-                review_from = st.text_input("From (YYYY-MM-DD)", key="review_from",
-                                            placeholder="2026-08-01")
+                review_from = st.text_input("From (DD/MM/YYYY)", key="review_from",
+                                            placeholder="01-08-2026")
             with dr_col2:
-                review_to = st.text_input("To (YYYY-MM-DD)", key="review_to",
-                                          placeholder="2026-09-06")
+                review_to = st.text_input("To (DD/MM/YYYY)", key="review_to",
+                                          placeholder="06-09-2026")
         else:
             review_from = review_to = None
 
@@ -1389,7 +1389,7 @@ with tab5:
                 'border-radius:8px;padding:10px 16px;margin:14px 0;'
                 'font-family:\'Inter\',sans-serif;font-size:.78rem;color:#fcd34d">'
                 '⚠ No date-stamped ledger files found in <code>data/processed/</code>. '
-                'Expected pattern: <code>ledger_YYYY-MM-DD.json</code>. '
+                'Expected pattern: <code>ledger_DD-MM-YYYY.json</code> (e.g. <code>ledger_15-08-2026.json</code>). '
                 'After each matchday run, copy <code>match_ledger.json</code> to a date-stamped name.'
                 '</div>',
                 unsafe_allow_html=True,

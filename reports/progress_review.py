@@ -5,15 +5,16 @@ Aggregates multiple match ledgers over a rolling 6–8 game window.
 
 CLI:
     python reports/progress_review.py --last 6
-    python reports/progress_review.py --from 2026-08-01 --to 2026-09-06
+    python reports/progress_review.py --from 15-08-2026 --to 06-09-2026
 
 Output:
-    data/processed/progress_review_YYYY-MM-DD.html
-    data/processed/progress_review_YYYY-MM-DD_dof_card.html
+    data/processed/progress_review_DD-MM-YYYY.html
+    data/processed/progress_review_DD-MM-YYYY_dof_card.html
 
 Ledger discovery:
-    Globs data/processed/ledger_YYYY-MM-DD.json (date-stamped copies).
-    After each matchday: cp data/processed/match_ledger.json data/processed/ledger_$(date +%F).json
+    Globs data/processed/ledger_DD-MM-YYYY.json (UK standard, e.g. ledger_15-08-2026.json).
+    Also accepts legacy ledger_YYYY-MM-DD.json for backward compatibility.
+    After each matchday: cp data/processed/match_ledger.json data/processed/ledger_$(date +%d-%m-%Y).json
 """
 
 from __future__ import annotations
@@ -132,6 +133,21 @@ def _safe_pct(num: int, denom: int) -> float:
 # Ledger discovery
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _parse_ledger_date(date_str: str) -> date:
+    """Parse a date string from a ledger filename, accepting UK (DD-MM-YYYY) or ISO (YYYY-MM-DD)."""
+    for fmt in ("%d-%m-%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f"Unrecognised ledger date format: {date_str!r}")
+
+
+def _parse_filter_date(date_str: str) -> date:
+    """Parse a filter date string supplied by the user, accepting DD-MM-YYYY or YYYY-MM-DD."""
+    return _parse_ledger_date(date_str)
+
+
 def discover_ledgers(
     proc_dir:  Path = PROC_DIR,
     last_n:    int  = 6,
@@ -139,22 +155,24 @@ def discover_ledgers(
     date_to:   Optional[str] = None,
 ) -> list[Path]:
     """
-    Find date-stamped ledger files (ledger_YYYY-MM-DD.json) in proc_dir.
+    Find date-stamped ledger files in proc_dir.
+    Accepts UK format ledger_DD-MM-YYYY.json (preferred) and legacy ledger_YYYY-MM-DD.json.
     Returns paths in chronological order.
     """
     candidates: list[tuple[date, Path]] = []
     for p in proc_dir.glob("ledger_*.json"):
+        raw = p.stem.replace("ledger_", "")
         try:
-            d = date.fromisoformat(p.stem.replace("ledger_", ""))
+            d = _parse_ledger_date(raw)
             candidates.append((d, p))
         except ValueError:
-            pass
+            pass  # skip non-date-stamped files (e.g. match_ledger.json backups)
 
     candidates.sort(key=lambda x: x[0], reverse=True)   # newest first
 
     if date_from or date_to:
-        lo = date.fromisoformat(date_from) if date_from else date.min
-        hi = date.fromisoformat(date_to)   if date_to   else date.max
+        lo = _parse_filter_date(date_from) if date_from else date.min
+        hi = _parse_filter_date(date_to)   if date_to   else date.max
         candidates = [(d, p) for d, p in candidates if lo <= d <= hi]
     else:
         candidates = candidates[:last_n]
@@ -766,7 +784,7 @@ def generate_review(
     """
     if not ledger_paths:
         raise ValueError(
-            "No ledger files supplied. Expected pattern: ledger_YYYY-MM-DD.json"
+            "No ledger files supplied. Expected pattern: ledger_DD-MM-YYYY.json (e.g. ledger_15-08-2026.json)"
         )
 
     snaps = [extract_per_game_metrics(p) for p in ledger_paths]
@@ -802,15 +820,17 @@ def _cli() -> None:
     grp = parser.add_mutually_exclusive_group()
     grp.add_argument("--last", type=int, default=6, metavar="N",
                      help="N most recent ledger files (default: 6)")
-    grp.add_argument("--from", dest="date_from", metavar="YYYY-MM-DD")
-    parser.add_argument("--to", dest="date_to",  metavar="YYYY-MM-DD")
+    grp.add_argument("--from", dest="date_from", metavar="DD-MM-YYYY",
+                     help="Start date in UK format, e.g. 15-08-2026")
+    parser.add_argument("--to", dest="date_to",  metavar="DD-MM-YYYY",
+                        help="End date in UK format, e.g. 06-09-2026")
     args = parser.parse_args()
 
     paths = discover_ledgers(PROC_DIR, last_n=args.last,
                              date_from=args.date_from, date_to=args.date_to)
     if not paths:
         print("⚠  No date-stamped ledger files found in data/processed/")
-        print("   Expected: data/processed/ledger_YYYY-MM-DD.json")
+        print("   Expected: data/processed/ledger_DD-MM-YYYY.json (e.g. ledger_15-08-2026.json)")
         print("   Tip: after each matchday, copy match_ledger.json to a date-stamped name.")
         sys.exit(0)
 
