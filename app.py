@@ -29,6 +29,8 @@ import contextlib
 import importlib.util
 import io
 import json
+import re
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -396,6 +398,49 @@ def _extract_frame(video_path: str, frame_idx: int) -> np.ndarray | None:
     ret, frame = cap.read()
     cap.release()
     return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) if ret else None
+
+
+def _archive_match(match_date: str, opponent: str) -> Path:
+    """
+    Move all working match files into data/archive/{DD-MM-YYYY}_{opponent-slug}/.
+
+    Moves:
+        data/processed/match_ledger.json
+        data/raw/match_context.json
+        data/raw/camera_calibration.json
+        data/processed/plots/   (entire folder)
+        data/processed/tivvy_tactical_dossier.html
+        data/processed/plots/dof_match_card.png  (via plots/ move)
+
+    Leaves untouched:
+        data/processed/ledger_*.json  (date-stamped copies for Progress Review)
+        data/clips/                   (already organised by match folder)
+
+    Returns the archive directory Path.
+    """
+    slug = re.sub(r"[^\w]+", "-", opponent.lower()).strip("-")
+    label = f"{match_date}_{slug}" if match_date else slug or "unknown"
+    archive_dir = ROOT / "data" / "archive" / label
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    def _move(src: Path) -> None:
+        if src.exists():
+            dest = archive_dir / src.name
+            # If a folder already exists at dest, remove it first (idempotent re-archive)
+            if dest.exists():
+                if dest.is_dir():
+                    shutil.rmtree(dest)
+                else:
+                    dest.unlink()
+            shutil.move(str(src), str(dest))
+
+    _move(LEDGER_PATH)
+    _move(CONTEXT_PATH)
+    _move(CALIB_PATH)
+    _move(PLOTS_DIR)       # moves entire plots/ subtree (includes dof_match_card.png)
+    _move(HTML_REPORT_PATH)
+
+    return archive_dir
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1563,6 +1608,100 @@ with tab4:
               </div>
             </div>
             """, unsafe_allow_html=True)
+
+    # ── Archive & Clear ───────────────────────────────────────────────────────
+    st.markdown(_divider(), unsafe_allow_html=True)
+    st.markdown(_section_label("Archive & Clear Workspace", color="#71717a"), unsafe_allow_html=True)
+    st.markdown(
+        '<div style="font-family:\'Inter\',sans-serif;font-size:.78rem;color:#71717a;'
+        'margin-bottom:16px;max-width:600px;line-height:1.6">'
+        'Once you have verified delivery — dossier sent, DoF card shared — archive this match '
+        'and open a clean workspace for the next game. All files are moved to '
+        '<code>data/archive/</code>, nothing is deleted. Date-stamped ledger copies and video '
+        'clips are left untouched.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Determine whether there is anything to archive
+    _has_ledger  = LEDGER_PATH.exists()
+    _has_context = CONTEXT_PATH.exists()
+    _has_dossier = HTML_REPORT_PATH.exists()
+    _has_dof     = DOF_CARD_PATH.exists()
+    _anything_to_archive = any([_has_ledger, _has_context, _has_dossier, _has_dof])
+
+    # Working files status strip
+    _file_statuses = [
+        ("Match Ledger",   _has_ledger),
+        ("Match Context",  _has_context),
+        ("HTML Dossier",   _has_dossier),
+        ("DoF Card",       _has_dof),
+        ("Plots folder",   PLOTS_DIR.exists() and any(PLOTS_DIR.iterdir()) if PLOTS_DIR.exists() else False),
+    ]
+    _status_html = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'
+    for _label, _present in _file_statuses:
+        _col  = "#22c55e" if _present else "#3f3f46"
+        _dot  = "●" if _present else "○"
+        _status_html += (
+            f'<div style="display:flex;align-items:center;gap:6px;'
+            f'background:#111116;border:1px solid rgba(255,255,255,0.06);'
+            f'border-radius:6px;padding:4px 10px;'
+            f'font-family:\'JetBrains Mono\',monospace;font-size:.72rem">'
+            f'<span style="color:{_col}">{_dot}</span>'
+            f'<span style="color:#a1a1aa">{_label}</span>'
+            f'</div>'
+        )
+    _status_html += '</div>'
+    st.markdown(_status_html, unsafe_allow_html=True)
+
+    if not _anything_to_archive:
+        st.markdown(
+            '<div style="background:#111116;border:1px solid rgba(255,255,255,0.06);'
+            'border-radius:8px;padding:10px 16px;font-family:\'Inter\',sans-serif;'
+            'font-size:.78rem;color:#3f3f46">Workspace is already clear — nothing to archive.</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        # Derive archive label from loaded context or ledger
+        _arch_ctx  = st.session_state.get("ctx") or {}
+        _arch_date = _arch_ctx.get("match_date", "")
+        _arch_opp  = _arch_ctx.get("opponent", "unknown")
+
+        if st.button(
+            f"📦  Archive & Clear Workspace",
+            key="btn_archive",
+            type="primary",
+        ):
+            try:
+                _arch_dir = _archive_match(match_date=_arch_date, opponent=_arch_opp)
+                # Reset session state: clear all match-specific keys
+                _clear_keys = [
+                    "ledger", "ctx", "agent_outputs", "dossier_content", "dossier_path",
+                    "rejection_count", "rejection_feedback", "pipeline_log", "approval_status",
+                    "H", "calib_points", "current_frame", "video_path", "frame_index",
+                    "last_click", "last_pitch_coord", "video_events_logged",
+                    "clip_offset_1h", "clip_offset_2h", "clip_lead_in", "clip_follow_through",
+                    "last_clip_path", "review_result",
+                ]
+                _defaults = {
+                    "ledger": None, "ctx": None, "agent_outputs": {}, "dossier_content": None,
+                    "dossier_path": None, "rejection_count": 0, "rejection_feedback": "",
+                    "pipeline_log": "", "approval_status": None,
+                    "H": None, "calib_points": [], "current_frame": None,
+                    "video_path": "", "frame_index": 0, "last_click": None,
+                    "last_pitch_coord": None, "video_events_logged": 0,
+                    "clip_offset_1h": 0, "clip_offset_2h": 0,
+                    "clip_lead_in": 5, "clip_follow_through": 3,
+                    "last_clip_path": None, "review_result": None,
+                }
+                for _k in _clear_keys:
+                    st.session_state[_k] = _defaults.get(_k)
+                # Recreate plots dir so the app doesn't error on missing folder
+                PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+                st.toast(f"✓ Archived to {_arch_dir}", icon="📦")
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"Archive failed: {_exc}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

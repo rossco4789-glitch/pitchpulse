@@ -10,7 +10,7 @@ PitchPulse/
 ├── CLAUDE.md                  # System constitution & persona constraints
 ├── PROJECT_INDEX.md           # This file — master map of the stack
 ├── requirements.txt           # Python dependencies (pandas, mplsoccer, opencv-python, streamlit)
-├── app.py                     # ✅ COMPLETE — Streamlit desktop dashboard; 5 tabs; OLED dark; local-only; Tab 2 Clip Workspace added
+├── app.py                     # ✅ COMPLETE — Streamlit desktop dashboard; 5 tabs; OLED dark; local-only; Tab 2 Clip Workspace; Tab 4 Archive & Clear
 ├── .streamlit/config.toml     # Streamlit theme: OLED #09090b bg, Tivvy Amber #f59e0b primary
 ├── run_matchday.py            # ✅ COMPLETE — Master pipeline runner (reconcile → visuals → agents)
 ├── tagger/
@@ -64,7 +64,7 @@ Opens at `http://localhost:8501`. Local only — no cloud, no external traffic.
 | 📥 Match Ingestion | Upload tagger JSONs + .docx; auto-parse to match_context.json + tivvy_x_feed.json |
 | 🎥 Veo Video Lab | Local video frame extraction; Plotly click-picker; homography calibration; video event logging; **Clip Workspace** — dual kick-off sync offsets, per-event ✂ Clip buttons, inline `st.video()` preview, M3U playlist export |
 | 🧠 Agent Cockpit | Run reconcile→visuals→agents pipeline; review 4 agent outputs; direct approve/reject gate (bypasses terminal `input()`) |
-| 📦 Deliverables Hub | Preview DoF card + HTML dossier; download buttons |
+| 📦 Deliverables Hub | Preview DoF card + HTML dossier; download buttons; **Archive & Clear** — moves working files to `data/archive/{date}_{opponent}/`, resets session state, leaves date-stamped ledgers and clips untouched |
 
 State persists across tab switches via `st.session_state`. Uploaded files are staged to `data/raw/staged/` before backend processing so existing function signatures (which expect `Path`) receive valid paths.
 
