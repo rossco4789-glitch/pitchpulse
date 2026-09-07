@@ -205,3 +205,94 @@ def export_playlist_m3u(
         lines.append(str(p.resolve()))
 
     m3u_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Tactical section export
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Fixed analytical windows (in Veo file seconds, relative to recording start).
+# The caller supplies offset_1h so sections are computed in Veo time, not
+# match time.  All durations are approximate — FFmpeg snaps to the nearest
+# keyframe so actual boundaries may shift ≤2 s.
+_TACTICAL_SECTIONS = [
+    # (label, match_start_s, match_end_s, which_offset)
+    # "which_offset" = "1h" → add offset_1h;  "2h" → add offset_2h and
+    # subtract 2700 s (nominal 45-min boundary) from the match seconds.
+    ("01_opening-15",      0,    900,  "1h"),
+    ("02_1h-closing-15",  2700, 2700,  "1h"),   # 30'–45'  (900 s window)
+    ("03_2h-opening-15",   0,    900,  "2h"),
+    ("04_final-20",       3600, 5400,  "2h"),   # 60'–90'  (1800 s window)
+]
+
+# Explicit window definitions as (label, veo_start_fn, veo_end_fn)
+# evaluated at call-time using the supplied offsets.
+def _section_windows(offset_1h: float, offset_2h: float) -> list[tuple[str, float, float]]:
+    """
+    Return (label, veo_start_s, veo_end_s) for each tactical section,
+    clamped so veo_start_s >= 0.
+    """
+    return [
+        (
+            "01_opening-15min",
+            max(0.0, offset_1h + 0),
+            offset_1h + 900,
+        ),
+        (
+            "02_1h-final-15min",
+            max(0.0, offset_1h + 1800),
+            offset_1h + 2700,
+        ),
+        (
+            "03_2h-opening-15min",
+            max(0.0, offset_2h + 0),
+            offset_2h + 900,
+        ),
+        (
+            "04_final-20min",
+            max(0.0, offset_2h + 2700),
+            offset_2h + 5400,
+        ),
+    ]
+
+
+def export_tactical_sections(
+    video_path: str | Path,
+    output_dir: Path,
+    offset_1h: float,
+    offset_2h: float,
+) -> tuple[list[Path], list[str]]:
+    """
+    Slice the full Veo match file into 4 fixed tactical windows using
+    fast stream copy (no re-encode). Each section lands in output_dir.
+
+    Sections:
+        01_opening-15min      — 1H kick-off → 15'
+        02_1h-final-15min     — 30' → 45' (closing pressure / rest defence)
+        03_2h-opening-15min   — 2H restart → 60' (shape after HT talk)
+        04_final-20min        — 70' → 90' (game management, sub impact)
+
+    Returns
+    -------
+    (succeeded: list[Path], errors: list[str])
+    """
+    video_path = Path(video_path)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    succeeded: list[Path] = []
+    errors:    list[str]  = []
+
+    for label, start_s, end_s in _section_windows(offset_1h, offset_2h):
+        out_path = output_dir / f"{label}.mp4"
+        ok, msg = slice_clip(video_path, start_s, end_s, out_path)
+        if ok:
+            succeeded.append(out_path)
+        else:
+            errors.append(f"{label}: {msg}")
+
+    if succeeded:
+        m3u_path = output_dir / "tactical_sections.m3u"
+        export_playlist_m3u(succeeded, m3u_path)
+
+    return succeeded, errors

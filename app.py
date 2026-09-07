@@ -1261,6 +1261,87 @@ with tab2:
                 if _pl_errors:
                     st.warning("Some clips failed:\n" + "\n".join(_pl_errors))
 
+            # ── Tactical Section Export ───────────────────────────────────
+            st.markdown(_divider(), unsafe_allow_html=True)
+            st.markdown(
+                '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
+                'font-size:.8rem;letter-spacing:.1em;color:#71717a;margin:10px 0 6px">'
+                'TACTICAL SECTION EXPORT</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                '<div style="font-family:\'Inter\',sans-serif;font-size:.76rem;'
+                'color:#71717a;margin-bottom:12px;max-width:560px;line-height:1.6">'
+                'Slice the full 90-minute file into 4 fixed analytical windows '
+                'for manager review — no event data needed. '
+                'Uses the kick-off offsets set above.</div>',
+                unsafe_allow_html=True,
+            )
+
+            # Section preview table
+            st.markdown(
+                '<div style="display:grid;grid-template-columns:220px 90px 90px;gap:0;'
+                'background:#111116;border:1px solid rgba(255,255,255,0.06);'
+                'border-radius:10px 10px 0 0;padding:7px 14px;'
+                'font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
+                'font-size:.72rem;letter-spacing:.09em;color:#71717a">'
+                '<span>SECTION</span><span>FROM</span><span>TO</span></div>',
+                unsafe_allow_html=True,
+            )
+            _section_defs = [
+                ("01 · Opening 15 min",    "Kick-off",   "15′"),
+                ("02 · 1H Final 15 min",   "30′",        "45′"),
+                ("03 · 2H Opening 15 min", "2H restart", "60′"),
+                ("04 · Final 20 min",      "70′",        "90′"),
+            ]
+            for _si, (_slabel, _sfrom, _sto) in enumerate(_section_defs):
+                _bg = "rgba(255,255,255,0.015)" if _si % 2 == 0 else "transparent"
+                st.markdown(
+                    f'<div style="display:grid;grid-template-columns:220px 90px 90px;gap:0;'
+                    f'background:{_bg};border-left:1px solid rgba(255,255,255,0.06);'
+                    f'border-right:1px solid rgba(255,255,255,0.06);'
+                    f'border-bottom:1px solid rgba(255,255,255,0.04);'
+                    f'padding:6px 14px;font-family:\'JetBrains Mono\',monospace;'
+                    f'font-size:.72rem;color:#ededf0">'
+                    f'<span style="color:#f59e0b">{_slabel}</span>'
+                    f'<span style="color:#86efac">{_sfrom}</span>'
+                    f'<span style="color:#86efac">{_sto}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            st.markdown(
+                '<div style="border:1px solid rgba(255,255,255,0.06);'
+                'border-top:none;border-radius:0 0 10px 10px;height:4px"></div>',
+                unsafe_allow_html=True,
+            )
+
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+            if _ffmpeg_ok and _vpath and st.button(
+                "🎬  Export Tactical Sections",
+                key="btn_section_export",
+            ):
+                from reports.video_engine import export_tactical_sections
+                _opp_slug = re.sub(r"[^\w]+", "-", _opponent.lower()).strip("-")
+                _sec_dir = CLIPS_DIR / f"{_match_date or 'unknown'}_{_opp_slug}" / "sections"
+                _sec_bar = st.progress(0, text="Preparing sections…")
+                with st.spinner("Slicing tactical sections — this may take 30–60 s…"):
+                    _sec_ok, _sec_err = export_tactical_sections(
+                        video_path = _vpath,
+                        output_dir = _sec_dir,
+                        offset_1h  = float(st.session_state["clip_offset_1h"]),
+                        offset_2h  = float(st.session_state["clip_offset_2h"]),
+                    )
+                _sec_bar.progress(1.0, text="Done")
+                if _sec_ok:
+                    st.success(
+                        f"✓ {len(_sec_ok)} sections exported → {_sec_dir}\n\n"
+                        f"Playlist: {_sec_dir / 'tactical_sections.m3u'}\n\n"
+                        "Open the playlist in VLC for sequential manager review."
+                    )
+                if _sec_err:
+                    st.warning("Some sections failed:\n" + "\n".join(_sec_err))
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — Agent Cockpit & Approval Gate
