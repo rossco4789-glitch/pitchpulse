@@ -132,18 +132,31 @@ def _rule(char: str = "─") -> None:
 
 def _extract_tags(ledger: dict, event_type: str) -> list[dict]:
     """
-    Collect all tag events of a given event_type from both
-    matched (ledger['matched'][n]['tag']) and unmatched_tags lists.
+    Collect Tiverton tag events of a given event_type from matched and
+    unmatched_tags.  Events with team='opponent' are excluded.
     Returns events sorted by match_seconds ascending.
     """
     tags: list[dict] = []
     for match in ledger.get("matched", []):
         tag = match.get("tag", {})
-        if tag.get("event_type") == event_type:
+        if tag.get("event_type") == event_type and tag.get("team") != "opponent":
             tags.append(tag)
     for tag in ledger.get("unmatched_tags", []):
-        if tag.get("event_type") == event_type:
+        if tag.get("event_type") == event_type and tag.get("team") != "opponent":
             tags.append(tag)
+    return sorted(tags, key=lambda t: t.get("match_seconds", 0))
+
+
+def _extract_opponent_tags(ledger: dict, event_type: str) -> list[dict]:
+    """
+    Collect opposition tag events of a given event_type from the
+    dedicated opponent_events ledger key (produced by reconcile/sync.py ≥ v2.3).
+    Returns events sorted by match_seconds ascending.
+    """
+    tags = [
+        t for t in ledger.get("opponent_events", [])
+        if t.get("event_type") == event_type
+    ]
     return sorted(tags, key=lambda t: t.get("match_seconds", 0))
 
 
@@ -1027,6 +1040,186 @@ def run_nonleague_agent(ledger: dict, feedback: str = "", ctx: dict | None = Non
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Agent 5 — Opposition Threat Agent
+# Moment: OUT OF POSSESSION (Tiverton's perspective on opponent's attack)
+# Events: all event_types tagged with team='opponent'
+# Formal language: Rest Defense, Line of Engagement, Compactness, Block
+# ══════════════════════════════════════════════════════════════════════════════
+
+def run_opponent_agent(ledger: dict, feedback: str = "", ctx: dict | None = None) -> str:
+    """
+    Analyse opposition events (team='opponent') tagged during the match.
+
+    Answers two questions the other agents cannot:
+      1. WHERE did the opposition threaten? (their box entries, shots by zone)
+      2. WHERE did they win the ball from us? (our defensive vulnerability by zone)
+
+    All events come from ledger['opponent_events'], populated by reconcile/sync.py
+    when the tagger operator logs events with the OPP team toggle active.
+
+    Returns a formatted markdown section or a data-quality advisory when no
+    opposition events were tagged.
+    """
+    opp_events = ledger.get("opponent_events", [])
+
+    if not opp_events:
+        return "\n".join([
+            "## OPPOSITION THREAT ANALYSIS",
+            "",
+            "⚠ No opposition events tagged this match.",
+            _wrap(
+                "To activate opposition analysis: use the 🔴 OPP toggle on the tagger "
+                "before logging events for the opposition. Same event types apply — "
+                "SHOT, BOX_ENTRY, HIGH_REGAIN, SET_PIECE, AERIAL_DUEL. "
+                "Switch back to 🟡 TIVVY immediately after each opposition event."
+            ),
+        ])
+
+    # Pull opposition events by type
+    opp_shots   = _extract_opponent_tags(ledger, "SHOT")
+    opp_entries = _extract_opponent_tags(ledger, "BOX_ENTRY")
+    opp_regains = _extract_opponent_tags(ledger, "HIGH_REGAIN")   # they win the ball from us
+    opp_sp      = _extract_opponent_tags(ledger, "SET_PIECE")
+    opp_aerials = _extract_opponent_tags(ledger, "AERIAL_DUEL")
+
+    lines: list[str] = []
+    lines.append("## OPPOSITION THREAT ANALYSIS")
+
+    if feedback:
+        lines.append(f"> ⚙ Manager note: {feedback.strip()}")
+        lines.append("")
+
+    opponent = ctx.get("opponent", "Opposition") if ctx else "Opposition"
+
+    lines.append(
+        f"**{opponent} — Tagged Events:** {len(opp_events)} total  |  "
+        f"Shots: {len(opp_shots)}  |  "
+        f"Box Entries: {len(opp_entries)}  |  "
+        f"Ball Wins: {len(opp_regains)}  |  "
+        f"Set Pieces: {len(opp_sp)}  |  "
+        f"Aerials: {len(opp_aerials)}"
+    )
+    lines.append("")
+
+    # ── Opposition Shot Threat ─────────────────────────────────────────────
+    if opp_shots:
+        opp_on   = sum(1 for s in opp_shots if s.get("sub_type") == "ON_TARGET")
+        opp_off  = sum(1 for s in opp_shots if s.get("sub_type") == "OFF_TARGET")
+        opp_blk  = sum(1 for s in opp_shots if s.get("sub_type") == "BLOCKED")
+        shot_z   = [s.get("zone_id") for s in opp_shots if s.get("zone_id")]
+        lines.append(
+            f"**{opponent} Shot Threat:** {len(opp_shots)} shots — "
+            f"{opp_on} on target, {opp_off} off target, {opp_blk} blocked"
+        )
+        if shot_z:
+            lines.append(f"**Shot Zones:** {_summarise_zones(shot_z)}")
+        if opp_on >= 3:
+            lines.append(_wrap(
+                f"⚠ {opp_on} shots on target — Rest Defense is under sustained "
+                "pressure. The goalkeeper is being asked to work consistently: "
+                "review the shot zones and tighten the Block's press-recovery line "
+                "to reduce the opposition's shooting angle."
+            ))
+        lines.append("")
+
+    # ── Opposition Box Entry Corridor (where they're breaching our defence) ─
+    if opp_entries:
+        corridor_counts: dict[str, int] = {"Flank": 0, "Half-Space": 0, "Central (Zone 14)": 0, "Unknown": 0}
+        zoned = 0
+        for e in opp_entries:
+            zid = e.get("zone_id")
+            if zid is None:
+                corridor_counts["Unknown"] += 1
+                continue
+            zoned += 1
+            channel = ZONES[zid]["channel"] if zid in ZONES else ""
+            if channel in _FLANK_CHANNELS:
+                corridor_counts["Flank"] += 1
+            elif zid in _HALF_SPACE_ZONES:
+                corridor_counts["Half-Space"] += 1
+            else:
+                corridor_counts["Central (Zone 14)"] += 1
+
+        lines.append(f"**{opponent} Box Entry Corridors** (our defensive vulnerability):")
+        if zoned > 0:
+            for corridor in ("Flank", "Half-Space", "Central (Zone 14)"):
+                n   = corridor_counts[corridor]
+                pct = _safe_pct(n, zoned)
+                bar = "█" * (pct // 10)
+                lines.append(f"  {corridor:<22}  {n:>2}  ({pct:>3}%)  {bar}")
+            dominant = max(
+                ("Flank", "Half-Space", "Central (Zone 14)"),
+                key=lambda k: corridor_counts[k]
+            )
+            lines.append(f"**Dominant Opposition Corridor:** {dominant}")
+            lines.append(_wrap(
+                f"Tactical lever: the opposition is finding space in the {dominant.lower()} "
+                "channel. Ensure the corresponding fullback or central midfielder "
+                "is tracking their runner and not ball-watching."
+            ))
+        lines.append("")
+
+    # ── Where they won the ball from us (our press/possession failure zones) ─
+    if opp_regains:
+        opp_thirds: dict[str, int] = {"A": 0, "M": 0, "D": 0}
+        for r in opp_regains:
+            zid = r.get("zone_id")
+            if zid and zid in ZONES:
+                opp_thirds[ZONES[zid]["third"]] += 1
+        total_zoned = sum(opp_thirds.values())
+        if total_zoned > 0:
+            dominant_third = max(opp_thirds, key=opp_thirds.get)
+            third_label = {"A": "our attacking third", "M": "halfway", "D": "our defensive third"}
+            lines.append(
+                f"**Where {opponent} Won the Ball:** "
+                f"attacking third: {opp_thirds['A']}  ·  "
+                f"middle third: {opp_thirds['M']}  ·  "
+                f"defensive third: {opp_thirds['D']}"
+            )
+            lines.append(_wrap(
+                f"Possession losses concentrated at {third_label[dominant_third]}. "
+                + ("⚠ HIGH RISK — the opposition are winning the ball in our defensive "
+                   "third. The Block is not protecting the back line under pressure. "
+                   "Lever: drop the Line of Engagement and prioritise shape over pressing "
+                   "triggers in the defensive third."
+                   if dominant_third == "D" else
+                   "Mid-pitch turnovers are allowing the opposition to transition quickly. "
+                   "Improve ball retention in the middle third to reduce counter exposure."
+                   if dominant_third == "M" else
+                   "Opposition winning ball high — our press is being turned. "
+                   "Review the Counter-Pressing Phase trigger to avoid over-committing "
+                   "bodies in the attacking third.")
+            ))
+            lines.append("")
+
+    # ── Opposition Set Pieces ──────────────────────────────────────────────
+    if opp_sp:
+        att_sp = [e for e in opp_sp if e.get("sub_type") in ("ATT_CORNER", "FREE_KICK")]
+        lines.append(
+            f"**{opponent} Set Pieces:** {len(opp_sp)} total — "
+            f"attacking: {len(att_sp)}"
+        )
+        if len(att_sp) >= 3:
+            lines.append(_wrap(
+                f"⚠ {len(att_sp)} attacking set pieces for the opposition. "
+                "REST DEFENSE ALERT — sustained dead-ball exposure. "
+                "Review delivery zones in Tab 2 clips and assign a specific "
+                "runner tracker in the zonal scheme."
+            ))
+        lines.append("")
+
+    # ── Data Quality Note ─────────────────────────────────────────────────
+    if len(opp_events) < 5:
+        lines.append(_wrap(
+            f"⚠ Only {len(opp_events)} opposition events tagged — "
+            "sample is thin for reliable pattern detection. "
+            "Aim for 10+ events per match to draw confident tactical conclusions."
+        ))
+
+    return "\n".join(lines)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Dossier assembly
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1102,6 +1295,7 @@ def _build_dossier(
     section_pr  = run_press_agent(ledger, feedback, ctx=ctx)
     section_sp  = run_set_piece_agent(ledger, feedback, ctx=ctx)
     section_nl  = run_nonleague_agent(ledger, feedback, ctx=ctx)
+    section_opp = run_opponent_agent(ledger, feedback, ctx=ctx)
 
     summary_stats = ledger.get("summary", {})
     schema_v      = ledger.get("schema_version", 1)
@@ -1116,13 +1310,15 @@ def _build_dossier(
         f"Unmatched tags: {summary_stats.get('unmatched_tags', '?')}  |  "
         f"Unmatched club events: {summary_stats.get('unmatched_club_events', '?')}  |  "
         f"Events with real zone: {zoned_count}  |  "
-        f"Substitutions: {summary_stats.get('substitutions', 0)}",
+        f"Substitutions: {summary_stats.get('substitutions', 0)}  |  "
+        f"Opposition events: {summary_stats.get('opponent_events', 0)}",
         "",
         "_PitchPulse Tactical Intelligence · Tiverton Town FC Performance Analysis_",
     ])
 
     sep = "\n\n---\n\n"
-    return header + section_ip + sep + section_pr + sep + section_sp + sep + section_nl + footer
+    return (header + section_ip + sep + section_pr + sep + section_sp
+            + sep + section_nl + sep + section_opp + footer)
 
 
 def _write_dossier(content: str, match_id: str) -> Path:
@@ -1279,6 +1475,7 @@ def main() -> None:
     print("    Agent 2: Out-of-Possession / Press  (HIGH_REGAIN, DEF_TURNOVER)")
     print("    Agent 3: Set-Piece Analyst          (SET_PIECE)")
     print("    Agent 4: Non-League Physics         (AERIAL_DUEL, SECOND_BALL)")
+    print("    Agent 5: Opposition Threat          (opponent_events — all types)")
     print()
 
     saved = run_approval_gate(ledger)

@@ -377,10 +377,13 @@ def _stamp_zone(tag: dict) -> None:
 
 
 def build_ledger(
-    matched:         list[dict],
-    unmatched_tags:  list[dict],
-    unmatched_club:  list[dict],
+    matched:          list[dict],
+    unmatched_tags:   list[dict],
+    unmatched_club:   list[dict],
+    opponent_events:  list[dict] | None = None,
 ) -> dict:
+    opponent_events = opponent_events or []
+
     # ── Extract substitution events before zone-stamping ──────────────────
     # SUB events carry no spatial data; keep them in a dedicated top-level
     # list so synthesis.py can build a dynamic player-name timeline.
@@ -418,10 +421,12 @@ def build_ledger(
             "unmatched_club_events": len(unmatched_club),
             "events_with_zone":      zoned_count,
             "substitutions":         len(substitutions),
+            "opponent_events":       len(opponent_events),
         },
         "matched":               matched,
         "unmatched_tags":        spatial_tags,
-        "substitutions":         substitutions,       # ← new dedicated key
+        "substitutions":         substitutions,
+        "opponent_events":       opponent_events,     # ← opposition tracking (v2.3)
         "unmatched_club_events": unmatched_club,
     }
 
@@ -452,6 +457,7 @@ def print_audit(ledger: dict) -> None:
     print(f"  {'UNMATCHED CLUB EVENTS':<32} {s['unmatched_club_events']:>4}  ⚠")
     print(f"  {'EVENTS WITH REAL ZONE (v2)':<32} {s.get('events_with_zone', '—'):>4}  📍")
     print(f"  {'SUBSTITUTIONS':<32} {s.get('substitutions', 0):>4}  ↔")
+    print(f"  {'OPPOSITION EVENTS':<32} {s.get('opponent_events', 0):>4}  🔴")
     _rule()
 
     if ledger["matched"]:
@@ -487,6 +493,19 @@ def print_audit(ledger: dict) -> None:
                 f" {tag.get('event_type',''):<16}"
                 f" {str(tag.get('sub_type') or ''):<13}"
                 f"  {resolve_player(tag.get('player_num'))}"
+            )
+        _rule()
+
+    if ledger.get("opponent_events"):
+        print("\n  OPPOSITION EVENTS  (zone-stamped, not reconciled against club feed)")
+        _rule()
+        for tag in ledger["opponent_events"]:
+            print(
+                f"  {tag.get('clock_display','--:--'):<8}"
+                f" {tag.get('period','?'):<4}"
+                f" {tag.get('event_type',''):<16}"
+                f" {str(tag.get('sub_type') or ''):<13}"
+                f"  zone: {tag.get('zone_id') or 'no coord'}"
             )
         _rule()
 
@@ -528,9 +547,17 @@ def main() -> None:
         club_events = extract_club_events(feed_data, feed_type)
     print(f"  [FEED] {len(club_events)} club event(s) parsed.")
 
+    # Separate opposition events before reconciliation — the club feed is
+    # Tiverton-centric, so opposition observations are stored directly without
+    # any attempt to match them against club-feed entries.
+    opponent_events  = [e for e in tag_events if e.get("team") == "opponent"]
+    tiverton_events  = [e for e in tag_events if e.get("team") != "opponent"]
+    if opponent_events:
+        print(f"  [OPP ] {len(opponent_events)} opposition event(s) split off before reconciliation.")
+
     print("\n[3/4] Reconciling …")
     matched, unmatched_tags, unmatched_club = reconcile_events(
-        tag_events, club_events, window=RECON_WINDOW_S
+        tiverton_events, club_events, window=RECON_WINDOW_S
     )
     print(
         f"  Matched: {len(matched)}  |  "
@@ -538,8 +565,13 @@ def main() -> None:
         f"Unmatched club: {len(unmatched_club)}"
     )
 
+    # Zone-stamp opposition events using the same spatial logic
+    for opp_ev in opponent_events:
+        _stamp_zone(opp_ev)
+
     print("\n[4/4] Writing ledger …")
-    ledger = build_ledger(matched, unmatched_tags, unmatched_club)
+    ledger = build_ledger(matched, unmatched_tags, unmatched_club,
+                          opponent_events=opponent_events)
     write_ledger(ledger, LEDGER_OUT)
 
     print()

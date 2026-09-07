@@ -122,6 +122,18 @@
     </div>
   </header>
 
+  <!-- ═══ Team Toggle Strip ═══════════════════════════════════════════════ -->
+  <div id="team-strip" class="shrink-0 flex items-center justify-between px-4 py-1.5"
+    style="border-bottom:1px solid rgba(255,255,255,.06); transition: background .2s, border-color .2s;">
+    <span class="text-[10px] font-semibold tracking-[.18em] text-white/30">TAGGING FOR</span>
+    <button id="btn-team" onclick="toggleTeam()"
+      class="text-[11px] font-black tracking-[.12em] px-4 py-1.5 rounded-full transition-all duration-150 ease-out active:scale-[0.95]"
+      style="background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.35); color:#fbbf24;">
+      🟡 TIVVY
+    </button>
+    <span class="text-[10px] font-semibold tracking-[.18em] text-white/30">TAP TO SWITCH</span>
+  </div>
+
   <!-- ═══ Clock Controls ══════════════════════════════════════════════════ -->
   <section class="shrink-0 px-3 py-2.5 no-scrollbar overflow-x-auto"
     style="border-bottom:1px solid rgba(255,255,255,.06);">
@@ -577,6 +589,7 @@
     let activePlayer   = null;
     let activePhase    = '—';
     let attackingRight = true;   // auto-set by period; manual override via btn-dir
+    let activeTeam     = 'tiverton'; // 'tiverton' | 'opponent' — toggled via HUD
     let clockRunning   = false;
     let paused         = false;
     let phaseStartWall = null;
@@ -665,6 +678,32 @@
     // ══════════════════════════════════════════════════════════════════════
     // Attacking direction toggle
     // ══════════════════════════════════════════════════════════════════════
+    function toggleTeam() {
+      activeTeam = (activeTeam === 'tiverton') ? 'opponent' : 'tiverton';
+      updateTeamToggle();
+    }
+
+    function updateTeamToggle() {
+      const btn  = document.getElementById('btn-team');
+      const strip = document.getElementById('team-strip');
+      if (!btn || !strip) return;
+      if (activeTeam === 'opponent') {
+        btn.textContent = '🔴 OPP';
+        btn.style.background = 'rgba(220,38,38,.25)';
+        btn.style.borderColor = 'rgba(248,113,113,.5)';
+        btn.style.color = '#fca5a5';
+        strip.style.background = 'rgba(220,38,38,.08)';
+        strip.style.borderBottomColor = 'rgba(220,38,38,.25)';
+      } else {
+        btn.textContent = '🟡 TIVVY';
+        btn.style.background = 'rgba(251,191,36,.1)';
+        btn.style.borderColor = 'rgba(251,191,36,.35)';
+        btn.style.color = '#fbbf24';
+        strip.style.background = '';
+        strip.style.borderBottomColor = '';
+      }
+    }
+
     function toggleDirection() {
       attackingRight = !attackingRight;
       updateDirButton();
@@ -887,6 +926,7 @@
         match_seconds:  secs,
         clock_display:  `${mm}:${ss}`,
         player_num:     activePlayer,
+        team:           activeTeam,
         event_type:     eventType,
         sub_type:       subType   || null,
         x_pct:          coords    ? coords.x_pct : null,
@@ -914,7 +954,7 @@
     function flashBadge() {
       const badge = document.getElementById('event-badge');
       badge.style.transform  = 'scale(1.35)';
-      badge.style.background = '#4ade80';
+      badge.style.background = activeTeam === 'opponent' ? '#ef4444' : '#4ade80';
       badge.style.color      = '#000';
       setTimeout(() => {
         badge.style.transform  = '';
