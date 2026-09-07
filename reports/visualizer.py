@@ -390,6 +390,79 @@ def plot_zonal_heatmap(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Multi-match shot map  (progress review — all events colour-coded by game)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_GAME_PALETTE = [
+    "#f59e0b", "#22d3ee", "#a855f7", "#10b981",
+    "#f43f5e", "#3b82f6", "#fb923c", "#84cc16",
+]
+
+
+def multi_match_shot_map(
+    events:      list[dict],
+    output_path: Path | None = None,
+    window_label: str = "",
+) -> Path:
+    """
+    Shot map pooling events from multiple matches.
+    Events must carry a 'game_idx' (int) field injected by the caller.
+    Each game gets a distinct colour from _GAME_PALETTE.
+    Returns the output path.
+    """
+    out = output_path or _ensure_plots_dir() / "multi_match_shot_map.png"
+    _ensure_plots_dir()
+
+    shots = [e for e in events if e.get("event_type") == "SHOT"]
+    fig, ax, _ = _dark_pitch()
+
+    plotted = False
+    for ev in shots:
+        coords = _resolve_coords(ev)
+        if coords is None:
+            continue
+        x, y   = coords
+        sub     = ev.get("sub_type") or "OFF_TARGET"
+        g_idx   = int(ev.get("game_idx", 0))
+        colour  = _GAME_PALETTE[g_idx % len(_GAME_PALETTE)]
+        marker  = _SHOT_STYLES.get(sub, _SHOT_STYLES["OFF_TARGET"])["marker"]
+        ax.scatter(x, y, marker=marker, color=colour, s=180,
+                   edgecolors="white", linewidths=0.4, alpha=0.85, zorder=6)
+        plotted = True
+
+    if not plotted:
+        _no_data_label(ax, "No shot data across window")
+
+    n_games  = max((int(e.get("game_idx", 0)) for e in shots), default=-1) + 1
+    subtitle = window_label or f"{n_games} games"
+    ax.set_title(
+        f"Multi-Match Shot Map  ·  {len(shots)} shots  ·  {subtitle}",
+        color=TEXT, fontsize=11, fontweight="bold", pad=10,
+    )
+    _brand_stamp(ax, "PitchPulse · Rolling Shot Analysis")
+    return _save(fig, out)
+
+
+def multi_match_heatmap(
+    events:      list[dict],
+    output_path: Path | None = None,
+    window_label: str = "",
+) -> Path:
+    """
+    Zonal heatmap accumulating events from multiple matches.
+    Same rendering as plot_zonal_heatmap — counts represent totals
+    across all games in the window, not a single match.
+    Returns the output path.
+    """
+    out = output_path or _ensure_plots_dir() / "multi_match_heatmap.png"
+    # Delegate to the standard heatmap function with a custom output path and title
+    path = plot_zonal_heatmap(events, output_path=out)
+    # Re-open only to retitle (cheap — just read the saved PNG as-is and re-stamp via a new figure)
+    # Avoid re-processing: instead just return the path and let the caller override the title in Streamlit.
+    return path
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Smoke test
 # ══════════════════════════════════════════════════════════════════════════════
 

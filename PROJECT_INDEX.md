@@ -10,7 +10,7 @@ PitchPulse/
 ├── CLAUDE.md                  # System constitution & persona constraints
 ├── PROJECT_INDEX.md           # This file — master map of the stack
 ├── requirements.txt           # Python dependencies (pandas, mplsoccer, opencv-python, streamlit)
-├── app.py                     # ✅ COMPLETE — Streamlit desktop dashboard; 4 tabs; OLED dark; local-only
+├── app.py                     # ✅ COMPLETE — Streamlit desktop dashboard; 5 tabs; OLED dark; local-only
 ├── .streamlit/config.toml     # Streamlit theme: OLED #09090b bg, Tivvy Amber #f59e0b primary
 ├── run_matchday.py            # ✅ COMPLETE — Master pipeline runner (reconcile → visuals → agents)
 ├── tagger/
@@ -24,9 +24,10 @@ PitchPulse/
 │   └── tests/
 │       └── test_homography.py # ✅ COMPLETE — 21-test synthetic suite; no image/GPU required; 21/21 passing
 ├── reports/
-│   ├── visualizer.py          # ✅ COMPLETE — OLED-dark mplsoccer engine; shot map, transition map, zonal heatmap → data/processed/plots/
+│   ├── visualizer.py          # ✅ COMPLETE — OLED-dark mplsoccer engine; shot map, transition map, zonal heatmap; multi_match_shot_map/heatmap added
 │   ├── packager.py            # ✅ COMPLETE — Self-contained HTML dossier packager; base64 PNGs, OLED dark, mobile responsive, iOS Safari A4 print
-│   └── dof_card.py            # ✅ COMPLETE — 1080×1920 DoF match card PNG; OLED dark, Tivvy amber, KPI tiles, pitch miniatures, exec bullets
+│   ├── dof_card.py            # ✅ COMPLETE — 1080×1920 DoF match card PNG; OLED dark, Tivvy amber, KPI tiles, pitch miniatures, exec bullets
+│   └── progress_review.py     # ✅ COMPLETE — Longitudinal tactical review engine; rolling 4–8 game window; CLI + Streamlit Tab 5
 ├── agents/
 │   ├── __init__.py            # Package marker
 │   └── synthesis.py           # ✅ COMPLETE — 3-agent UEFA tactical analysis engine + CLI approval gate

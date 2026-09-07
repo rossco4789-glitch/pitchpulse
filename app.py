@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import streamlit as st
 
@@ -349,6 +350,7 @@ _SS: dict = {
     "H": None, "calib_points": [], "current_frame": None,
     "video_path": "", "frame_index": 0, "last_click": None,
     "last_pitch_coord": None, "video_events_logged": 0,
+    "review_result": None,
 }
 for _k, _v in _SS.items():
     if _k not in st.session_state:
@@ -483,11 +485,12 @@ st.markdown("""
 # TABS
 # ══════════════════════════════════════════════════════════════════════════════
 
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📥  Match Ingestion",
     "🎥  Veo Video Lab",
     "🧠  Agent Cockpit",
     "📦  Deliverables",
+    "📈  Progress Review",
 ])
 
 
@@ -1311,3 +1314,249 @@ with tab4:
               </div>
             </div>
             """, unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 5 — Progress Review
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab5:
+    st.markdown(_section_label("Tactical Progress Review"), unsafe_allow_html=True)
+    st.markdown(
+        '<div style="font-family:\'Inter\',sans-serif;font-size:.8rem;color:#71717a;'
+        'margin-bottom:20px;max-width:680px">Aggregate multiple match ledgers into '
+        'a rolling window report. Tracks the 4 Moments across 4–8 games to separate '
+        'tactical habits from single-match noise.</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Controls ──────────────────────────────────────────────────────────────
+    ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([1, 1, 2], gap="large")
+    with ctrl_col1:
+        review_mode = st.selectbox(
+            "Window mode", ["Last N games", "Date range"], key="review_mode"
+        )
+    with ctrl_col2:
+        review_n = st.slider("Games", min_value=4, max_value=8, value=6, key="review_n")
+    with ctrl_col3:
+        if review_mode == "Date range":
+            dr_col1, dr_col2 = st.columns(2)
+            with dr_col1:
+                review_from = st.text_input("From (YYYY-MM-DD)", key="review_from",
+                                            placeholder="2026-08-01")
+            with dr_col2:
+                review_to = st.text_input("To (YYYY-MM-DD)", key="review_to",
+                                          placeholder="2026-09-06")
+        else:
+            review_from = review_to = None
+
+    # ── Ledger discovery preview ──────────────────────────────────────────────
+    try:
+        from reports.progress_review import discover_ledgers, generate_review
+        from reports.progress_review import (
+            fig_in_possession, fig_pressing, fig_set_pieces, fig_nonleague,
+        )
+        pr_import_ok = True
+    except ImportError as e:
+        st.error(f"progress_review module unavailable: {e}")
+        pr_import_ok = False
+
+    if pr_import_ok:
+        paths = discover_ledgers(
+            PROC_DIR,
+            last_n=review_n,
+            date_from=review_from or None,
+            date_to=review_to or None,
+        )
+
+        # Status row showing found ledgers
+        if paths:
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:10px;'
+                f'background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);'
+                f'border-radius:8px;padding:10px 16px;margin:14px 0;'
+                f'font-family:\'JetBrains Mono\',monospace;font-size:.75rem">'
+                f'<span style="color:#22c55e">●</span>'
+                f'<span style="color:#86efac">{len(paths)} ledger file{"s" if len(paths) != 1 else ""} found</span>'
+                f'<span style="color:#3f3f46;margin-left:6px">'
+                + "  ·  ".join(p.stem for p in paths) +
+                f'</span></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);'
+                'border-radius:8px;padding:10px 16px;margin:14px 0;'
+                'font-family:\'Inter\',sans-serif;font-size:.78rem;color:#fcd34d">'
+                '⚠ No date-stamped ledger files found in <code>data/processed/</code>. '
+                'Expected pattern: <code>ledger_YYYY-MM-DD.json</code>. '
+                'After each matchday run, copy <code>match_ledger.json</code> to a date-stamped name.'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        run_review = st.button(
+            "📈  GENERATE REVIEW",
+            type="primary",
+            disabled=not paths,
+            key="btn_review",
+            use_container_width=False,
+        )
+
+        if run_review and paths:
+            with st.spinner("Aggregating ledgers and rendering trends…"):
+                try:
+                    result = generate_review(paths, PROC_DIR)
+                    st.session_state["review_result"] = result
+                except Exception as exc:
+                    st.error(f"Review failed: {exc}")
+                    st.session_state["review_result"] = None
+
+        result = st.session_state.get("review_result")
+
+        if result is not None and not result.df.empty:
+            df = result.df
+            snaps = result.snaps
+
+            st.markdown(_divider(), unsafe_allow_html=True)
+
+            # ── Window summary tiles ──────────────────────────────────────────
+            wins   = sum(1 for s in snaps if s.result.upper().startswith("W"))
+            draws  = sum(1 for s in snaps if s.result.upper().startswith("D"))
+            losses = sum(1 for s in snaps if s.result.upper().startswith("L"))
+            gf     = sum(s.tiv_goals for s in snaps)
+            ga     = sum(s.opp_goals  for s in snaps)
+
+            t1, t2, t3, t4, t5_inner = st.columns(5)
+            t1.markdown(_tile("Games",   str(len(df))),                         unsafe_allow_html=True)
+            t2.markdown(_tile("W / D / L", f"{wins} / {draws} / {losses}"),     unsafe_allow_html=True)
+            t3.markdown(_tile("GF — GA",   f"{gf} — {ga}"),                     unsafe_allow_html=True)
+            t4.markdown(_tile("CP Eff",    f"{df['cp_efficiency'].mean():.0f}%"),unsafe_allow_html=True)
+            t5_inner.markdown(_tile("½-Space", f"{df['half_space_pct'].mean():.0f}%"),
+                              unsafe_allow_html=True)
+
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+            # ── Per-moment trend charts ───────────────────────────────────────
+            moment_tabs = st.tabs([
+                "⚽  In Possession",
+                "🔵  Press & LoE",
+                "🟡  Set Pieces",
+                "💪  Non-League Physics",
+            ])
+
+            with moment_tabs[0]:
+                try:
+                    fig = fig_in_possession(df)
+                    st.pyplot(fig, use_container_width=True)
+                    plt.close(fig)
+                except Exception as e:
+                    st.warning(f"Chart error: {e}")
+
+            with moment_tabs[1]:
+                try:
+                    fig = fig_pressing(df)
+                    st.pyplot(fig, use_container_width=True)
+                    plt.close(fig)
+                except Exception as e:
+                    st.warning(f"Chart error: {e}")
+
+            with moment_tabs[2]:
+                try:
+                    fig = fig_set_pieces(df)
+                    st.pyplot(fig, use_container_width=True)
+                    plt.close(fig)
+                except Exception as e:
+                    st.warning(f"Chart error: {e}")
+
+            with moment_tabs[3]:
+                try:
+                    fig = fig_nonleague(df)
+                    st.pyplot(fig, use_container_width=True)
+                    plt.close(fig)
+                except Exception as e:
+                    st.warning(f"Chart error: {e}")
+
+            st.markdown(_divider(), unsafe_allow_html=True)
+
+            # ── Game-by-game table ────────────────────────────────────────────
+            st.markdown(_section_label("Game-by-Game Log"), unsafe_allow_html=True)
+            table_rows = ""
+            for _, r in df.iterrows():
+                rd_icon = "🚨" if r["rest_defense_flagged"] else "—"
+                result_color = (
+                    "#22c55e" if str(r["result"]).upper().startswith("W") else
+                    "#f43f5e" if str(r["result"]).upper().startswith("L") else
+                    "#f59e0b"
+                )
+                table_rows += f"""
+                <tr>
+                  <td style="color:#71717a">{r['match_date']}</td>
+                  <td>{r['opponent']}</td>
+                  <td style="color:{result_color};font-weight:700">{r['result']}</td>
+                  <td>{r['tiv_goals']}–{r['opp_goals']}</td>
+                  <td style="color:#f59e0b">{r['loe_index']:.2f}</td>
+                  <td>{r['cp_efficiency']:.0f}%</td>
+                  <td>{r['half_space_pct']:.0f}%</td>
+                  <td>{r['aerial_wr_d']:.0f}%</td>
+                  <td>{r['sb_wr']:.0f}%</td>
+                  <td>{rd_icon}</td>
+                </tr>"""
+
+            st.markdown(f"""
+            <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;
+                          font-family:'JetBrains Mono',monospace;font-size:.75rem">
+              <thead>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.08)">
+                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                             font-size:.62rem;letter-spacing:.08em">Date</th>
+                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                             font-size:.62rem;letter-spacing:.08em">Opponent</th>
+                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                             font-size:.62rem;letter-spacing:.08em">Result</th>
+                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                             font-size:.62rem;letter-spacing:.08em">Score</th>
+                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                             font-size:.62rem;letter-spacing:.08em">LoE Idx</th>
+                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                             font-size:.62rem;letter-spacing:.08em">CP%</th>
+                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                             font-size:.62rem;letter-spacing:.08em">½-Space%</th>
+                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                             font-size:.62rem;letter-spacing:.08em">Aerial WR(D)</th>
+                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                             font-size:.62rem;letter-spacing:.08em">2nd Ball%</th>
+                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                             font-size:.62rem;letter-spacing:.08em">RD</th>
+                </tr>
+              </thead>
+              <tbody>{table_rows}</tbody>
+            </table>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown(_divider(), unsafe_allow_html=True)
+
+            # ── Download buttons ──────────────────────────────────────────────
+            st.markdown(_section_label("Downloads"), unsafe_allow_html=True)
+            dl1, dl2 = st.columns(2)
+            with dl1:
+                st.download_button(
+                    "⬇  Full HTML Review",
+                    data=result.html_report.encode("utf-8"),
+                    file_name=result.html_report_path.name,
+                    mime="text/html",
+                    key="dl_review_html",
+                    use_container_width=True,
+                )
+            with dl2:
+                st.download_button(
+                    "⬇  DoF Executive Card",
+                    data=result.dof_card_html.encode("utf-8"),
+                    file_name=result.dof_card_path.name,
+                    mime="text/html",
+                    key="dl_dof_card",
+                    use_container_width=True,
+                )
