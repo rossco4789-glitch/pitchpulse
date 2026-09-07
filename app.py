@@ -400,47 +400,60 @@ def _extract_frame(video_path: str, frame_idx: int) -> np.ndarray | None:
     return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) if ret else None
 
 
-def _archive_match(match_date: str, opponent: str) -> Path:
+def _archive_match(match_date: str, opponent: str) -> tuple[Path, Path | None]:
     """
-    Move all working match files into data/archive/{DD-MM-YYYY}_{opponent-slug}/.
+    Stamp a date-keyed ledger copy then move all working match files to archive.
 
-    Moves:
+    Step 1 — Auto-stamp ledger (before moving):
+        Copies data/processed/match_ledger.json
+             → data/processed/ledger_DD-MM-YYYY.json
+        so Progress Review can always find this match, even if the analyst
+        forgot the manual copy step.  Skipped silently if the stamp already
+        exists or the ledger is absent.
+
+    Step 2 — Move working files to data/archive/{DD-MM-YYYY}_{opponent-slug}/:
         data/processed/match_ledger.json
         data/raw/match_context.json
         data/raw/camera_calibration.json
         data/processed/plots/   (entire folder)
         data/processed/tivvy_tactical_dossier.html
-        data/processed/plots/dof_match_card.png  (via plots/ move)
 
     Leaves untouched:
         data/processed/ledger_*.json  (date-stamped copies for Progress Review)
         data/clips/                   (already organised by match folder)
 
-    Returns the archive directory Path.
+    Returns (archive_dir, stamp_path | None).
+    stamp_path is None if the stamp was skipped (already existed or no ledger).
     """
     slug = re.sub(r"[^\w]+", "-", opponent.lower()).strip("-")
     label = f"{match_date}_{slug}" if match_date else slug or "unknown"
     archive_dir = ROOT / "data" / "archive" / label
     archive_dir.mkdir(parents=True, exist_ok=True)
 
+    # ── Step 1: auto-stamp ledger for Progress Review ─────────────────────
+    stamp_path: Path | None = None
+    if LEDGER_PATH.exists() and match_date:
+        stamp_dest = PROC_DIR / f"ledger_{match_date}.json"
+        if not stamp_dest.exists():
+            shutil.copy2(str(LEDGER_PATH), str(stamp_dest))
+            stamp_path = stamp_dest
+        # else: stamp already exists — leave it untouched
+
+    # ── Step 2: move working files to archive ────────────────────────────
     def _move(src: Path) -> None:
         if src.exists():
             dest = archive_dir / src.name
-            # If a folder already exists at dest, remove it first (idempotent re-archive)
             if dest.exists():
-                if dest.is_dir():
-                    shutil.rmtree(dest)
-                else:
-                    dest.unlink()
+                shutil.rmtree(dest) if dest.is_dir() else dest.unlink()
             shutil.move(str(src), str(dest))
 
     _move(LEDGER_PATH)
     _move(CONTEXT_PATH)
     _move(CALIB_PATH)
-    _move(PLOTS_DIR)       # moves entire plots/ subtree (includes dof_match_card.png)
+    _move(PLOTS_DIR)
     _move(HTML_REPORT_PATH)
 
-    return archive_dir
+    return archive_dir, stamp_path
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1673,7 +1686,7 @@ with tab4:
             type="primary",
         ):
             try:
-                _arch_dir = _archive_match(match_date=_arch_date, opponent=_arch_opp)
+                _arch_dir, _stamp = _archive_match(match_date=_arch_date, opponent=_arch_opp)
                 # Reset session state: clear all match-specific keys
                 _clear_keys = [
                     "ledger", "ctx", "agent_outputs", "dossier_content", "dossier_path",
@@ -1698,7 +1711,8 @@ with tab4:
                     st.session_state[_k] = _defaults.get(_k)
                 # Recreate plots dir so the app doesn't error on missing folder
                 PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-                st.toast(f"✓ Archived to {_arch_dir}", icon="📦")
+                _stamp_msg = f" · ledger stamped as {_stamp.name}" if _stamp else ""
+                st.toast(f"✓ Archived to {_arch_dir}{_stamp_msg}", icon="📦")
                 st.rerun()
             except Exception as _exc:
                 st.error(f"Archive failed: {_exc}")
