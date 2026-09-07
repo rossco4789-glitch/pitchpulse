@@ -1,3 +1,4 @@
 pandas
 mplsoccer
 opencv-python        # cv/calibration.py, cv/picker.py — Tier 1 homography (CPU only)
+streamlit            # app.py — desktop dashboard (local only, no cloud)

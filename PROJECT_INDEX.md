@@ -9,7 +9,9 @@
 PitchPulse/
 ├── CLAUDE.md                  # System constitution & persona constraints
 ├── PROJECT_INDEX.md           # This file — master map of the stack
-├── requirements.txt           # Python dependencies (pandas, mplsoccer)
+├── requirements.txt           # Python dependencies (pandas, mplsoccer, opencv-python, streamlit)
+├── app.py                     # ✅ COMPLETE — Streamlit desktop dashboard; 4 tabs; OLED dark; local-only
+├── .streamlit/config.toml     # Streamlit theme: OLED #09090b bg, Tivvy Amber #f59e0b primary
 ├── run_matchday.py            # ✅ COMPLETE — Master pipeline runner (reconcile → visuals → agents)
 ├── tagger/
 │   └── index.html             # ✅ COMPLETE (v2.2) — Broadcast-grade OLED tactical pad; SVG letterbox fix; UNDO toast; ↔ SUB modal with player-off/on selects
@@ -44,6 +46,25 @@ PitchPulse/
 ### `CLAUDE.md`
 System constitution and persona constraints. Governs all agent behaviour:
 canary drift detection, tactical analysis framework, ELI5 requirement, token conservation, and local-first architecture rules.
+
+### `app.py` — Streamlit Desktop Dashboard
+GUI alternative to the terminal pipeline. **Does not modify `run_matchday.py`.**
+
+**Launch:**
+```bash
+streamlit run app.py
+```
+Opens at `http://localhost:8501`. Local only — no cloud, no external traffic.
+
+**Tabs:**
+| Tab | Purpose |
+|-----|---------|
+| 📥 Match Ingestion | Upload tagger JSONs + .docx; auto-parse to match_context.json + tivvy_x_feed.json |
+| 🎥 Veo Video Lab | Local video frame extraction; Plotly click-picker; homography calibration; video event logging |
+| 🧠 Agent Cockpit | Run reconcile→visuals→agents pipeline; review 4 agent outputs; direct approve/reject gate (bypasses terminal `input()`) |
+| 📦 Deliverables Hub | Preview DoF card + HTML dossier; download buttons |
+
+State persists across tab switches via `st.session_state`. Uploaded files are staged to `data/raw/staged/` before backend processing so existing function signatures (which expect `Path`) receive valid paths.
 
 ### `run_matchday.py`
 Master matchday orchestration script. Runs the full pipeline in four sequential steps:

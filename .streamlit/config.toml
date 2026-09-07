@@ -1,0 +1,12 @@
+[theme]
+base                     = "dark"
+primaryColor             = "#f59e0b"   # Tivvy Amber
+backgroundColor          = "#09090b"   # OLED black
+secondaryBackgroundColor = "#18181b"   # near-black surface
+textColor                = "#f8fafc"   # off-white
+font                     = "monospace"
+
+[server]
+headless         = true
+enableCORS       = false
+enableXsrfProtection = true
