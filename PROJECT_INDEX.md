@@ -14,7 +14,9 @@ PitchPulse/
 ├── .streamlit/config.toml     # Streamlit theme: OLED #09090b bg, Tivvy Amber #f59e0b primary
 ├── run_matchday.py            # ✅ COMPLETE — Master pipeline runner (reconcile → visuals → agents)
 ├── tagger/
-│   └── index.html             # ✅ COMPLETE (v2.2) — Broadcast-grade OLED tactical pad; SVG letterbox fix; UNDO toast; ↔ SUB modal with player-off/on selects
+│   └── index.html             # ✅ COMPLETE (v3.0) — Broadcast-grade OLED tactical pad; dual-team split buttons (Tivvy/Opp per card); live score widget; haptic feedback; collapsible event log; UNDO toast; ↔ SUB modal
+├── tools/
+│   └── tagger_sanity.py       # ✅ COMPLETE — Post-session ledger validator CLI; 7 checks; ANSI colour report; exit 0/1; --test self-test suite (11 tests)
 ├── reconcile/
 │   └── sync.py                # ✅ COMPLETE — Post-match reconciliation engine; ±90s temporal match, roster resolution, JSON/TXT feed, ledger output
 ├── cv/
@@ -63,10 +65,16 @@ Opens at `http://localhost:8501`. Local only — no cloud, no external traffic.
 |-----|---------|
 | 📥 Match Ingestion | Upload tagger JSONs + .docx; auto-parse to match_context.json + tivvy_x_feed.json |
 | 🎥 Veo Video Lab | Local video frame extraction; Plotly click-picker; homography calibration; video event logging; **Clip Workspace** — dual kick-off sync offsets, per-event ✂ Clip buttons, inline `st.video()` preview, M3U playlist export; **Tactical Section Export** — 4 fixed windows (Opening 15, 1H Final 15, 2H Opening 15, Final 20) sliced to `sections/` with M3U for manager review |
-| 🧠 Agent Cockpit | Run reconcile→visuals→agents pipeline; review 4 agent outputs; direct approve/reject gate (bypasses terminal `input()`) |
+| 🧠 Agent Cockpit | Run reconcile→visuals→agents pipeline; **⚡ Half-time Briefing** (1H-only stat grid + 3 UEFA bullets + WhatsApp plain text); review 4 agent outputs; direct approve/reject gate (bypasses terminal `input()`) |
 | 📦 Deliverables Hub | Preview DoF card + HTML dossier; download buttons; **Archive & Clear** — auto-stamps `ledger_DD-MM-YYYY.json` for Progress Review, moves working files to `data/archive/{date}_{opponent}/`, resets session state, leaves clips untouched |
 
 State persists across tab switches via `st.session_state`. Uploaded files are staged to `data/raw/staged/` before backend processing so existing function signatures (which expect `Path`) receive valid paths.
+
+**Half-time Briefing helpers (module-level):**
+- `_ht_extract(ledger)` — filters all tagged events (`matched` + `unmatched_tags` + `opponent_events`) to 1H (`period == "1H"` or `match_seconds ≤ 2700`); returns `(tivvy_events, opp_events)`.
+- `_ht_zone(x_m)` — "defensive third" / "midfield" / "attacking third".
+- `_ht_flank(y_m)` — "left channel" / "central corridor" / "right channel".
+- `_ht_build_briefing(ledger)` — computes Tivvy/Opp stat counters; generates 3 context-sensitive UEFA-language bullets (Press & Territory, Threat Profile, Tactical Adjustment); returns dict including `plain` WhatsApp text string. Stored in `st.session_state["ht_briefing"]`.
 
 ### `run_matchday.py`
 Master matchday orchestration script. Runs the full pipeline in four sequential steps:
@@ -77,15 +85,46 @@ Master matchday orchestration script. Runs the full pipeline in four sequential 
 
 Flags: `--skip-reconcile`, `--skip-visuals`, `--latest`
 
-### `tagger/index.html`
-Offline-first mobile tap-pad for live match tagging. **v2.2: SUB event added.**
+### `tools/tagger_sanity.py`
+Post-session ledger and tagger-export validator. Run after downloading the tagger JSON to catch data quality issues before reconciliation.
 
-**Step 1:** Select player chip + tap action button.  
+```bash
+python tools/tagger_sanity.py data/raw/tivvy_events_1H.json
+python tools/tagger_sanity.py data/processed/match_ledger.json
+python tools/tagger_sanity.py --test   # 11 built-in unit tests
+```
+
+Accepts either a raw tagger JSON array or a schema-v2 match ledger dict (auto-detected). Outputs a colour ANSI terminal report; exits `0` if only warnings, `1` if any ERROR.
+
+| Check | Severity | Trigger |
+|---|---|---|
+| `DUPLICATE_ID` | ERROR | Two events share the same `id` |
+| `TIME_ORDER` | ERROR | `match_seconds` decreases between consecutive events |
+| `OUT_OF_BOUNDS` | ERROR | `x_m` outside `[0, 105]` or `y_m` outside `[0, 68]` |
+| `NULL_COORDS` | WARNING | `x_m` or `y_m` is null / absent |
+| `DEFENSIVE_SHOT` | WARNING | `SHOT` tagged at `x_m < 52.5` (own half — likely coordinate error) |
+| `LOW_REGAIN` | WARNING | `HIGH_REGAIN` at `x_m < 35` (defensive third — expected to be high) |
+| `EVENT_SPIKE` | WARNING | > 4 events in any 3-second window |
+| `SUB_INCOMPLETE` | WARNING | `SUB` event missing `player_off` or `player_on` |
+| `LOW_COUNT` | WARNING | Fewer than 10 events in total |
+
+ELI5: It reads your tagger data and shouts if anything looks wrong before you use it for analysis.
+
+### `tagger/index.html`
+Offline-first mobile tap-pad for live match tagging. **v3.0: dual-team split buttons, score widget, haptic feedback, live event log.**
+
+**Step 1:** Tap either the amber **TIVVY** or red **OPP** half of any event card — the team is captured directly; no toggle needed.  
 **Step 2:** Full-screen SVG pitch overlay appears — optional sub-type chip, then **tap pitch** to record real spatial coordinates. Auto-dismisses on pitch tap.
 
 Attacking direction auto-sets: `1H → attacking_right=true`, `2H → attacking_right=false`. Manual override via the `→ ATT` toggle button at all times.
 
 Coordinate calculation uses `getBoundingClientRect()` with `touchstart` + `preventDefault()` to block scroll/zoom distortion. Ghost-click suppressed via `lastTouchTime` guard. Coordinates clamped to `[0.0, 1.0]`.
+
+**v3.0 additions:**
+- **Dual-team split buttons** — every event card is a full-width left/right split; left = Tivvy (amber), right = Opponent (red). Replaces single team-toggle strip. `team` field on every event is set at tap time.
+- **Score widget** — `#score-bar` between header and clock; HOME +/− and AWAY −/+ buttons; `score_home`/`score_away` persisted to localStorage and emitted on every event object.
+- **Haptic feedback** — `navigator.vibrate(40)` on every field event; `vibrate([40,60,40])` on SUB confirm (feature-detected; silent on iOS/desktop).
+- **Live event log strip** — collapsible `#event-log-drawer` (`max-height` CSS transition); shows last 8 events as `{min}′ {TEAM} {EVENT} {zone}` rows; individual ✕ delete per row; strip header previews the latest event inline.
 
 **v2.1 fixes:** `aspect-ratio: 360 / 232` on `#pitch-svg` eliminates portrait-mode SVG letterbox coordinate drift (previously caused all flank taps to mis-map as half-space). 1-touch UNDO button (`#btn-undo`) removes last event from localStorage with amber toast confirmation; disabled when no events are logged.
 

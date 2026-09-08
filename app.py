@@ -359,6 +359,7 @@ _SS: dict = {
     "clip_lead_in": 5, "clip_follow_through": 3,
     "last_clip_path": None,
     "checklist": {},
+    "ht_briefing": None,
 }
 for _k, _v in _SS.items():
     if _k not in st.session_state:
@@ -1441,6 +1442,153 @@ with tab2:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
+# Half-time Snapshot helpers
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _ht_extract(ledger: dict) -> tuple[list, list]:
+    """Return (tivvy_1h_events, opp_1h_events) filtered strictly to period 1H."""
+    def _is_1h(tag: dict) -> bool:
+        p = tag.get("period", "")
+        if p == "1H":
+            return True
+        if p in ("2H", "ET1", "ET2", "FT", "PEN"):
+            return False
+        return tag.get("match_seconds", 0) <= 2700
+
+    all_tags: list[dict] = []
+    for m in ledger.get("matched", []):
+        all_tags.append(m.get("tag", {}))
+    all_tags += ledger.get("unmatched_tags", [])
+    all_tags += ledger.get("opponent_events", [])
+
+    tivvy = [t for t in all_tags if _is_1h(t) and t.get("team") != "opponent"]
+    opp   = [t for t in all_tags if _is_1h(t) and t.get("team") == "opponent"]
+    return tivvy, opp
+
+
+def _ht_zone(x_m) -> str:
+    if x_m is None:
+        return "unknown zone"
+    return "defensive third" if x_m < 35 else "midfield" if x_m < 70 else "attacking third"
+
+
+def _ht_flank(y_m) -> str:
+    if y_m is None:
+        return "central"
+    return "left channel" if y_m < 22 else "right channel" if y_m > 46 else "central corridor"
+
+
+def _ht_build_briefing(ledger: dict) -> dict:
+    from collections import Counter as _Counter
+    tivvy, opp = _ht_extract(ledger)
+
+    def _evs(pool, et):  return [e for e in pool if e.get("event_type") == et]
+    def _sub(pool, et, st_): return [e for e in pool if e.get("event_type") == et
+                                      and e.get("sub_type") == st_]
+
+    # ── TIVVY ──────────────────────────────────────────────────────────────
+    t_shots      = _evs(tivvy, "SHOT")
+    t_on_tgt     = _sub(tivvy, "SHOT", "ON_TARGET")
+    t_box_shots  = [e for e in t_shots  if (e.get("x_m") or 0) > 80]
+    t_box_entry  = _evs(tivvy, "BOX_ENTRY")
+    t_regains    = _evs(tivvy, "HIGH_REGAIN")
+    t_turnovers  = _evs(opp,   "HIGH_REGAIN")           # opp regains = our turnovers
+    t_att_corn   = _sub(tivvy, "SET_PIECE", "ATT_CORNER")
+    t_def_corn   = _sub(tivvy, "SET_PIECE", "DEF_CORNER")
+
+    avg_reg_x = (sum(e.get("x_m", 52.5) for e in t_regains) / len(t_regains)
+                 if t_regains else None)
+
+    # ── OPP ────────────────────────────────────────────────────────────────
+    o_shots     = _evs(opp, "SHOT")
+    o_on_tgt    = _sub(opp, "SHOT", "ON_TARGET")
+    o_box_entry = _evs(opp, "BOX_ENTRY")
+    o_regains   = _evs(opp, "HIGH_REGAIN")
+
+    flanks      = [_ht_flank(e.get("y_m")) for e in o_box_entry]
+    dom_flank   = _Counter(flanks).most_common(1)[0][0] if flanks else "central corridor"
+    avg_o_shot_x = (sum(e.get("x_m", 52.5) for e in o_shots) / len(o_shots)
+                    if o_shots else None)
+
+    # ── Bullet 1: Press & Territory ────────────────────────────────────────
+    reg_zone = _ht_zone(avg_reg_x)
+    if len(t_regains) >= 3:
+        b1 = (f"**Press & Territory:** {len(t_regains)} High Regains in the "
+              f"{reg_zone} (avg {avg_reg_x:.0f}m). Counter-Pressing Phase "
+              f"is winning the ball high — maintain the pressing trigger. "
+              f"Opponent forced {len(t_turnovers)} turnover(s) in their 1H.")
+    elif len(t_regains) == 1:
+        b1 = (f"**Press & Territory:** 1 High Regain in the {reg_zone}. "
+              f"Opponent won possession back {len(t_turnovers)} time(s) via their regain. "
+              f"Press triggers need sharper co-ordination — consider tightening the "
+              f"Line of Engagement 5m in 2H.")
+    else:
+        b1 = (f"**Press & Territory:** 0 High Regains in 1H — Line of Engagement "
+              f"sitting too passive. Opponent generated {len(t_turnovers)} regain(s). "
+              f"Consider stepping the block up to challenge earlier in 2H.")
+
+    # ── Bullet 2: Threat Profile ────────────────────────────────────────────
+    box_pct = int(len(t_box_shots) / len(t_shots) * 100) if t_shots else 0
+    if not t_shots:
+        b2 = (f"**Threat Profile:** 0 shots in 1H — {len(t_box_entry)} box "
+              f"entr{'ies' if len(t_box_entry) != 1 else 'y'} created but none converted "
+              f"to shot. Emphasise final-third decision-making: shoot inside the box.")
+    elif box_pct >= 60:
+        b2 = (f"**Threat Profile:** {len(t_shots)} shot(s), {len(t_on_tgt)} on target — "
+              f"{len(t_box_shots)}/{len(t_shots)} from inside the box ({box_pct}%). "
+              f"Qualitative Superiority is being generated in Zone 14. "
+              f"Maintain this entry pattern via {len(t_box_entry)} box entry route(s).")
+    else:
+        b2 = (f"**Threat Profile:** {len(t_shots)} shot(s), {len(t_on_tgt)} on target — "
+              f"only {len(t_box_shots)}/{len(t_shots)} from inside the box ({box_pct}%). "
+              f"Too many speculative attempts outside Zone 14. "
+              f"Prioritise box entry ({len(t_box_entry)} created) before shooting.")
+
+    # ── Bullet 3: Tactical Adjustment ──────────────────────────────────────
+    if o_box_entry:
+        severity = ("Defensive shape compressing too slowly — tighten Rest Defense on that flank."
+                    if len(o_box_entry) >= 3
+                    else "Monitor for escalation in 2H; Rest Defense shape is holding for now.")
+        b3 = (f"**Tactical Adjustment:** Opponent generated {len(o_box_entry)} box "
+              f"entr{'ies' if len(o_box_entry) != 1 else 'y'} — predominantly via the "
+              f"{dom_flank}. {severity}")
+    elif o_shots:
+        b3 = (f"**Tactical Adjustment:** Opponent registered {len(o_shots)} shot(s) "
+              f"({len(o_on_tgt)} on target) from the {_ht_zone(avg_o_shot_x)}. "
+              f"Block line is {'stable' if len(o_on_tgt) <= 1 else 'under pressure'} — "
+              f"{'maintain Compactness and unit cohesion' if len(o_on_tgt) <= 1 else 'drop Line of Engagement 5m to reduce space in behind'}.")
+    else:
+        b3 = ("**Tactical Adjustment:** Opponent created minimal threat in 1H — "
+              "0 Box Entries, 0 shots on record. Maintain Out of Possession shape; "
+              "push Line of Engagement higher in 2H to exploit their passivity.")
+
+    # ── Plain-text WhatsApp/clipboard version ──────────────────────────────
+    plain = (
+        "TIVVY HALF-TIME BRIEFING (1H)\n"
+        "══════════════════════════\n"
+        f"TIVVY │ Shots {len(t_shots)} ({len(t_on_tgt)} on tgt) │ "
+        f"Box entries {len(t_box_entry)} │ Regains {len(t_regains)}\n"
+        f"OPP   │ Shots {len(o_shots)} ({len(o_on_tgt)} on tgt) │ "
+        f"Box entries {len(o_box_entry)} │ Regains {len(o_regains)}\n"
+        f"Corners: {len(t_att_corn)} ATT / {len(t_def_corn)} DEF\n"
+        "──────────────────────────\n"
+        f"1. {b1.replace('**', '')}\n\n"
+        f"2. {b2.replace('**', '')}\n\n"
+        f"3. {b3.replace('**', '')}\n"
+    )
+
+    return {
+        "t_shots": len(t_shots), "t_on_tgt": len(t_on_tgt),
+        "t_box_entry": len(t_box_entry), "t_regains": len(t_regains),
+        "t_att_corn": len(t_att_corn), "t_def_corn": len(t_def_corn),
+        "o_shots": len(o_shots), "o_on_tgt": len(o_on_tgt),
+        "o_box_entry": len(o_box_entry), "o_regains": len(o_regains),
+        "b1": b1, "b2": b2, "b3": b3, "plain": plain,
+        "n_1h": len(tivvy) + len(opp),
+    }
+
+
 # TAB 3 — Agent Cockpit & Approval Gate
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1562,6 +1710,57 @@ with tab3:
     if st.session_state["pipeline_log"]:
         with st.expander("Pipeline log", expanded=False):
             st.code(st.session_state["pipeline_log"], language="text")
+
+    st.markdown(_divider(), unsafe_allow_html=True)
+
+    # ── Half-time Briefing ───────────────────────────────────────────────────
+    if ledger_loaded:
+        st.markdown(
+            _section_label("⚡ Half-time Briefing", "#f59e0b"),
+            unsafe_allow_html=True,
+        )
+        if st.button("⚡ Half-time Briefing (1H Only)", key="btn_ht_briefing"):
+            st.session_state["ht_briefing"] = _ht_build_briefing(ledger)
+
+        brief = st.session_state.get("ht_briefing")
+        if brief:
+            n = brief["n_1h"]
+            st.markdown(
+                f"""
+                <div style="background:#0f1117;border:2px solid #f59e0b;border-radius:14px;
+                            padding:20px 24px;margin:10px 0 18px">
+                  <div style="font-family:'Inter',sans-serif;font-size:.72rem;letter-spacing:.1em;
+                              color:#f59e0b;margin-bottom:14px">
+                    HALF-TIME BRIEFING · {n} TAGGED EVENT{'S' if n != 1 else ''} (1H)
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;
+                              margin-bottom:18px">
+                    <div style="color:#a1a1aa;font-size:.78rem">
+                      <span style="color:#fbbf24;font-weight:700">TIVVY</span><br>
+                      Shots: <b style="color:#fff">{brief['t_shots']}</b>
+                        ({brief['t_on_tgt']} on tgt)&nbsp;&nbsp;
+                      Box entries: <b style="color:#fff">{brief['t_box_entry']}</b>&nbsp;&nbsp;
+                      Regains: <b style="color:#fff">{brief['t_regains']}</b><br>
+                      Corners: ATT&nbsp;<b style="color:#fff">{brief['t_att_corn']}</b>
+                        / DEF&nbsp;<b style="color:#fff">{brief['t_def_corn']}</b>
+                    </div>
+                    <div style="color:#a1a1aa;font-size:.78rem">
+                      <span style="color:#ef4444;font-weight:700">OPP</span><br>
+                      Shots: <b style="color:#fff">{brief['o_shots']}</b>
+                        ({brief['o_on_tgt']} on tgt)&nbsp;&nbsp;
+                      Box entries: <b style="color:#fff">{brief['o_box_entry']}</b>&nbsp;&nbsp;
+                      Regains: <b style="color:#fff">{brief['o_regains']}</b>
+                    </div>
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown(brief["b1"])
+            st.markdown(brief["b2"])
+            st.markdown(brief["b3"])
+            st.markdown("**📋 Copy to clipboard / WhatsApp:**")
+            st.code(brief["plain"], language="text")
 
     st.markdown(_divider(), unsafe_allow_html=True)
 

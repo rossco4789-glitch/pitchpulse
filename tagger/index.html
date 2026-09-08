@@ -44,8 +44,37 @@
     .act-2ndball:active { box-shadow: 0 0 0 2px rgba(129,140,248,.5), inset 0 1px 0 rgba(255,255,255,.09) !important; }
     .act-sub:active     { box-shadow: 0 0 0 2px rgba(74,222,128,.5),  inset 0 1px 0 rgba(255,255,255,.09) !important; }
 
+    /* Split-button team halves */
+    .act-tivvy:active { box-shadow: 0 0 0 3px rgba(251,191,36,.6) !important; background:rgba(120,53,15,.55) !important; }
+    .act-opp:active   { box-shadow: 0 0 0 3px rgba(239,68,68,.6)  !important; background:rgba(127,29,29,.55) !important; }
+
+    /* Event log drawer */
+    #event-log-drawer {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height .22s cubic-bezier(.4,0,.2,1);
+    }
+    #event-log-drawer.log-open { max-height: 320px; }
+    .log-row { display:flex; align-items:center; gap:8px; padding:7px 14px;
+               border-bottom:1px solid rgba(255,255,255,.05); }
+    .log-row:last-child { border-bottom:none; }
+    .log-del { width:26px; height:26px; border-radius:6px; border:none; display:flex;
+               align-items:center; justify-content:center; font-size:12px; font-weight:900;
+               background:rgba(239,68,68,.1); color:rgba(248,113,113,.7);
+               cursor:pointer; flex-shrink:0; transition:background .1s; }
+    .log-del:active { background:rgba(239,68,68,.3); }
+
     /* Clock digit glow */
     #clock-mm, #clock-ss { text-shadow: 0 0 22px rgba(255,255,255,.18); }
+
+    /* Score bar */
+    .score-num { font-size:22px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1; }
+    .score-btn { width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+                 font-size:18px; font-weight:900; line-height:1;
+                 background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1);
+                 box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 2px 6px rgba(0,0,0,.4);
+                 transition: transform .1s, background .1s; }
+    .score-btn:active { transform:scale(.9); background:rgba(255,255,255,.15); }
 
     /* Phase pill */
     .phase-pill { font-size:10px; letter-spacing:.15em; font-weight:900; padding:3px 8px; border-radius:5px;
@@ -122,16 +151,63 @@
     </div>
   </header>
 
-  <!-- ═══ Team Toggle Strip ═══════════════════════════════════════════════ -->
-  <div id="team-strip" class="shrink-0 flex items-center justify-between px-4 py-1.5"
-    style="border-bottom:1px solid rgba(255,255,255,.06); transition: background .2s, border-color .2s;">
-    <span class="text-[10px] font-semibold tracking-[.18em] text-white/30">TAGGING FOR</span>
-    <button id="btn-team" onclick="toggleTeam()"
-      class="text-[11px] font-black tracking-[.12em] px-4 py-1.5 rounded-full transition-all duration-150 ease-out active:scale-[0.95]"
-      style="background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.35); color:#fbbf24;">
-      🟡 TIVVY
+  <!-- ═══ Score Bar ════════════════════════════════════════════════════════ -->
+  <div id="score-bar" class="shrink-0 flex items-center justify-between px-4 py-1.5"
+    style="background:rgba(9,9,11,.80); border-bottom:1px solid rgba(255,255,255,.06);">
+
+    <!-- Home side -->
+    <div class="flex items-center gap-2">
+      <div class="flex flex-col items-center" style="min-width:38px;">
+        <span class="score-num text-white" id="score-home">0</span>
+        <span class="text-[8px] font-semibold tracking-[.14em] text-white/30 mt-[2px]">HOME</span>
+      </div>
+      <button class="score-btn text-emerald-400" onclick="bumpScore('home', 1)" aria-label="Home goal">+</button>
+      <button class="score-btn text-red-400"     onclick="bumpScore('home',-1)" aria-label="Undo home goal">−</button>
+    </div>
+
+    <!-- Separator -->
+    <span class="text-white/20 font-black text-lg select-none">–</span>
+
+    <!-- Away side -->
+    <div class="flex items-center gap-2">
+      <button class="score-btn text-red-400"     onclick="bumpScore('away',-1)" aria-label="Undo away goal">−</button>
+      <button class="score-btn text-emerald-400" onclick="bumpScore('away', 1)" aria-label="Away goal">+</button>
+      <div class="flex flex-col items-center" style="min-width:38px;">
+        <span class="score-num text-white" id="score-away">0</span>
+        <span class="text-[8px] font-semibold tracking-[.14em] text-white/30 mt-[2px]">AWAY</span>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ═══ Event Log Strip ════════════════════════════════════════════════ -->
+  <div id="event-log-strip" class="shrink-0"
+    style="border-bottom:1px solid rgba(255,255,255,.06);">
+
+    <!-- Toggle bar -->
+    <button onclick="toggleEventLog()"
+      class="w-full flex items-center justify-between px-4 py-2 transition-colors duration-150"
+      style="background:transparent; border:none; cursor:pointer;"
+      aria-expanded="false" id="event-log-toggle">
+      <div class="flex items-center gap-2">
+        <span id="event-log-title"
+          class="text-[10px] font-black tracking-[.18em]"
+          style="color:rgba(255,255,255,.35);">RECENT TAGS (0) ▾</span>
+      </div>
+      <span id="event-log-preview"
+        class="text-[10px] font-semibold truncate"
+        style="color:rgba(255,255,255,.22); max-width:180px;">—</span>
     </button>
-    <span class="text-[10px] font-semibold tracking-[.18em] text-white/30">TAP TO SWITCH</span>
+
+    <!-- Drawer -->
+    <div id="event-log-drawer">
+      <div id="event-log-list"
+        style="background:rgba(255,255,255,.02);">
+        <!-- rows rendered by JS -->
+      </div>
+    </div>
+
   </div>
 
   <!-- ═══ Clock Controls ══════════════════════════════════════════════════ -->
@@ -182,105 +258,193 @@
   <!-- ═══ Action Grid ══════════════════════════════════════════════════════ -->
   <main class="flex-1 px-3 py-3 flex flex-col gap-2.5 overflow-y-auto min-h-0">
 
-    <div class="grid grid-cols-2 gap-2.5">
-
-      <!-- SHOT -->
-      <button onclick="triggerAction('SHOT')"
-        class="act-btn act-shot min-h-[72px] flex flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
-        style="background:linear-gradient(145deg,rgba(159,18,57,.5),rgba(76,5,25,.85)); border:1px solid rgba(251,113,133,.22);">
+    <!-- SHOT -->
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:72px; border:1px solid rgba(255,255,255,.08);">
+      <button onclick="triggerAction('SHOT','tiverton')"
+        class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
         <svg class="w-6 h-6" style="color:#fb7185" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <circle cx="12" cy="12" r="8"/>
-          <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>
-          <line x1="12" y1="4" x2="12" y2="9.4"/>
-          <line x1="12" y1="14.6" x2="12" y2="20"/>
-          <line x1="4" y1="12" x2="9.4" y2="12"/>
-          <line x1="14.6" y1="12" x2="20" y2="12"/>
+          <circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>
+          <line x1="12" y1="4" x2="12" y2="9.4"/><line x1="12" y1="14.6" x2="12" y2="20"/>
+          <line x1="4" y1="12" x2="9.4" y2="12"/><line x1="14.6" y1="12" x2="20" y2="12"/>
         </svg>
-        <span class="text-[13px] font-black tracking-[.1em] text-white/90">SHOT</span>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#fbbf24;">SHOT</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(251,191,36,.45);">TIVVY</span>
       </button>
-
-      <!-- BOX ENTRY -->
-      <button onclick="triggerAction('BOX_ENTRY')"
-        class="act-btn act-box min-h-[72px] flex flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
-        style="background:linear-gradient(145deg,rgba(8,51,68,.7),rgba(7,30,49,.88)); border:1px solid rgba(34,211,238,.2);">
-        <svg class="w-6 h-6" style="color:#22d3ee" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="13 17 18 12 13 7"/>
-          <line x1="3" y1="12" x2="18" y2="12"/>
-          <path d="M15 5h4a1 1 0 011 1v12a1 1 0 01-1 1h-4"/>
+      <button onclick="triggerAction('SHOT','opponent')"
+        class="act-opp flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(127,29,29,.3);">
+        <svg class="w-6 h-6" style="color:#fb7185" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>
+          <line x1="12" y1="4" x2="12" y2="9.4"/><line x1="12" y1="14.6" x2="12" y2="20"/>
+          <line x1="4" y1="12" x2="9.4" y2="12"/><line x1="14.6" y1="12" x2="20" y2="12"/>
         </svg>
-        <span class="text-[11px] font-black tracking-[.08em] text-white/90">BOX ENTRY</span>
-      </button>
-
-      <!-- DEF TURNOVER -->
-      <button onclick="triggerAction('DEF_TURNOVER')"
-        class="act-btn act-turn min-h-[72px] flex flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
-        style="background:linear-gradient(145deg,rgba(78,52,0,.7),rgba(41,26,0,.88)); border:1px solid rgba(251,191,36,.18);">
-        <svg class="w-6 h-6" style="color:#fbbf24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          <line x1="9" y1="9" x2="15" y2="15"/>
-          <line x1="15" y1="9" x2="9" y2="15"/>
-        </svg>
-        <span class="text-[10px] font-black tracking-[.07em] text-white/90">DEF TURNOVER</span>
-      </button>
-
-      <!-- HIGH REGAIN -->
-      <button onclick="triggerAction('HIGH_REGAIN')"
-        class="act-btn act-regain min-h-[72px] flex flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
-        style="background:linear-gradient(145deg,rgba(5,46,22,.7),rgba(2,25,12,.88)); border:1px solid rgba(52,211,153,.2);">
-        <svg class="w-6 h-6" style="color:#34d399" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-        </svg>
-        <span class="text-[10px] font-black tracking-[.07em] text-white/90">HIGH REGAIN</span>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#f87171;">SHOT</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(248,113,113,.45);">OPP</span>
       </button>
     </div>
 
-    <!-- SET PIECE (full width) -->
-    <button onclick="triggerAction('SET_PIECE')"
-      class="act-btn act-set w-full min-h-[68px] flex items-center justify-center gap-3 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
-      style="background:linear-gradient(145deg,rgba(46,16,101,.6),rgba(26,8,62,.88)); border:1px solid rgba(167,139,250,.2);">
-      <svg class="w-6 h-6" style="color:#c084fc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="4" y1="21" x2="4" y2="4"/>
-        <path d="M4 4l14 5-14 5"/>
-      </svg>
-      <span class="text-[13px] font-black tracking-[.1em] text-white/90">SET PIECE</span>
-    </button>
+    <!-- BOX ENTRY -->
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:72px; border:1px solid rgba(255,255,255,.08);">
+      <button onclick="triggerAction('BOX_ENTRY','tiverton')"
+        class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        <svg class="w-6 h-6" style="color:#22d3ee" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="13 17 18 12 13 7"/><line x1="3" y1="12" x2="18" y2="12"/>
+          <path d="M15 5h4a1 1 0 011 1v12a1 1 0 01-1 1h-4"/>
+        </svg>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#fbbf24;">BOX ENTRY</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(251,191,36,.45);">TIVVY</span>
+      </button>
+      <button onclick="triggerAction('BOX_ENTRY','opponent')"
+        class="act-opp flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(127,29,29,.3);">
+        <svg class="w-6 h-6" style="color:#22d3ee" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="13 17 18 12 13 7"/><line x1="3" y1="12" x2="18" y2="12"/>
+          <path d="M15 5h4a1 1 0 011 1v12a1 1 0 01-1 1h-4"/>
+        </svg>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#f87171;">BOX ENTRY</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(248,113,113,.45);">OPP</span>
+      </button>
+    </div>
 
-    <!-- Non-League Tier: AERIAL DUEL + SECOND BALL -->
-    <div class="grid grid-cols-2 gap-2.5">
+    <!-- DEF TURNOVER -->
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:72px; border:1px solid rgba(255,255,255,.08);">
+      <button onclick="triggerAction('DEF_TURNOVER','tiverton')"
+        class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        <svg class="w-6 h-6" style="color:#fbbf24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/>
+        </svg>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#fbbf24;">DEF TURNOVER</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(251,191,36,.45);">TIVVY</span>
+      </button>
+      <button onclick="triggerAction('DEF_TURNOVER','opponent')"
+        class="act-opp flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(127,29,29,.3);">
+        <svg class="w-6 h-6" style="color:#fbbf24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/>
+        </svg>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#f87171;">DEF TURNOVER</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(248,113,113,.45);">OPP</span>
+      </button>
+    </div>
 
-      <!-- AERIAL DUEL -->
-      <button onclick="triggerAction('AERIAL_DUEL')"
-        class="act-btn act-aerial min-h-[64px] flex flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
-        style="background:linear-gradient(145deg,rgba(124,45,18,.55),rgba(67,20,7,.88)); border:1px solid rgba(251,146,60,.2);">
+    <!-- HIGH REGAIN -->
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:72px; border:1px solid rgba(255,255,255,.08);">
+      <button onclick="triggerAction('HIGH_REGAIN','tiverton')"
+        class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        <svg class="w-6 h-6" style="color:#34d399" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#fbbf24;">HIGH REGAIN</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(251,191,36,.45);">TIVVY</span>
+      </button>
+      <button onclick="triggerAction('HIGH_REGAIN','opponent')"
+        class="act-opp flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(127,29,29,.3);">
+        <svg class="w-6 h-6" style="color:#34d399" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#f87171;">HIGH REGAIN</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(248,113,113,.45);">OPP</span>
+      </button>
+    </div>
+
+    <!-- SET PIECE -->
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:68px; border:1px solid rgba(255,255,255,.08);">
+      <button onclick="triggerAction('SET_PIECE','tiverton')"
+        class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        <svg class="w-6 h-6" style="color:#c084fc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="21" x2="4" y2="4"/><path d="M4 4l14 5-14 5"/>
+        </svg>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#fbbf24;">SET PIECE</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(251,191,36,.45);">TIVVY</span>
+      </button>
+      <button onclick="triggerAction('SET_PIECE','opponent')"
+        class="act-opp flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(127,29,29,.3);">
+        <svg class="w-6 h-6" style="color:#c084fc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="21" x2="4" y2="4"/><path d="M4 4l14 5-14 5"/>
+        </svg>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#f87171;">SET PIECE</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(248,113,113,.45);">OPP</span>
+      </button>
+    </div>
+
+    <!-- AERIAL DUEL -->
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:68px; border:1px solid rgba(255,255,255,.08);">
+      <button onclick="triggerAction('AERIAL_DUEL','tiverton')"
+        class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
         <svg class="w-5 h-5" style="color:#fb923c" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
         </svg>
-        <span class="text-[10px] font-black tracking-[.06em] text-white/90">AERIAL DUEL</span>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#fbbf24;">AERIAL DUEL</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(251,191,36,.45);">TIVVY</span>
       </button>
+      <button onclick="triggerAction('AERIAL_DUEL','opponent')"
+        class="act-opp flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(127,29,29,.3);">
+        <svg class="w-5 h-5" style="color:#fb923c" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#f87171;">AERIAL DUEL</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(248,113,113,.45);">OPP</span>
+      </button>
+    </div>
 
-      <!-- SECOND BALL -->
-      <button onclick="triggerAction('SECOND_BALL')"
-        class="act-btn act-2ndball min-h-[64px] flex flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
-        style="background:linear-gradient(145deg,rgba(30,27,75,.6),rgba(15,12,50,.88)); border:1px solid rgba(129,140,248,.2);">
+    <!-- SECOND BALL -->
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:68px; border:1px solid rgba(255,255,255,.08);">
+      <button onclick="triggerAction('SECOND_BALL','tiverton')"
+        class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
         <svg class="w-5 h-5" style="color:#818cf8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="9"/>
           <path d="M12 3a4.5 4.5 0 014.5 4.5M12 21a4.5 4.5 0 01-4.5-4.5"/>
           <circle cx="12" cy="12" r="3"/>
         </svg>
-        <span class="text-[10px] font-black tracking-[.06em] text-white/90">SECOND BALL</span>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#fbbf24;">SECOND BALL</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(251,191,36,.45);">TIVVY</span>
+      </button>
+      <button onclick="triggerAction('SECOND_BALL','opponent')"
+        class="act-opp flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(127,29,29,.3);">
+        <svg class="w-5 h-5" style="color:#818cf8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M12 3a4.5 4.5 0 014.5 4.5M12 21a4.5 4.5 0 01-4.5-4.5"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#f87171;">SECOND BALL</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(248,113,113,.45);">OPP</span>
       </button>
     </div>
 
-    <!-- SUB — full width, no pitch tap, opens inline modal -->
-    <button onclick="triggerSub()"
-      class="act-btn act-sub w-full min-h-[60px] flex items-center justify-center gap-3 rounded-2xl transition-all duration-150 ease-out active:scale-[0.97]"
-      style="background:linear-gradient(145deg,rgba(5,46,22,.55),rgba(2,25,12,.85)); border:1px solid rgba(74,222,128,.22);">
-      <svg class="w-5 h-5" style="color:#4ade80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M7 16V4m0 0L3 8m4-4l4 4"/>
-        <path d="M17 8v12m0 0l4-4m-4 4l-4-4"/>
-      </svg>
-      <span class="text-[13px] font-black tracking-[.1em] text-white/90">↔ SUB</span>
-    </button>
+    <!-- SUB -->
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:60px; border:1px solid rgba(255,255,255,.08);">
+      <button onclick="triggerSub('tiverton')"
+        class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        <svg class="w-5 h-5" style="color:#4ade80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/>
+        </svg>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#fbbf24;">↔ SUB</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(251,191,36,.45);">TIVVY</span>
+      </button>
+      <button onclick="triggerSub('opponent')"
+        class="act-opp flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
+        style="background:rgba(127,29,29,.3);">
+        <svg class="w-5 h-5" style="color:#4ade80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/>
+        </svg>
+        <span style="font-size:12px;font-weight:900;letter-spacing:.1em;color:#f87171;">↔ SUB</span>
+        <span style="font-size:8px;font-weight:700;letter-spacing:.16em;color:rgba(248,113,113,.45);">OPP</span>
+      </button>
+    </div>
 
   </main>
 
@@ -335,9 +499,9 @@
     <div style="width:calc(100% - 48px); max-width:320px; background:#18181b;
                 border:1px solid rgba(74,222,128,.22); border-radius:20px; padding:24px 20px 20px;">
 
-      <div style="font-size:11px; font-weight:900; letter-spacing:.18em; color:#4ade80;
+      <div id="sub-team-label" style="font-size:11px; font-weight:900; letter-spacing:.18em; color:#fbbf24;
                   margin-bottom:20px; text-align:center;">
-        ↔ SUBSTITUTION
+        ↔ TIVVY SUB
       </div>
 
       <!-- Player OFF -->
@@ -397,6 +561,9 @@
         <span id="ov-action"
           class="text-[13px] font-black tracking-[.12em]"
           style="color:#f59e0b;">SHOT</span>
+        <span id="ov-team"
+          class="text-[10px] font-black tracking-[.14em] px-2 py-0.5 rounded-full"
+          style="background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.3); color:#fbbf24;">TIVVY</span>
         <span class="text-white/25 text-[11px]">·</span>
         <span id="ov-player"
           class="text-[12px] font-bold text-white/70 tracking-wide">TEAM</span>
@@ -589,7 +756,8 @@
     let activePlayer   = null;
     let activePhase    = '—';
     let attackingRight = true;   // auto-set by period; manual override via btn-dir
-    let activeTeam     = 'tiverton'; // 'tiverton' | 'opponent' — toggled via HUD
+    let pendingTeam    = 'tiverton'; // set by split-button tap before pitch tap
+    let pendingSubTeam = 'tiverton'; // set by SUB split-button tap
     let clockRunning   = false;
     let paused         = false;
     let phaseStartWall = null;
@@ -600,6 +768,8 @@
     let pendingAction  = null;
     let pendingSubType = null;
     let lastTouchTime  = 0;      // ghost-click suppression timestamp
+    let scoreHome      = parseInt(localStorage.getItem('tivvy_score_home') || '0', 10);
+    let scoreAway      = parseInt(localStorage.getItem('tivvy_score_away') || '0', 10);
 
     // ══════════════════════════════════════════════════════════════════════
     // Clock engine (drift-free delta timing — unchanged from v1)
@@ -678,32 +848,6 @@
     // ══════════════════════════════════════════════════════════════════════
     // Attacking direction toggle
     // ══════════════════════════════════════════════════════════════════════
-    function toggleTeam() {
-      activeTeam = (activeTeam === 'tiverton') ? 'opponent' : 'tiverton';
-      updateTeamToggle();
-    }
-
-    function updateTeamToggle() {
-      const btn  = document.getElementById('btn-team');
-      const strip = document.getElementById('team-strip');
-      if (!btn || !strip) return;
-      if (activeTeam === 'opponent') {
-        btn.textContent = '🔴 OPP';
-        btn.style.background = 'rgba(220,38,38,.25)';
-        btn.style.borderColor = 'rgba(248,113,113,.5)';
-        btn.style.color = '#fca5a5';
-        strip.style.background = 'rgba(220,38,38,.08)';
-        strip.style.borderBottomColor = 'rgba(220,38,38,.25)';
-      } else {
-        btn.textContent = '🟡 TIVVY';
-        btn.style.background = 'rgba(251,191,36,.1)';
-        btn.style.borderColor = 'rgba(251,191,36,.35)';
-        btn.style.color = '#fbbf24';
-        strip.style.background = '';
-        strip.style.borderBottomColor = '';
-      }
-    }
-
     function toggleDirection() {
       attackingRight = !attackingRight;
       updateDirButton();
@@ -757,9 +901,10 @@
     // ══════════════════════════════════════════════════════════════════════
     // Action trigger — opens pitch overlay for ALL events
     // ══════════════════════════════════════════════════════════════════════
-    function triggerAction(action) {
+    function triggerAction(action, team) {
       pendingAction  = action;
       pendingSubType = null;
+      pendingTeam    = team;
       openPitchOverlay(action);
     }
 
@@ -774,6 +919,18 @@
       const { mm, ss } = formatClock(secs);
       document.getElementById('ov-action').textContent = action.replace('_', ' ');
       document.getElementById('ov-action').style.color = ACTION_COLORS[action] || '#f59e0b';
+      const teamBadge = document.getElementById('ov-team');
+      if (pendingTeam === 'opponent') {
+        teamBadge.textContent   = 'OPP';
+        teamBadge.style.background  = 'rgba(220,38,38,.2)';
+        teamBadge.style.borderColor = 'rgba(248,113,113,.4)';
+        teamBadge.style.color       = '#f87171';
+      } else {
+        teamBadge.textContent   = 'TIVVY';
+        teamBadge.style.background  = 'rgba(251,191,36,.12)';
+        teamBadge.style.borderColor = 'rgba(251,191,36,.3)';
+        teamBadge.style.color       = '#fbbf24';
+      }
       document.getElementById('ov-player').textContent =
         activePlayer !== null ? `#${activePlayer}` : 'TEAM';
       document.getElementById('ov-clock').textContent = `${mm}:${ss}`;
@@ -926,7 +1083,7 @@
         match_seconds:  secs,
         clock_display:  `${mm}:${ss}`,
         player_num:     activePlayer,
-        team:           activeTeam,
+        team:           pendingTeam,
         event_type:     eventType,
         sub_type:       subType   || null,
         x_pct:          coords    ? coords.x_pct : null,
@@ -934,27 +1091,117 @@
         x_m:            coords    ? coords.x_m   : null,
         y_m:            coords    ? coords.y_m   : null,
         attacking_right: attackingRight,
+        score_home:     scoreHome,
+        score_away:     scoreAway,
         timestamp_iso:  new Date().toISOString(),
       };
       events.push(ev);
       persist();
       updateBadge();
       updateUndo();
-      flashBadge();
+      flashBadge(ev.team);
+      if (navigator.vibrate) navigator.vibrate(40);
+      updateEventLog();
     }
 
     function persist() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
     }
 
+    function bumpScore(team, delta) {
+      if (team === 'home') {
+        scoreHome = Math.max(0, scoreHome + delta);
+        localStorage.setItem('tivvy_score_home', scoreHome);
+        document.getElementById('score-home').textContent = scoreHome;
+      } else {
+        scoreAway = Math.max(0, scoreAway + delta);
+        localStorage.setItem('tivvy_score_away', scoreAway);
+        document.getElementById('score-away').textContent = scoreAway;
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Event Log Panel
+    // ══════════════════════════════════════════════════════════════════════
+    let eventLogOpen = false;
+
+    function toggleEventLog() {
+      eventLogOpen = !eventLogOpen;
+      const drawer  = document.getElementById('event-log-drawer');
+      const toggle  = document.getElementById('event-log-toggle');
+      const title   = document.getElementById('event-log-title');
+      drawer.classList.toggle('log-open', eventLogOpen);
+      toggle.setAttribute('aria-expanded', eventLogOpen);
+      // Flip arrow glyph
+      title.textContent = title.textContent
+        .replace(eventLogOpen ? '▾' : '▴', eventLogOpen ? '▴' : '▾');
+    }
+
+    function _zoneLabel(ev) {
+      if (ev.x_m === null || ev.x_m === undefined) return '—';
+      if (ev.x_m < 35) return 'DEF';
+      if (ev.x_m < 70) return 'MID';
+      return 'ATT';
+    }
+
+    function updateEventLog() {
+      const title   = document.getElementById('event-log-title');
+      const preview = document.getElementById('event-log-preview');
+      const list    = document.getElementById('event-log-list');
+      if (!title || !list) return;
+
+      // Update toggle label (keep current arrow direction)
+      const arrow = eventLogOpen ? '▴' : '▾';
+      title.textContent = `RECENT TAGS (${events.length}) ${arrow}`;
+
+      // Preview = most recent event, shown when collapsed
+      const latest = events[events.length - 1];
+      if (latest) {
+        const tc = latest.team === 'opponent' ? '#f87171' : '#fbbf24';
+        const tl = latest.team === 'opponent' ? 'OPP' : 'TIVVY';
+        preview.innerHTML =
+          `<span style="color:${tc};font-weight:900;">${tl}</span>` +
+          `&nbsp;${latest.clock_display}&nbsp;${latest.event_type.replace(/_/g,' ')}`;
+      } else {
+        preview.textContent = '—';
+      }
+
+      // Render last 8 rows (newest first)
+      const last8 = events.slice(-8).reverse();
+      list.innerHTML = last8.map(ev => {
+        const tc   = ev.team === 'opponent' ? '#f87171' : '#fbbf24';
+        const tl   = ev.team === 'opponent' ? 'OPP' : 'TIVVY';
+        const name = ev.event_type.replace(/_/g,' ');
+        const zone = _zoneLabel(ev);
+        return `<div class="log-row">
+          <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.35);min-width:32px;">${ev.clock_display}</span>
+          <span style="font-size:9px;font-weight:900;letter-spacing:.1em;color:${tc};min-width:32px;">${tl}</span>
+          <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,.8);flex:1;">${name}</span>
+          <span style="font-size:10px;color:rgba(255,255,255,.25);min-width:24px;">${zone}</span>
+          <button class="log-del" onclick="deleteEventById('${ev.id}')" aria-label="Delete">✕</button>
+        </div>`;
+      }).join('');
+    }
+
+    function deleteEventById(id) {
+      const idx = events.findIndex(e => e.id === id);
+      if (idx === -1) return;
+      events.splice(idx, 1);
+      persist();
+      updateBadge();
+      updateUndo();
+      updateEventLog();
+      if (navigator.vibrate) navigator.vibrate(30);
+    }
+
     function updateBadge() {
       document.getElementById('event-badge').textContent = events.length;
     }
 
-    function flashBadge() {
+    function flashBadge(team) {
       const badge = document.getElementById('event-badge');
       badge.style.transform  = 'scale(1.35)';
-      badge.style.background = activeTeam === 'opponent' ? '#ef4444' : '#4ade80';
+      badge.style.background = team === 'opponent' ? '#ef4444' : '#4ade80';
       badge.style.color      = '#000';
       setTimeout(() => {
         badge.style.transform  = '';
@@ -972,6 +1219,7 @@
       persist();
       updateBadge();
       updateUndo();
+      updateEventLog();
       showUndoToast();
     }
 
@@ -1049,7 +1297,16 @@
       on.value  = activePlayer ? (activePlayer % 18) + 1 : 2;
     }
 
-    function triggerSub() {
+    function triggerSub(team) {
+      pendingSubTeam = team;
+      const label = document.getElementById('sub-team-label');
+      if (team === 'opponent') {
+        label.textContent = '↔ OPP SUB';
+        label.style.color = '#f87171';
+      } else {
+        label.textContent = '↔ TIVVY SUB';
+        label.style.color = '#fbbf24';
+      }
       _populateSubSelects();
       openSubModal();
     }
@@ -1093,6 +1350,7 @@
         match_seconds:   secs,
         clock_display:   `${mm}:${ss}`,
         player_num:      null,          // SUB is a team event; no active player
+        team:            pendingSubTeam,
         event_type:      'SUB',
         sub_type:        null,
         player_off:      playerOff,     // shirt number leaving the pitch
@@ -1108,7 +1366,9 @@
       persist();
       updateBadge();
       updateUndo();
-      flashBadge();
+      flashBadge(pendingSubTeam);
+      if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+      updateEventLog();
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1116,7 +1376,11 @@
     // ══════════════════════════════════════════════════════════════════════
     buildRoster();
     updateBadge();
+    // Restore score from localStorage on load
+    document.getElementById('score-home').textContent = scoreHome;
+    document.getElementById('score-away').textContent = scoreAway;
     updateUndo();
+    updateEventLog();
     updateClockDisplay();
     updateDirButton();
     initPitchEvents();
