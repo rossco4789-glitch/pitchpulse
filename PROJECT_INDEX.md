@@ -27,6 +27,7 @@ PitchPulse/
 │       └── test_homography.py # ✅ COMPLETE — 21-test synthetic suite; no image/GPU required; 21/21 passing
 ├── reports/
 │   ├── visualizer.py          # ✅ COMPLETE — OLED-dark mplsoccer engine; shot map, transition map, zonal heatmap; multi_match_shot_map/heatmap added
+│   ├── set_piece_matrix.py    # ✅ COMPLETE — Set-Piece Target Matrix; 6 delivery zones; first-contact & sequence inference; ATT/DEF side-by-side penalty-area scatter; KPI dict; smoke test
 │   ├── packager.py            # ✅ COMPLETE — Self-contained HTML dossier packager; base64 PNGs, OLED dark, mobile responsive, iOS Safari A4 print
 │   ├── dof_card.py            # ✅ COMPLETE — 1080×1920 DoF match card PNG; OLED dark, Tivvy amber, KPI tiles, pitch miniatures, exec bullets
 │   ├── progress_review.py     # ✅ COMPLETE — Longitudinal tactical review engine; rolling 4–8 game window; CLI + Streamlit Tab 5
@@ -285,6 +286,41 @@ FFmpeg-based match clip slicing engine. Local-only; no cloud, no re-encoding.
 **Output directories:**
 - Event clips: `data/clips/{DD-MM-YYYY}_{opponent-slug}/`
 - Tactical sections: `data/clips/{DD-MM-YYYY}_{opponent-slug}/sections/`
+
+### `reports/set_piece_matrix.py`
+Set-Piece Target Matrix — corner delivery analysis on an attacking penalty-area view.
+
+```bash
+python reports/set_piece_matrix.py           # smoke test (mock corners)
+
+from reports.set_piece_matrix import plot_set_piece_matrix, compute_kpis, extract_corners
+path, corners = plot_set_piece_matrix(ledger)
+kpis = compute_kpis(corners)
+```
+
+**Zone discretisation** (attacking end, x increasing):
+
+| Zone | Coordinates | Colour |
+|---|---|---|
+| Near Post | x > 99.5, y < 29 or y > 39 | Amber |
+| Central / Six-Yard | x > 99.5, 29 ≤ y ≤ 39 | Purple |
+| Penalty Spot / 12-Yd | 91 ≤ x ≤ 99.5, 26.5 ≤ y ≤ 41.5 | Crimson |
+| Back Post | 91 ≤ x ≤ 99.5, outside central band | Cyan |
+| Edge / Cutback | 87 ≤ x < 91, 18 ≤ y ≤ 50 | Emerald |
+| Second Ball | catch-all perimeter | Zinc |
+
+**First-contact inference** (8s window after corner):  
+Tivvy SHOT/BOX_ENTRY/AERIAL_DUEL → "Won (Tivvy)" · Opp HIGH_REGAIN/DEF_TURNOVER → "Lost (Opponent Clearance)" · else → "Flick-on / Uncontested".
+
+**Sequence-outcome inference** (12s window):  
+"Shot On Target" · "Shot Off Target" · "Counter Conceded" · "Turnover / Recycled"
+
+**DEF corners** are mirrored (`x → 105 − x, y → 68 − y`) to share the attacking-end orientation.
+
+Output: `data/processed/plots/set_piece_matrix.png` @ 150 DPI (≈ 80 KB).  
+Also surfaced in Tab 4 (Deliverables Hub) with 3 KPI metrics and a Download button.
+
+ELI5: It draws where every corner was aimed and colour-codes who got their head to it first, so the manager can see in one glance which delivery zones win the ball and which ones don't.
 
 ### `reports/visualizer.py`
 OLED-dark mplsoccer pitch rendering engine. Accepts a `list[dict]` of events with optional

@@ -59,6 +59,8 @@ CALIB_PATH       = RAW_DIR / "camera_calibration.json"
 CLIPS_DIR        = ROOT / "data" / "clips"
 VEO_RAW_DIR      = RAW_DIR / "veo"
 
+SP_MATRIX_PATH = PLOTS_DIR / "set_piece_matrix.png"
+
 for _d in (RAW_DIR, STAGED_DIR, PROC_DIR, PLOTS_DIR, REPORTS_DIR, CLIPS_DIR, VEO_RAW_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
@@ -1998,6 +2000,76 @@ with tab4:
               </div>
             </div>
             """, unsafe_allow_html=True)
+
+    # ── Set-Piece Target Matrix ───────────────────────────────────────────────
+    st.markdown(_divider(), unsafe_allow_html=True)
+    st.markdown(
+        _section_label("📐 Set-Piece Target Matrix", "#a855f7"),
+        unsafe_allow_html=True,
+    )
+
+    if ledger_loaded:
+        # KPI row
+        try:
+            from reports.set_piece_matrix import (
+                plot_set_piece_matrix as _sp_plot,
+                compute_kpis as _sp_kpis,
+                extract_corners as _sp_extract,
+            )
+            _sp_corners = _sp_extract(ledger)
+            _sp_kpi = _sp_kpis(_sp_corners)
+        except Exception:
+            _sp_corners, _sp_kpi = [], {}
+
+        _k1, _k2, _k3 = st.columns(3)
+        with _k1:
+            st.metric(
+                "ATT First-Contact Win %",
+                f"{_sp_kpi.get('att_fc_win_pct', 0):.0f}%",
+                help="% of attacking corners where Tivvy won first contact",
+            )
+        with _k2:
+            st.metric(
+                "Shots from ATT Corners",
+                _sp_kpi.get("att_shots_generated", 0),
+                help="Corners that led to a Tivvy shot within 12 seconds",
+            )
+        with _k3:
+            st.metric(
+                "DEF Clearance Rate",
+                f"{_sp_kpi.get('def_clearance_pct', 0):.0f}%",
+                help="% of opposition corners where Tivvy won first contact",
+            )
+
+        if st.button("📐 Regenerate Set-Piece Matrix", key="btn_sp_matrix"):
+            with st.spinner("Rendering Set-Piece Target Matrix…"):
+                try:
+                    _sp_plot(ledger, output_path=SP_MATRIX_PATH)
+                    st.success("Matrix saved to data/processed/plots/set_piece_matrix.png")
+                except Exception as _e:
+                    st.error(f"Render failed: {_e}")
+
+    if SP_MATRIX_PATH.exists():
+        st.image(str(SP_MATRIX_PATH), use_container_width=True)
+        with open(SP_MATRIX_PATH, "rb") as _f:
+            st.download_button(
+                "⬇  Download Set-Piece Matrix (PNG)",
+                data=_f,
+                file_name="set_piece_matrix.png",
+                mime="image/png",
+                key="dl_sp_matrix",
+                use_container_width=True,
+            )
+    elif not ledger_loaded:
+        st.markdown("""
+        <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
+                    border-radius:12px;padding:28px;text-align:center">
+          <div style="font-family:'Inter',sans-serif;font-size:.78rem;color:#71717a">
+            Load a match ledger in the Agent Cockpit tab, then click
+            <strong>📐 Regenerate Set-Piece Matrix</strong>.
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     # ── Archive & Clear ───────────────────────────────────────────────────────
     st.markdown(_divider(), unsafe_allow_html=True)
