@@ -57,6 +57,7 @@ Format: `ELI5: <one sentence>`
 - **Data:** Local files (CSV, JSON, SQLite) — no paid databases
 - **APIs:** No paid external APIs or heavy SaaS services
 - **AI/ML:** Local models or rule-based logic only
+- **Exception:** Headless batch video processing may be dispatched to free Kaggle GPU runners via tools/cloud_vision_runner.py when local CPU limits preclude timely rendering. No paid runtimes or persistent cloud functions are permitted.
 
 ---
 

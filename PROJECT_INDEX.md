@@ -21,6 +21,8 @@ PitchPulse/
 │   ├── evals.py               # ✅ COMPLETE — Self-improving eval ledger (stdlib); record/gate/replay/digest → data/evals/
 │   ├── scout_fetcher.py       # ✅ COMPLETE — Public match-evidence fetcher (stdlib urllib/html.parser); league table, team sheets, events, club articles → data/scouting/evidence/
 │   ├── scout_brief.py         # ✅ COMPLETE — Tab 1 Opposition Briefing: preview upload → fixture detect → scout_fetcher → 4-moments brief.md → packager HTML
+│   ├── cloud_vision_runner.py # ✅ COMPLETE — Kaggle GPU dispatcher/collector (CLAUDE.md §5 exception); vision_job.json state, hash + 4-moments schema checks → vision_metrics.json
+│   ├── templates/kaggle_vision_worker.py # ✅ COMPLETE — Remote worker: 2 FPS, 500-frame chunks, homography rejection rules, FAILED report contract
 │   └── tests/
 │       └── test_scout_harvester.py # ✅ COMPLETE — Dossier schema integrity + CLI smoke suite (pytest, offline)
 ├── reconcile/
@@ -465,6 +467,21 @@ python -m pytest tools/tests/test_scout_brief.py -v
 **Contract:** network or parse failure degrades to a notes-only brief with a warning; only an unreadable upload or a missing "X v Tiverton" line raises `ValueError`. A hand-edited `brief.md` (no auto marker) is kept unless overwrite is ticked; the draft goes to `brief_auto.md` (gitignored) and the HTML compiles from the hand-edited brief.
 
 ELI5: One upload turns the club's match preview into a checked, phone-ready opposition brief without opening a terminal.
+
+### `tools/cloud_vision_runner.py` + `tools/templates/kaggle_vision_worker.py`
+Headless full-match CV on a free, private Kaggle GPU script kernel (the only cloud exception in CLAUDE.md §5).
+
+```bash
+python tools/cloud_vision_runner.py --video match.mp4 --opponent dorchester_town --opponent-kit "#000000" --dispatch-only
+python tools/cloud_vision_runner.py --opponent dorchester_town --collect            # check once; --wait N to poll
+python -m pytest tools/tests/test_cloud_vision_runner.py -v
+```
+
+**Setup:** `pip install kaggle`; `~/.kaggle/kaggle.json`; phone-verified account; private dataset `<user>/pitchpulse-cv-models` with `players.pt`, `pitch.pt`, `pitch_config.json` (`landmarks_m` in the 105×68 m frame, index-aligned with the pose keypoints).
+
+**Contract:** videos over 1.5 GB are cut to 2 FPS / 720p with ffmpeg; uploads and pushes retry 5 times with exponential backoff; `vision_job.json` records DISPATCHED → RUNNING → COMPLETE | FAILED | INVALID. The worker drops frames under the homography rules (≥ 6 landmarks at conf ≥ 0.5, hull ≥ 150 m², RMSE ≤ 0.5 m, inliers ≥ 80 %, cond ≤ 1e7) and counts each drop. Possession-dependent moments stay null (no ball tracking); Out of Possession metrics need a settled block for ≥ 4 s, n ≥ 30 across ≥ 2 five-minute windows, and an unambiguous kit split. The collector writes `vision_metrics.json` only after the worker report, output hash, payload hash and schema all pass. Exit codes 0 / 2 setup / 3 remote failure / 4 rejected output / 5 still running.
+
+ELI5: The laptop posts the match to a free graphics card, and only numbers that pass every check come back.
 
 ### `tools/evals.py`
 Self-improving evaluation loop. Stdlib only (`hashlib`, `json`, `pathlib`, `sys`, `time`), fully offline.

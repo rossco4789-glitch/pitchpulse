@@ -38,6 +38,10 @@ data/scouting/sources/**/*.pdf
 data/processed/*_scouting.html
 data/scouting/sources/**/brief_auto.md
 
+# Cloud vision runner: staged payloads and remote job state stay local
+data/scouting/cloud_staging/
+data/scouting/sources/**/vision_job.json
+
 # Sample data & ledger (committed for demo; swap for real data)
 # data/samples/2026-09-05_st_blazey/  ← keep tracked (moved out of data/raw so
 #   reconcile's tivvy_events_*.json glob and match_context.json never load demo data live;
