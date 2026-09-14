@@ -40,6 +40,7 @@ data/scouting/sources/**/brief_auto.md
 
 # Cloud vision runner: staged payloads and remote job state stay local
 data/scouting/cloud_staging/
+data/staging/
 data/scouting/sources/**/vision_job.json
 
 # Sample data & ledger (committed for demo; swap for real data)
