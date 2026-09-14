@@ -18,6 +18,7 @@ PitchPulse/
 ├── tools/
 │   ├── tagger_sanity.py       # ✅ COMPLETE — Post-session ledger validator CLI; 7 checks; ANSI colour report; exit 0/1; --test self-test suite (11 tests)
 │   ├── scout_harvester.py     # ✅ COMPLETE — Offline Opposition Intelligence Harvester; Alpha/Beta/Gamma task graph → data/scouting/{slug}_dossier.json
+│   ├── evals.py               # ✅ COMPLETE — Self-improving eval ledger (stdlib); record/gate/replay/digest → data/evals/
 │   └── tests/
 │       └── test_scout_harvester.py # ✅ COMPLETE — Dossier schema integrity + CLI smoke suite (pytest, offline)
 ├── reconcile/
@@ -96,7 +97,10 @@ Post-session ledger and tagger-export validator. Run after downloading the tagge
 python tools/tagger_sanity.py data/raw/tivvy_events_1H.json
 python tools/tagger_sanity.py data/processed/match_ledger.json
 python tools/tagger_sanity.py --test   # 11 built-in unit tests
+python tools/tagger_sanity.py data/processed/match_ledger.json --run-id 2026-09-20   # default run id: today
 ```
+
+Every finding is also written to the eval ledger via `tools/evals.py` (key = offending `event_type`). A previously resolved issue that recurs is escalated to ERROR and exits `1`.
 
 Accepts either a raw tagger JSON array or a schema-v2 match ledger dict (auto-detected). Outputs a colour ANSI terminal report; exits `0` if only warnings, `1` if any ERROR.
 
@@ -379,6 +383,7 @@ offline HTML file — no CDN, no external fonts, no JavaScript.
 - OLED dark theme (`#09090b` / `#f59e0b` gold), 2-column CSS Grid (55 %/45 %)
 - `@media print`: white A4, `break-before: page` per section, `break-inside: avoid` on grids/alerts/blockquotes
 - Regex-only Markdown→HTML conversion: bold, italic, H1/H2, `>` manager notes, emoji alert boxes (🚨 ⚡ ⚠), bar-chart code blocks
+- **Delivery gate:** before writing HTML, `evals.gate(run_id)` blocks on any unresolved eval ERROR for the run (exit `1`, reasons printed). `--run-id` defaults to the date in `dossier_YYYY-MM-DD.md`, else today.
 
 ELI5: It turns the text report into a one-file webpage the manager can open on any device — pictures and all — with no internet needed.
 
@@ -413,6 +418,27 @@ Structured template for a 3-bullet halftime tactical diagnosis (4 Moments framew
 ---
 
 ## Tools & Scripts
+
+### `tools/evals.py`
+Self-improving evaluation loop. Stdlib only (`hashlib`, `json`, `pathlib`, `sys`, `time`), fully offline.
+
+```bash
+python tools/evals.py --digest --top 10          # rebuild data/evals/learnings.md, print top open issues
+python tools/evals.py --replay                   # re-run validators on frozen cases; exit 2 if one slips through
+python tools/evals.py --resolve 68728f1d0e93 "retagged corner coords"
+```
+
+| API / file | Role |
+|---|---|
+| `record(tool, check, severity, key, detail, run_id, sample)` | Appends to `data/evals/ledger.jsonl`; fingerprint = sha1(tool\|check\|key)[:12]; recurrence of a RESOLVED fingerprint → ERROR; freezes first sample to `data/evals/cases/{fp}.json` |
+| `gate(run_id)` | Unresolved ERROR findings for that run — used by `reports/packager.py` |
+| `data/evals/ledger.jsonl` | Append-only history (gitignored, local) |
+| `data/evals/cases/` | Frozen bad inputs (tracked regression fixtures) |
+| `data/evals/learnings.md` | Generated digest sorted by recurrence (tracked) |
+
+Dev hooks (`.claude/settings.json`): `SessionStart` → `--digest --top 10`; `PostToolUse` on Edit/Write → `--replay`. Matchday pipeline does not need Claude or the hooks.
+
+ELI5: It keeps a notebook of every data mistake and re-tests the old mistakes each time, so the same glitch can't sneak into the manager's report twice.
 
 ### `tools/scout_harvester.py`
 Standalone, off-pitch Opposition Intelligence Harvester. Builds a pre-match UEFA 4-Moments dossier from local opponent material. **Decoupled by design** — never imported by `app.py` or `tagger/index.html`; stdlib only, no network, no API keys.

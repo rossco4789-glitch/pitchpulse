@@ -9,6 +9,10 @@ __pycache__/
 # Claude Code internals (project skills are tracked governance)
 .claude/*
 !.claude/skills/
+!.claude/settings.json
+
+# Eval loop: run history stays local; frozen cases + digest are tracked
+data/evals/ledger.jsonl
 
 # Large binary / generated outputs (do not commit)
 data/clips/

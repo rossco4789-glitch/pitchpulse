@@ -1,0 +1,16 @@
+{
+  "fp": "8a129c27ec16",
+  "tool": "tagger_sanity",
+  "check": "DEFENSIVE_SHOT",
+  "key": "SHOT",
+  "input": [
+    {
+      "id": "s2",
+      "event_type": "SHOT",
+      "match_seconds": 120,
+      "clock_display": "02:00",
+      "x_m": 30.0,
+      "y_m": 34.0
+    }
+  ]
+}

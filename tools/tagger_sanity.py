@@ -6,6 +6,7 @@ Usage:
     python tools/tagger_sanity.py                          # default ledger
     python tools/tagger_sanity.py path/to/ledger.json     # explicit path
     python tools/tagger_sanity.py --test                   # run built-in unit tests
+    python tools/tagger_sanity.py ledger.json --run-id 2026-09-20   # findings → data/evals/ledger.jsonl
 
 Input formats accepted:
     • Raw tagger export  — a JSON *array* of event objects
@@ -18,7 +19,9 @@ Exit codes:
 
 import io
 import json
+import re
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -476,12 +479,40 @@ def _run_tests() -> None:
 DEFAULT_LEDGER = Path("data/processed/match_ledger.json")
 
 
+def _eval_case(check: str, msg: str, events: list[dict]) -> tuple[str, list[dict] | None]:
+    """Normalise a finding into (category key, minimal event sample that reproduces it)."""
+    m = re.match(r"idx (\d+):", msg)
+    if m:
+        i = int(m.group(1))
+        ev = events[i]
+        if check == "TIME_ORDER":
+            sample = events[i - 1:i + 1]
+        elif check == "EVENT_SPIKE":
+            t0 = ev.get("match_seconds", 0)
+            sample = [e for e in events if abs(e.get("match_seconds", 0) - t0) <= SPIKE_WINDOW_S]
+        else:
+            sample = [ev]
+        return ev.get("event_type", "?"), sample
+    if check == "DUPLICATE_ID":
+        dup = re.search(r"Event id '(.*?)'", msg)
+        return "", [e for e in events if dup and str(e.get("id")) == dup.group(1)]
+    if check == "LOW_COUNT":
+        return "", events
+    return "", None
+
+
 def main() -> None:
     args = sys.argv[1:]
 
     if args and args[0] == "--test":
         _run_tests()
         return  # _run_tests exits internally
+
+    run_id = time.strftime("%Y-%m-%d")
+    if "--run-id" in args:
+        i = args.index("--run-id")
+        run_id = args[i + 1]
+        del args[i:i + 2]
 
     ledger_path = Path(args[0]) if args else DEFAULT_LEDGER
 
@@ -497,7 +528,16 @@ def main() -> None:
 
     events   = extract_events(data)
     findings = run_checks(events)
+
+    import evals
+    logged = []
+    for sev, check, msg in findings:
+        key, sample = _eval_case(check, msg, events)
+        logged.append((evals.record("tagger_sanity", check, sev, key, msg, run_id, sample), check, msg))
+    findings = logged
+
     exit_code = print_report(findings, len(events))
+    print(f"  Eval ledger: {len(findings)} finding(s) logged under run_id '{run_id}'")
     sys.exit(exit_code)
 
 
