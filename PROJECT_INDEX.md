@@ -409,6 +409,51 @@ Structured template for a 3-bullet halftime tactical diagnosis (4 Moments framew
 
 ---
 
+## Impeccable Design System & Visual Governance
+
+Applies to `tagger/index.html`, `app.py`, and every generated deliverable (dossier HTML, DoF card). New or edited UI code must use these tokens; no one-off values.
+
+ELI5: Using the same spacing, sizes and colours every time makes our reports look like they come from a pro club, so the manager trusts them and acts on them faster.
+
+### Spatial Rhythm
+- Strict **4px base grid**. Allowed spacing values only: `4px, 8px, 12px, 16px, 24px, 32px, 48px`.
+- No arbitrary paddings/margins (e.g. `10px`, `28px`, `60px` are violations).
+- Tokens (`app.py` `:root`): `--sp-1`=4 · `--sp-2`=8 · `--sp-3`=12 · `--sp-4`=16 · `--sp-6`=24 · `--sp-8`=32 · `--sp-12`=48.
+
+### Ergonomics & Touch (Mobile Tagger)
+- Minimum **48×48px** thumb touch target on every button (`button { min-height: var(--touch) }` in the tagger).
+- Primary action zones are bottom-anchored within thumb reach; destructive/secondary actions stay out of the primary thumb arc.
+- **High ambient contrast** for direct sunlight: text on the pitch overlay must meet **WCAG AAA (≥7:1)**. On the `#09090b` ground this means white text at ≥70% opacity; `white/20–50` is banned for anything the analyst must read.
+
+ELI5: Big, bright buttons mean the analyst never mis-tags a Pressing Trigger in the sun, so the half-time data is right.
+
+### Executive Typography (Deliverables & Dossiers)
+| Level | Face | Use |
+|-------|------|-----|
+| Display | Barlow Condensed 900 | Match result, page title |
+| Heading | Barlow Condensed 700, uppercase, tracked | Section labels (`_section_label`) |
+| Subhead | Inter 600 | Card titles, expander summaries |
+| Monospace Data | JetBrains Mono | KPIs, coordinates, clocks, tables |
+| Caption | Inter 400, `--text-2` | Help text, empty states |
+
+- `font-variant-numeric: tabular-nums` is mandatory for match clocks, scores, event counters, coordinates and KPI percentages (set globally on the tagger `body` and on `.stApp`).
+
+ELI5: Numbers that don't wobble when they change let the DoF compare 62% and 18% at a glance.
+
+### Color Governance (dark mode)
+| Token | Hex | Role |
+|-------|-----|------|
+| True Slate `--slate` | `#0F172A` | Base surface |
+| Pitch Surface `--pitch` | `#1E293B` | Raised cards / pitch panels |
+| Gold/Amber `--gold` | `#F59E0B` | Tiverton (Tivvy) primary |
+| Cardinal Red `--cardinal` | `#EF4444` | Opponent / errors |
+| Emerald `--emerald` | `#10B981` | Completed actions / success |
+
+- Team encoding is fixed: Gold = Tivvy, Cardinal = Opponent. Never swap for decoration.
+- Migration note: legacy zinc surfaces (`--bg #08080a`, `--surface #111116`) remain in `app.py`; tokens are declared and must be used for new work. A full surface migration is a separate task.
+
+---
+
 ## Data Flow
 
 ```

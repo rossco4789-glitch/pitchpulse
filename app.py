@@ -108,7 +108,15 @@ st.markdown("""
   --mono:       'JetBrains Mono', 'Fira Code', monospace;
   --sans:       'Inter', system-ui, sans-serif;
   --display:    'Barlow Condensed', Impact, sans-serif;
+  /* Impeccable Design System (PROJECT_INDEX.md) */
+  --slate:      #0F172A;
+  --pitch:      #1E293B;
+  --gold:       #F59E0B;
+  --cardinal:   #EF4444;
+  --emerald:    #10B981;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px; --sp-8: 32px; --sp-12: 48px;
 }
+.stApp { font-variant-numeric: tabular-nums; }
 
 /* ── GROUND ────────────────────────────────────────────────────────────────── */
 .stApp,
@@ -255,7 +263,12 @@ st.markdown("""
 /* ── METRICS (native fallback) ───────────────────────────────────────────── */
 [data-testid="stMetricLabel"] { color: var(--text-2) !important; font-family: var(--sans) !important;
   font-size: .72rem !important; text-transform: uppercase !important; letter-spacing: .08em !important; }
-[data-testid="stMetricValue"] { color: var(--amber) !important; font-family: var(--mono) !important; }
+[data-testid="stMetricValue"] { color: var(--amber) !important; font-family: var(--mono) !important;
+  font-variant-numeric: tabular-nums !important; line-height: 1.1 !important; }
+[data-testid="stMetric"] { background: var(--surface) !important; border: 1px solid var(--border) !important;
+  border-radius: 12px !important; padding: var(--sp-4) var(--sp-6) !important; height: 100% !important; }
+[data-testid="stDataFrame"], [data-testid="stTable"], .stApp table {
+  font-family: var(--mono) !important; font-variant-numeric: tabular-nums !important; }
 
 /* ── SPINNER ─────────────────────────────────────────────────────────────── */
 .stSpinner > div { border-top-color: var(--amber) !important; }
@@ -1933,8 +1946,8 @@ with tab4:
         else:
             st.markdown("""
             <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
-                        border-radius:12px;padding:40px;text-align:center">
-              <div style="font-size:2rem;margin-bottom:10px">🖼</div>
+                        border-radius:12px;padding:48px;text-align:center">
+              <div style="font-size:2rem;margin-bottom:12px">🖼</div>
               <div style="font-family:'Inter',sans-serif;font-size:.78rem;color:#71717a">
                 Sign off the dossier in the Agent Cockpit tab — the card generates on approval.
               </div>
@@ -1988,9 +2001,9 @@ with tab4:
         else:
             st.markdown("""
             <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
-                        border-radius:12px;padding:60px;text-align:center">
+                        border-radius:12px;padding:48px;text-align:center">
               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.4rem;
-                          color:#3f3f46;letter-spacing:.04em;margin-bottom:10px">
+                          color:#3f3f46;letter-spacing:.04em;margin-bottom:12px">
                 NO DOSSIER YET
               </div>
               <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#71717a;
@@ -2021,7 +2034,7 @@ with tab4:
         except Exception:
             _sp_corners, _sp_kpi = [], {}
 
-        _k1, _k2, _k3 = st.columns(3)
+        _k1, _k2, _k3 = st.columns(3, gap="medium")
         with _k1:
             st.metric(
                 "ATT First-Contact Win %",
@@ -2063,7 +2076,7 @@ with tab4:
     elif not ledger_loaded:
         st.markdown("""
         <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
-                    border-radius:12px;padding:28px;text-align:center">
+                    border-radius:12px;padding:24px;text-align:center">
           <div style="font-family:'Inter',sans-serif;font-size:.78rem;color:#71717a">
             Load a match ledger in the Agent Cockpit tab, then click
             <strong>📐 Regenerate Set-Piece Matrix</strong>.
