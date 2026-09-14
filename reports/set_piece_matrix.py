@@ -52,7 +52,7 @@ SURFACE  = "#1E293B"
 LINE     = "#475569"
 GOLD     = "#f59e0b"
 CRIMSON  = "#f43f5e"
-ZINC     = "#94A3B8"
+ZINC     = "#A8B5C7"
 EMERALD  = "#10b981"
 PURPLE   = "#a855f7"
 CYAN     = "#22d3ee"
@@ -91,7 +91,7 @@ _ZONE_FILL: dict[str, str] = {
     "Penalty Spot / 12-Yd": "#f43f5e",  # crimson
     "Back Post":            "#22d3ee",  # cyan
     "Edge / Cutback":       "#10b981",  # emerald
-    "Second Ball":          "#94A3B8",  # zinc
+    "Second Ball":          "#A8B5C7",  # zinc
 }
 _ZONE_ALPHA = 0.10
 

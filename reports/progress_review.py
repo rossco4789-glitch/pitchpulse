@@ -55,7 +55,7 @@ EMERALD  = "#10b981"
 CYAN     = "#22d3ee"
 BLUE     = "#3b82f6"
 PURPLE   = "#a855f7"
-ZINC     = "#94A3B8"
+ZINC     = "#A8B5C7"
 TEXT     = "#F8FAFC"
 TEXT_DIM = "#64748B"
 
@@ -553,7 +553,7 @@ def _narrate_nl(df) -> str:
 _STYLE = """
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0F172A;--sf:#1E293B;--bd:#334155;--am:#f59e0b;--tx:#F8FAFC;--dim:#94A3B8}
+:root{--bg:#0F172A;--sf:#1E293B;--bd:#334155;--am:#f59e0b;--tx:#F8FAFC;--dim:#A8B5C7}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.6;padding:32px 24px;max-width:1100px;margin:0 auto}
 h1{font-family:'Barlow Condensed',Impact,sans-serif;font-size:2rem;font-weight:900;color:var(--am);letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
@@ -658,7 +658,7 @@ body{background:#0F172A;color:#F8FAFC;font-family:'Inter',system-ui,sans-serif;
 .card{width:100%;max-width:680px;background:#1E293B;border:1px solid #334155;border-radius:16px;overflow:hidden}
 .head{background:linear-gradient(135deg,#1E293B,#1a1610);padding:22px 26px;border-bottom:1px solid rgba(245,158,11,.15)}
 .head h1{font-family:'Barlow Condensed',Impact,sans-serif;font-size:1.5rem;font-weight:900;color:#f59e0b;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
-.sub{font-size:.72rem;color:#94A3B8;letter-spacing:.06em;text-transform:uppercase}
+.sub{font-size:.72rem;color:#A8B5C7;letter-spacing:.06em;text-transform:uppercase}
 .chips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 .chip{font-family:'JetBrains Mono',monospace;font-size:.78rem;padding:3px 12px;border-radius:5px;font-weight:700}
 .w{background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3)}
@@ -667,13 +667,13 @@ body{background:#0F172A;color:#F8FAFC;font-family:'Inter',system-ui,sans-serif;
 .grid{display:grid;grid-template-columns:repeat(3,1fr)}
 .cell{padding:18px 20px;border-right:1px solid #334155;border-bottom:1px solid #334155}
 .cell:nth-child(3n){border-right:none}
-.lbl{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;font-weight:600;margin-bottom:6px}
+.lbl{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:#A8B5C7;font-weight:600;margin-bottom:6px}
 .val{font-family:'JetBrains Mono',monospace;font-size:1.3rem;font-weight:700;color:#f59e0b;line-height:1}
 .trend{font-size:.7rem;margin-top:5px}
-.up{color:#10b981}.dn{color:#f43f5e}.warn{color:#f59e0b}.neutral{color:#94A3B8}
+.up{color:#10b981}.dn{color:#f43f5e}.warn{color:#f59e0b}.neutral{color:#A8B5C7}
 .finding{padding:18px 26px}
 .finding-lbl{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:#f43f5e;font-weight:700;margin-bottom:7px}
-.finding-txt{font-size:.8rem;color:#94A3B8;line-height:1.55}
+.finding-txt{font-size:.8rem;color:#A8B5C7;line-height:1.55}
 footer{padding:12px 26px;font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#64748B;border-top:1px solid #334155}
 </style>"""
 

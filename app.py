@@ -103,7 +103,7 @@ st.markdown("""
   --blue:       #3b82f6;
   --purple:     #a855f7;
   --text:       #F8FAFC;
-  --text-2:     #94A3B8;
+  --text-2:     #A8B5C7;
   --text-3:     #64748B;
   --mono:       'JetBrains Mono', 'Fira Code', monospace;
   --sans:       'Inter', system-ui, sans-serif;
@@ -301,11 +301,11 @@ st.markdown("""
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _tile(label: str, value: str, sub: str = "", color: str = "#f59e0b") -> str:
-    sub_html = f'<div style="color:#94A3B8;font-size:.72rem;font-family:var(--sans);margin-top:6px">{sub}</div>' if sub else ""
+    sub_html = f'<div style="color:#A8B5C7;font-size:.72rem;font-family:var(--sans);margin-top:6px">{sub}</div>' if sub else ""
     return f"""
     <div style="background:#1E293B;border:1px solid #334155;
                 border-radius:10px;padding:20px 20px;text-align:center;">
-      <div style="color:#94A3B8;font-size:.65rem;text-transform:uppercase;
+      <div style="color:#A8B5C7;font-size:.65rem;text-transform:uppercase;
                   letter-spacing:.14em;font-family:'Inter',sans-serif;margin-bottom:10px">{label}</div>
       <div style="color:{color};font-size:1.9rem;font-weight:500;
                   font-family:'JetBrains Mono',monospace;line-height:1">{value}</div>
@@ -344,7 +344,7 @@ def _agent_card_header(title: str, subtitle: str, color: str) -> str:
       <div>
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.1rem;
                     letter-spacing:.05em;text-transform:uppercase;color:#F8FAFC">{title}</div>
-        <div style="font-family:'Inter',sans-serif;font-size:.73rem;color:#94A3B8;
+        <div style="font-family:'Inter',sans-serif;font-size:.73rem;color:#A8B5C7;
                     margin-top:2px;letter-spacing:.02em">{subtitle}</div>
       </div>
     </div>"""
@@ -485,7 +485,7 @@ with st.sidebar:
                   font-size:2.1rem;color:#f59e0b;letter-spacing:-.01em;line-height:1">
         PITCHPULSE
       </div>
-      <div style="font-family:'Inter',sans-serif;font-size:.7rem;color:#94A3B8;
+      <div style="font-family:'Inter',sans-serif;font-size:.7rem;color:#A8B5C7;
                   letter-spacing:.12em;text-transform:uppercase;margin-top:3px">
         Tiverton Town FC
       </div>
@@ -495,7 +495,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     # System status
-    st.markdown(_section_label("System Status", "#94A3B8"), unsafe_allow_html=True)
+    st.markdown(_section_label("System Status", "#A8B5C7"), unsafe_allow_html=True)
     ledger_ok = LEDGER_PATH.exists()
     ctx_ok    = CONTEXT_PATH.exists()
     calib_ok  = CALIB_PATH.exists()
@@ -514,7 +514,7 @@ with st.sidebar:
     # Active ledger stats
     if st.session_state["ledger"]:
         summary = st.session_state["ledger"].get("summary", {})
-        st.markdown(_section_label("Active Ledger", "#94A3B8"), unsafe_allow_html=True)
+        st.markdown(_section_label("Active Ledger", "#A8B5C7"), unsafe_allow_html=True)
         cols = st.columns(2)
         cols[0].markdown(
             _tile("Tagged", str(summary.get("total_events", "—"))),
@@ -527,11 +527,11 @@ with st.sidebar:
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
         cols2 = st.columns(2)
         cols2[0].markdown(
-            _tile("Unmatched", str(summary.get("unmatched_tags", "—")), color="#94A3B8"),
+            _tile("Unmatched", str(summary.get("unmatched_tags", "—")), color="#A8B5C7"),
             unsafe_allow_html=True,
         )
         cols2[1].markdown(
-            _tile("Subs", str(summary.get("substitutions", "—")), color="#94A3B8"),
+            _tile("Subs", str(summary.get("substitutions", "—")), color="#A8B5C7"),
             unsafe_allow_html=True,
         )
 
@@ -553,7 +553,7 @@ st.markdown("""
   <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:10px">
     <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2.8rem;
                  color:#f59e0b;letter-spacing:-.02em;line-height:1">COMMAND CENTRE</span>
-    <span style="font-family:'Inter',sans-serif;font-size:.75rem;color:#94A3B8;
+    <span style="font-family:'Inter',sans-serif;font-size:.75rem;color:#A8B5C7;
                  letter-spacing:.1em;text-transform:uppercase">UEFA 4 Moments Framework</span>
   </div>
   <div style="width:100%;height:1px;background:linear-gradient(90deg,#f59e0b 120px,rgba(245,158,11,.15) 400px,transparent 700px)"></div>
@@ -594,7 +594,7 @@ with tab1:
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;
                       letter-spacing:.06em;text-transform:uppercase;color:#F8FAFC;
                       margin-bottom:6px">{title}</div>
-          <div style="font-family:'Inter',sans-serif;font-size:.75rem;color:#94A3B8;
+          <div style="font-family:'Inter',sans-serif;font-size:.75rem;color:#A8B5C7;
                       line-height:1.55">{body}</div>
         </div>"""
 
@@ -662,7 +662,7 @@ with tab1:
             staged_docx = _stage_upload(docx_file, docx_file.name)
             st.markdown(
                 f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.75rem;'
-                f'color:#94A3B8;margin-bottom:8px">staged → {staged_docx.relative_to(ROOT)}</div>',
+                f'color:#A8B5C7;margin-bottom:8px">staged → {staged_docx.relative_to(ROOT)}</div>',
                 unsafe_allow_html=True,
             )
             if st.button("⚙  Parse Report", type="primary", key="btn_parse"):
@@ -694,7 +694,7 @@ with tab1:
             <div style="background:#1E293B;border:1px solid #334155;
                         border-radius:12px;padding:40px;text-align:center">
               <div style="font-size:2rem;margin-bottom:12px">📋</div>
-              <div style="font-family:'Inter',sans-serif;font-size:.82rem;color:#94A3B8">
+              <div style="font-family:'Inter',sans-serif;font-size:.82rem;color:#A8B5C7">
                 No match context loaded yet.<br>Upload and parse a .docx report.
               </div>
             </div>
@@ -730,7 +730,7 @@ with tab1:
                              font-size:.75rem;padding:3px 10px;border-radius:5px">{comp}</span>
                 <span style="background:#334155;color:#F8FAFC;font-family:'Inter',sans-serif;
                              font-size:.75rem;padding:3px 10px;border-radius:5px">{venue} ({home})</span>
-                <span style="background:#334155;color:#94A3B8;font-family:'JetBrains Mono',monospace;
+                <span style="background:#334155;color:#A8B5C7;font-family:'JetBrains Mono',monospace;
                              font-size:.72rem;padding:3px 10px;border-radius:5px">{date}</span>
               </div>
             </div>
@@ -743,7 +743,7 @@ with tab1:
                 if lineup:
                     rows = ""
                     for p in lineup:
-                        flag = " <span style='color:#94A3B8'>(sub)</span>" if p.get("is_sub") else ""
+                        flag = " <span style='color:#A8B5C7'>(sub)</span>" if p.get("is_sub") else ""
                         rows += f"""
                         <div style="display:flex;gap:10px;align-items:baseline;padding:4px 0;
                                     border-bottom:1px solid #334155">
@@ -757,7 +757,7 @@ with tab1:
                     st.markdown(f"""
                     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;
                                 font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;
-                                color:#94A3B8;margin-bottom:8px">Starting XI</div>
+                                color:#A8B5C7;margin-bottom:8px">Starting XI</div>
                     <div style="background:#1E293B;border:1px solid #334155;
                                 border-radius:10px;padding:12px 14px">{rows}</div>
                     """, unsafe_allow_html=True)
@@ -776,22 +776,22 @@ with tab1:
                           <span style="font-family:'Inter',sans-serif;font-size:.8rem;
                                        color:#F8FAFC">{s['player']}</span>
                           <span style="font-family:'JetBrains Mono',monospace;font-size:.72rem;
-                                       color:#94A3B8;margin-left:auto">{s.get('minute_raw', s['minute'])}′</span>
+                                       color:#A8B5C7;margin-left:auto">{s.get('minute_raw', s['minute'])}′</span>
                         </div>"""
                     for s in opp_sc:
                         rows += f"""
                         <div style="display:flex;gap:8px;align-items:baseline;padding:4px 0;
                                     border-bottom:1px solid #334155">
-                          <span style="color:#94A3B8">⚽</span>
+                          <span style="color:#A8B5C7">⚽</span>
                           <span style="font-family:'Inter',sans-serif;font-size:.8rem;
-                                       color:#94A3B8">{s['player']} ({opp})</span>
+                                       color:#A8B5C7">{s['player']} ({opp})</span>
                           <span style="font-family:'JetBrains Mono',monospace;font-size:.72rem;
                                        color:#64748B;margin-left:auto">{s.get('minute_raw', s['minute'])}′</span>
                         </div>"""
                     st.markdown(f"""
                     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;
                                 font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;
-                                color:#94A3B8;margin-bottom:8px">Scorers</div>
+                                color:#A8B5C7;margin-bottom:8px">Scorers</div>
                     <div style="background:#1E293B;border:1px solid #334155;
                                 border-radius:10px;padding:12px 14px">{rows}</div>
                     """, unsafe_allow_html=True)
@@ -801,7 +801,7 @@ with tab1:
     st.markdown(_divider(), unsafe_allow_html=True)
     st.markdown(_section_label("Matchday Checklist"), unsafe_allow_html=True)
     st.markdown(
-        '<div style="font-family:\'Inter\',sans-serif;font-size:.77rem;color:#94A3B8;'
+        '<div style="font-family:\'Inter\',sans-serif;font-size:.77rem;color:#A8B5C7;'
         'margin-bottom:14px">Work through each phase in order. Ticks persist across tab '
         'switches for this session. Reset all when starting a new matchday.</div>',
         unsafe_allow_html=True,
@@ -897,7 +897,7 @@ with tab1:
 with tab2:
     st.markdown(_section_label("Video Frame Extraction"), unsafe_allow_html=True)
     st.markdown(
-        '<div style="font-family:\'Inter\',sans-serif;font-size:.8rem;color:#94A3B8;'
+        '<div style="font-family:\'Inter\',sans-serif;font-size:.8rem;color:#A8B5C7;'
         'margin-bottom:16px">Enter the path to your local Veo file. '
         'Scrub to a frame with clear pitch markings, click the image to pick a pixel, '
         'then use it to calibrate the camera or log a video-assisted event.</div>',
@@ -937,12 +937,12 @@ with tab2:
             fig = px.imshow(frame, title=f"Frame {st.session_state['frame_index']} — click to pick pixel")
             fig.update_layout(
                 paper_bgcolor="#0F172A", plot_bgcolor="#0F172A", font_color="#F8FAFC",
-                title_font=dict(family="Barlow Condensed", size=14, color="#94A3B8"),
+                title_font=dict(family="Barlow Condensed", size=14, color="#A8B5C7"),
                 coloraxis_showscale=False,
                 margin=dict(l=0, r=0, t=32, b=0),
             )
-            fig.update_xaxes(title="U (px)", color="#94A3B8", gridcolor="#334155", tickfont=dict(family="JetBrains Mono", size=10))
-            fig.update_yaxes(title="V (px)", color="#94A3B8", gridcolor="#334155", tickfont=dict(family="JetBrains Mono", size=10))
+            fig.update_xaxes(title="U (px)", color="#A8B5C7", gridcolor="#334155", tickfont=dict(family="JetBrains Mono", size=10))
+            fig.update_yaxes(title="V (px)", color="#A8B5C7", gridcolor="#334155", tickfont=dict(family="JetBrains Mono", size=10))
             event_data = st.plotly_chart(fig, on_select="rerun", use_container_width=True, key="frame_chart")
             if event_data and hasattr(event_data, "selection") and event_data.selection.points:
                 pt = event_data.selection.points[0]
@@ -1009,16 +1009,16 @@ with tab2:
                 <div style="display:flex;gap:16px;padding:5px 0;
                             border-bottom:1px solid #334155;
                             font-family:'JetBrains Mono',monospace;font-size:.75rem">
-                  <span style="color:#94A3B8;width:20px">{i+1}</span>
+                  <span style="color:#A8B5C7;width:20px">{i+1}</span>
                   <span style="color:#F8FAFC;flex:1">{pt['label']}</span>
                   <span style="color:#f59e0b">U={u} V={v}</span>
-                  <span style="color:#94A3B8">→ ({xw}m, {yw}m)</span>
+                  <span style="color:#A8B5C7">→ ({xw}m, {yw}m)</span>
                 </div>"""
             st.markdown(f"""
             <div style="background:#1E293B;border:1px solid #334155;
                         border-radius:10px;padding:14px 18px;margin:12px 0">
               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.8rem;
-                          letter-spacing:.1em;color:#94A3B8;margin-bottom:8px">
+                          letter-spacing:.1em;color:#A8B5C7;margin-bottom:8px">
                 CALIBRATION POINTS &nbsp;
                 <span style="color:{'#f59e0b' if n_pts >= 4 else '#ef4444'}">{n_pts}/4+</span>
               </div>
@@ -1106,9 +1106,9 @@ with tab2:
                 f'<div style="background:#1E293B;border:1px solid rgba(245,158,11,.25);'
                 f'border-radius:10px;padding:14px 18px;display:inline-flex;gap:24px;'
                 f'font-family:\'JetBrains Mono\',monospace;font-size:.8rem;margin:10px 0">'
-                f'<span style="color:#94A3B8">Pitch coord</span>'
+                f'<span style="color:#A8B5C7">Pitch coord</span>'
                 f'<span style="color:#f59e0b">{x_m:.1f}m, {y_m:.1f}m</span>'
-                f'<span style="color:#94A3B8">Zone</span>'
+                f'<span style="color:#A8B5C7">Zone</span>'
                 f'<span style="color:#f59e0b">{zone_id}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -1163,7 +1163,7 @@ with tab2:
     # ── Sync Offsets ──────────────────────────────────────────────────────────
     st.markdown(
         '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
-        'font-size:.8rem;letter-spacing:.1em;color:#94A3B8;margin:10px 0 6px">KICK-OFF SYNC OFFSETS</div>',
+        'font-size:.8rem;letter-spacing:.1em;color:#A8B5C7;margin:10px 0 6px">KICK-OFF SYNC OFFSETS</div>',
         unsafe_allow_html=True,
     )
     sync_col1, sync_col2, sync_col3, sync_col4 = st.columns(4)
@@ -1211,7 +1211,7 @@ with tab2:
     # ── Event table with per-row Clip button ─────────────────────────────────
     st.markdown(
         '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
-        'font-size:.8rem;letter-spacing:.1em;color:#94A3B8;margin:10px 0 6px">KEY MOMENTS — CLIP EXPORT</div>',
+        'font-size:.8rem;letter-spacing:.1em;color:#A8B5C7;margin:10px 0 6px">KEY MOMENTS — CLIP EXPORT</div>',
         unsafe_allow_html=True,
     )
 
@@ -1249,7 +1249,7 @@ with tab2:
                 'gap:0;background:#1E293B;border:1px solid #334155;'
                 'border-radius:10px 10px 0 0;padding:8px 12px;'
                 'font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
-                'font-size:.72rem;letter-spacing:.09em;color:#94A3B8">'
+                'font-size:.72rem;letter-spacing:.09em;color:#A8B5C7">'
                 '<span>#</span><span>MIN</span><span>PERIOD</span>'
                 '<span>EVENT</span><span>SUB-TYPE</span><span>ZONE</span><span></span>'
                 '</div>',
@@ -1269,12 +1269,12 @@ with tab2:
                     f'border-bottom:1px solid #334155;'
                     f'padding:7px 12px;align-items:center;'
                     f'font-family:\'JetBrains Mono\',monospace;font-size:.72rem;color:#F8FAFC">'
-                    f'<span style="color:#94A3B8">{_i+1}</span>'
+                    f'<span style="color:#A8B5C7">{_i+1}</span>'
                     f'<span style="color:#f59e0b">{_min_label}</span>'
                     f'<span style="color:#86efac">{_row["period"]}</span>'
                     f'<span>{_row["event_type"]}</span>'
-                    f'<span style="color:#94A3B8">{_row["sub_type"]}</span>'
-                    f'<span style="color:#94A3B8">{_row["zone_id"]}</span>'
+                    f'<span style="color:#A8B5C7">{_row["sub_type"]}</span>'
+                    f'<span style="color:#A8B5C7">{_row["zone_id"]}</span>'
                     f'<span></span>'
                     f'</div>',
                     unsafe_allow_html=True,
@@ -1319,7 +1319,7 @@ with tab2:
                 st.markdown(_divider(), unsafe_allow_html=True)
                 st.markdown(
                     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
-                    'font-size:.8rem;letter-spacing:.1em;color:#94A3B8;margin:10px 0 6px">'
+                    'font-size:.8rem;letter-spacing:.1em;color:#A8B5C7;margin:10px 0 6px">'
                     'LAST CLIP PREVIEW</div>',
                     unsafe_allow_html=True,
                 )
@@ -1375,13 +1375,13 @@ with tab2:
             st.markdown(_divider(), unsafe_allow_html=True)
             st.markdown(
                 '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
-                'font-size:.8rem;letter-spacing:.1em;color:#94A3B8;margin:10px 0 6px">'
+                'font-size:.8rem;letter-spacing:.1em;color:#A8B5C7;margin:10px 0 6px">'
                 'TACTICAL SECTION EXPORT</div>',
                 unsafe_allow_html=True,
             )
             st.markdown(
                 '<div style="font-family:\'Inter\',sans-serif;font-size:.76rem;'
-                'color:#94A3B8;margin-bottom:12px;max-width:560px;line-height:1.6">'
+                'color:#A8B5C7;margin-bottom:12px;max-width:560px;line-height:1.6">'
                 'Slice the full 90-minute file into 4 fixed analytical windows '
                 'for manager review — no event data needed. '
                 'Uses the kick-off offsets set above.</div>',
@@ -1394,7 +1394,7 @@ with tab2:
                 'background:#1E293B;border:1px solid #334155;'
                 'border-radius:10px 10px 0 0;padding:7px 14px;'
                 'font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
-                'font-size:.72rem;letter-spacing:.09em;color:#94A3B8">'
+                'font-size:.72rem;letter-spacing:.09em;color:#A8B5C7">'
                 '<span>SECTION</span><span>FROM</span><span>TO</span></div>',
                 unsafe_allow_html=True,
             )
@@ -1619,7 +1619,7 @@ with tab3:
                   color:#f59e0b;letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px">
         Run Full Pipeline
       </div>
-      <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#94A3B8;max-width:520px">
+      <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#A8B5C7;max-width:520px">
         Matches tagger tags against the club feed, produces the shot map and zone heatmaps,
         then runs all four agents — In Possession, Press &amp; LoE, Set Pieces, Non-League Physics.
         Review each section and sign off before the dossier is written to disk.
@@ -1750,7 +1750,7 @@ with tab3:
                   </div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;
                               margin-bottom:18px">
-                    <div style="color:#94A3B8;font-size:.78rem">
+                    <div style="color:#A8B5C7;font-size:.78rem">
                       <span style="color:#fbbf24;font-weight:700">TIVVY</span><br>
                       Shots: <b style="color:#fff">{brief['t_shots']}</b>
                         ({brief['t_on_tgt']} on tgt)&nbsp;&nbsp;
@@ -1759,7 +1759,7 @@ with tab3:
                       Corners: ATT&nbsp;<b style="color:#fff">{brief['t_att_corn']}</b>
                         / DEF&nbsp;<b style="color:#fff">{brief['t_def_corn']}</b>
                     </div>
-                    <div style="color:#94A3B8;font-size:.78rem">
+                    <div style="color:#A8B5C7;font-size:.78rem">
                       <span style="color:#ef4444;font-weight:700">OPP</span><br>
                       Shots: <b style="color:#fff">{brief['o_shots']}</b>
                         ({brief['o_on_tgt']} on tgt)&nbsp;&nbsp;
@@ -1791,7 +1791,7 @@ with tab3:
             "Non-League Physics": ("#22c55e", "All 4 Moments — Physical Battle", "AERIAL_DUEL · SECOND_BALL · Quantitative Superiority · Direct Play"),
         }
         for agent_name, markdown_text in outputs.items():
-            color, moment, tags = AGENT_META.get(agent_name, ("#94A3B8", "", ""))
+            color, moment, tags = AGENT_META.get(agent_name, ("#A8B5C7", "", ""))
             st.markdown(f"""
             <div style="background:#1E293B;border:1px solid #334155;
                         border-radius:12px;margin-bottom:14px;overflow:hidden">
@@ -1814,7 +1814,7 @@ with tab3:
         st.markdown("""
         <div style="background:#1E293B;border:1px solid #334155;
                     border-radius:12px;padding:40px;text-align:center">
-          <div style="font-family:'Inter',sans-serif;font-size:.82rem;color:#94A3B8">
+          <div style="font-family:'Inter',sans-serif;font-size:.82rem;color:#A8B5C7">
             Run the pipeline above — the approval gate unlocks once all four agents have run.
           </div>
         </div>
@@ -1829,10 +1829,10 @@ with tab3:
           <div>
             <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.3rem;
                         letter-spacing:.04em;color:#22c55e">DOSSIER APPROVED</div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:.75rem;color:#94A3B8;
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.75rem;color:#A8B5C7;
                         margin-top:4px">{path_str}</div>
           </div>
-          <div style="margin-left:auto;font-family:'Inter',sans-serif;font-size:.8rem;color:#94A3B8">
+          <div style="margin-left:auto;font-family:'Inter',sans-serif;font-size:.8rem;color:#A8B5C7">
             Switch to the Deliverables tab to preview and download.
           </div>
         </div>
@@ -1842,7 +1842,7 @@ with tab3:
 
         with col_app:
             st.markdown("""
-            <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#94A3B8;
+            <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#A8B5C7;
                         margin-bottom:12px">
               Happy with the analysis? Approve to write the dossier, package the HTML report,
               and generate the DoF match card ready for WhatsApp.
@@ -1878,7 +1878,7 @@ with tab3:
         with col_rej:
             rejection_count = st.session_state.get("rejection_count", 0)
             st.markdown(f"""
-            <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#94A3B8;
+            <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#A8B5C7;
                         margin-bottom:12px">
               Not right? Add your note and all four agents re-run with it in context.
               Cycle {rejection_count} / 3.
@@ -1929,7 +1929,7 @@ with tab4:
     with col_dof:
         st.markdown("""
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.85rem;
-                    letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:12px">
+                    letter-spacing:.1em;text-transform:uppercase;color:#A8B5C7;margin-bottom:12px">
           Director of Football Card
         </div>
         """, unsafe_allow_html=True)
@@ -1948,7 +1948,7 @@ with tab4:
             <div style="background:#1E293B;border:1px solid #334155;
                         border-radius:12px;padding:48px;text-align:center">
               <div style="font-size:2rem;margin-bottom:12px">🖼</div>
-              <div style="font-family:'Inter',sans-serif;font-size:.78rem;color:#94A3B8">
+              <div style="font-family:'Inter',sans-serif;font-size:.78rem;color:#A8B5C7">
                 Sign off the dossier in the Agent Cockpit tab — the card generates on approval.
               </div>
             </div>
@@ -1963,14 +1963,14 @@ with tab4:
                 st.markdown(f"""
                 <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;
                             font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;
-                            color:#94A3B8;margin:16px 0 8px">{label}</div>
+                            color:#A8B5C7;margin:16px 0 8px">{label}</div>
                 """, unsafe_allow_html=True)
                 st.image(str(p), use_container_width=True)
 
     with col_doss:
         st.markdown("""
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.85rem;
-                    letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:12px">
+                    letter-spacing:.1em;text-transform:uppercase;color:#A8B5C7;margin-bottom:12px">
           Tactical Dossier
         </div>
         """, unsafe_allow_html=True)
@@ -2006,7 +2006,7 @@ with tab4:
                           color:#64748B;letter-spacing:.04em;margin-bottom:12px">
                 NO DOSSIER YET
               </div>
-              <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#94A3B8;
+              <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#A8B5C7;
                           max-width:320px;margin:0 auto;line-height:1.6">
                 Head to the Agent Cockpit tab, run the pipeline, read through each section,
                 and approve — the HTML report and DoF card land here.
@@ -2077,7 +2077,7 @@ with tab4:
         st.markdown("""
         <div style="background:#1E293B;border:1px solid #334155;
                     border-radius:12px;padding:24px;text-align:center">
-          <div style="font-family:'Inter',sans-serif;font-size:.78rem;color:#94A3B8">
+          <div style="font-family:'Inter',sans-serif;font-size:.78rem;color:#A8B5C7">
             Load a match ledger in the Agent Cockpit tab, then click
             <strong>📐 Regenerate Set-Piece Matrix</strong>.
           </div>
@@ -2086,9 +2086,9 @@ with tab4:
 
     # ── Archive & Clear ───────────────────────────────────────────────────────
     st.markdown(_divider(), unsafe_allow_html=True)
-    st.markdown(_section_label("Archive & Clear Workspace", color="#94A3B8"), unsafe_allow_html=True)
+    st.markdown(_section_label("Archive & Clear Workspace", color="#A8B5C7"), unsafe_allow_html=True)
     st.markdown(
-        '<div style="font-family:\'Inter\',sans-serif;font-size:.78rem;color:#94A3B8;'
+        '<div style="font-family:\'Inter\',sans-serif;font-size:.78rem;color:#A8B5C7;'
         'margin-bottom:16px;max-width:600px;line-height:1.6">'
         'Once you have verified delivery — dossier sent, DoF card shared — archive this match '
         'and open a clean workspace for the next game. All files are moved to '
@@ -2123,7 +2123,7 @@ with tab4:
             f'border-radius:6px;padding:4px 10px;'
             f'font-family:\'JetBrains Mono\',monospace;font-size:.72rem">'
             f'<span style="color:{_col}">{_dot}</span>'
-            f'<span style="color:#94A3B8">{_label}</span>'
+            f'<span style="color:#A8B5C7">{_label}</span>'
             f'</div>'
         )
     _status_html += '</div>'
@@ -2187,7 +2187,7 @@ with tab4:
 with tab5:
     st.markdown(_section_label("Tactical Progress Review"), unsafe_allow_html=True)
     st.markdown(
-        '<div style="font-family:\'Inter\',sans-serif;font-size:.8rem;color:#94A3B8;'
+        '<div style="font-family:\'Inter\',sans-serif;font-size:.8rem;color:#A8B5C7;'
         'margin-bottom:20px;max-width:680px">Aggregate multiple match ledgers into '
         'a rolling window report. Tracks the 4 Moments across 4–8 games to separate '
         'tactical habits from single-match noise.</div>',
@@ -2356,7 +2356,7 @@ with tab5:
                 )
                 table_rows += f"""
                 <tr>
-                  <td style="color:#94A3B8">{r['match_date']}</td>
+                  <td style="color:#A8B5C7">{r['match_date']}</td>
                   <td>{r['opponent']}</td>
                   <td style="color:{result_color};font-weight:700">{r['result']}</td>
                   <td>{r['tiv_goals']}–{r['opp_goals']}</td>
@@ -2374,25 +2374,25 @@ with tab5:
                           font-family:'JetBrains Mono',monospace;font-size:.75rem">
               <thead>
                 <tr style="border-bottom:1px solid #334155">
-                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#A8B5C7;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">Date</th>
-                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#A8B5C7;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">Opponent</th>
-                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#A8B5C7;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">Result</th>
-                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#A8B5C7;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">Score</th>
-                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#A8B5C7;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">LoE Idx</th>
-                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#A8B5C7;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">CP%</th>
-                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#A8B5C7;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">½-Space%</th>
-                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#A8B5C7;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">Aerial WR(D)</th>
-                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#A8B5C7;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">2nd Ball%</th>
-                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#A8B5C7;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">RD</th>
                 </tr>
               </thead>

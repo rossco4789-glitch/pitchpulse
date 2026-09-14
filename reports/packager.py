@@ -232,7 +232,7 @@ _CSS = """
   --gold:       #f59e0b;
   --gold-dim:   rgba(245,158,11,.12);
   --text:       #F8FAFC;
-  --text-muted: #94A3B8;
+  --text-muted: #A8B5C7;
   --green:      #34d399;
   --green-dim:  rgba(52,211,153,.11);
   --amber:      #fbbf24;
