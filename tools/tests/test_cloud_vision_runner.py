@@ -85,6 +85,35 @@ def test_collect_without_job_exits_2(env, capsys):
     assert "--dispatch-only first" in capsys.readouterr().out
 
 
+# ── Subprocess encoding (dry run 14 Sep 2026: cp1252 pipe crash on '⚠️' in the kernel log) ─────
+
+def test_kaggle_call_forces_utf8_env_and_decoding(monkeypatch):
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen.update(cmd=cmd, **kw)
+        return cp()
+
+    monkeypatch.setenv("PITCHPULSE_KEEP_ME", "yes")
+    monkeypatch.setattr(cvr.subprocess, "run", fake_run)
+    cvr.kaggle(["kernels", "status", "tivvy/x"])
+    assert seen["cmd"] == ["kaggle", "kernels", "status", "tivvy/x"]
+    assert (seen["env"]["PYTHONUTF8"], seen["env"]["PYTHONIOENCODING"]) == ("1", "utf-8")
+    assert seen["env"]["PITCHPULSE_KEEP_ME"] == "yes"  # parent environment (PATH, token vars) is preserved
+    assert (seen["encoding"], seen["errors"], seen["text"], seen["capture_output"]) == ("utf-8", "replace", True, True)
+
+
+def test_non_ascii_and_invalid_bytes_survive_a_real_pipe(monkeypatch):
+    """Real child process: emoji printed through a pipe plus a raw 0x8f byte must not crash either side."""
+    real_run = subprocess.run
+    child = ("import sys; print('WARNING ⚠️ half is deprecated'); sys.stdout.flush(); "
+             "sys.stdout.buffer.write(b'raw \\x8f byte\\n')")
+    monkeypatch.setattr(cvr.subprocess, "run", lambda cmd, **kw: real_run([sys.executable, "-c", child], **kw))
+    result = cvr.kaggle(["kernels", "output", "tivvy/x"])
+    assert result.returncode == 0, result.stderr
+    assert "WARNING ⚠️ half is deprecated" in result.stdout and "raw � byte" in result.stdout
+
+
 # ── Payload preparation ───────────────────────────────────────────────────────
 
 def test_ffmpeg_downsample_parameters():
@@ -268,7 +297,7 @@ def test_dispatch_only_uploads_pushes_and_records_job(env, monkeypatch):
     k = seen["kernel"]
     assert (k["enable_gpu"], k["is_private"], k["kernel_type"], k["code_file"]) == (True, True, "script", "kaggle_vision_worker.py")
     assert k["dataset_sources"] == ["tivvy/pitchpulse-footage-dorchester-town", "tivvy/pitchpulse-cv-models"]
-    assert "def main()" in seen["worker"]
+    assert "def main()" in seen["worker"] and k["machine_shape"] == "NvidiaTeslaT4"
     assert not (env / "staging" / SLUG).exists()
 
 
@@ -410,6 +439,26 @@ def test_collect_worker_failure_exits_3(env, monkeypatch):
 
 
 # ── Worker: schema parity, geometry rejection, metrics, failure report ────────
+
+KAGGLE_ARCH_LIST = ["sm_70", "sm_75", "sm_80", "sm_86", "sm_90", "sm_100", "sm_120"]  # from the dry-run kernel log
+
+
+@pytest.mark.parametrize("name,capability,ok", [
+    ("Tesla P100-PCIE-16GB", (6, 0), False),   # the dry-run failure
+    ("Tesla T4", (7, 5), True),
+    ("NVIDIA L4", (8, 9), True),               # no sm_89 build; runs on sm_86
+    ("Tesla V100", (7, 0), True),
+])
+def test_gpu_compatibility_guard(name, capability, ok):
+    error = worker.gpu_compatibility_error(name, capability, KAGGLE_ARCH_LIST)
+    assert (error is None) == ok
+    if not ok:
+        assert name in error and "6.0" in error and "NvidiaTeslaT4" in error
+
+
+def test_gpu_guard_rejects_cpu_only_build():
+    assert "no CUDA architectures" in worker.gpu_compatibility_error("Tesla T4", (7, 5), [])
+
 
 def test_worker_schema_constants_match_runner():
     assert (worker.SCHEMA_VERSION, worker.MIN_SAMPLES, worker.DROP_RULES, worker.MOMENTS) == \

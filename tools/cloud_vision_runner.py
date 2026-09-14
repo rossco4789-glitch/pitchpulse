@@ -59,6 +59,7 @@ DATASET_READY_S  = 600
 READY_POLL_BASE_S = 5
 READY_POLL_MAX_S  = 60
 MODEL_FILES      = ("players.pt", "pitch.pt", "pitch_config.json")
+MACHINE_SHAPE    = "NvidiaTeslaT4"  # Kaggle's default P100 (sm_60) is unsupported by the kernel's PyTorch build
 FOOTAGE          = ("full_wide", "highlight")
 TERMINAL         = {"complete", "error", "cancelacknowledged", "cancelrequested"}
 KAGGLE_CLI_HINT  = "pip install kaggle, then reopen the terminal"
@@ -133,8 +134,15 @@ def require_tool(name: str, hint: str) -> None:
 
 
 def kaggle(args: list[str], timeout: float = 600) -> subprocess.CompletedProcess:
-    """Single seam for every Kaggle CLI call (tests replace this)."""
-    return subprocess.run(["kaggle", *args], capture_output=True, text=True, timeout=timeout)
+    """Single seam for every Kaggle CLI call (tests replace this).
+
+    On Windows a piped CLI prints in cp1252 and crashes on kernel-log text such as '⚠️'; forcing UTF-8 in
+    the child and decoding with errors="replace" in the parent keeps every call's exit code and output intact.
+    """
+    env = os.environ.copy()
+    env.update(PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+    return subprocess.run(["kaggle", *args], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          timeout=timeout, env=env)
 
 
 def with_retry(label: str, fn, attempts: int = MAX_ATTEMPTS, base: float = BACKOFF_BASE_S):
@@ -286,7 +294,7 @@ def dispatch(args, creds: dict) -> dict:
         (kern_dir / "kernel-metadata.json").write_text(json.dumps({
             "id": kernel_ref, "title": f"pitchpulse-vision-{ks}", "code_file": WORKER.name,
             "language": "python", "kernel_type": "script", "is_private": True,
-            "enable_gpu": True, "enable_internet": True,
+            "enable_gpu": True, "enable_internet": True, "machine_shape": MACHINE_SHAPE,
             "dataset_sources": [dataset_ref, models_ref], "competition_sources": [], "kernel_sources": [],
         }, indent=2), encoding="utf-8")
         with_retry("kernel push", lambda: kaggle(["kernels", "push", "-p", str(kern_dir)]))

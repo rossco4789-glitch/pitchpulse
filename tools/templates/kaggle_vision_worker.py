@@ -31,6 +31,7 @@ Contract:
 
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import traceback
@@ -101,6 +102,21 @@ def fit_homography(image_xy, world_xy, conf) -> tuple[np.ndarray | None, str | N
     if rmse > MAX_RMSE_M or np.linalg.cond(H) > MAX_COND:
         return None, "unstable_homography"
     return H, None
+
+
+def gpu_compatibility_error(name: str, capability: tuple[int, int], arch_list: list[str]) -> str | None:
+    """None if this PyTorch build can run on the GPU, else an explicit reason.
+
+    A build compiled for sm_XY runs on any device with the same major version and minor ≥ Y
+    (an L4 at 8.9 runs on sm_86); a P100 at 6.0 has no sm_6x build and fails on the first tensor op.
+    """
+    major, minor = capability
+    built = sorted({(int(a[3:-1]), int(a[-1])) for a in arch_list if re.fullmatch(r"sm_\d{2,3}", a)})
+    if any(bm == major and bn <= minor for bm, bn in built):
+        return None
+    return (f"GPU {name} has CUDA capability {major}.{minor}, but this PyTorch build supports "
+            f"{', '.join(f'{m}.{n}' for m, n in built) or 'no CUDA architectures'}. "
+            f"Pin a T4 with \"machine_shape\": \"NvidiaTeslaT4\" in kernel-metadata.json.")
 
 
 def hex_to_lab(hex_colour: str) -> np.ndarray:
@@ -366,11 +382,18 @@ def run(input_dir: Path = INPUT, output_dir: Path = OUTPUT) -> None:
     if world.ndim != 2 or world.shape[1] != 2 or not ((world >= 0) & (world <= [PITCH_L, PITCH_W])).all():
         raise ValueError("pitch_config.json landmarks_m must be [[x, y], ...] inside 105×68 m")
 
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", PINNED], check=True)
     import torch
-    from ultralytics import YOLO
     if not torch.cuda.is_available():
         raise RuntimeError("no CUDA GPU attached; kernel-metadata enable_gpu must be true")
+    # before any install or tensor op, so an unsupported GPU fails in seconds with a named cause
+    gpu_error = gpu_compatibility_error(torch.cuda.get_device_name(0), torch.cuda.get_device_capability(0),
+                                        torch.cuda.get_arch_list())
+    if gpu_error:
+        raise RuntimeError(gpu_error)
+    print(f"GPU {torch.cuda.get_device_name(0)} capability {torch.cuda.get_device_capability(0)}", flush=True)
+
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", PINNED], check=True)
+    from ultralytics import YOLO
 
     players_pt, pitch_pt = _find(input_dir, "players.pt"), _find(input_dir, "pitch.pt")
     pitch_model, player_model = YOLO(str(pitch_pt)), YOLO(str(players_pt))
