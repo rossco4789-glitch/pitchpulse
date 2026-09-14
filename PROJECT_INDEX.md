@@ -16,7 +16,10 @@ PitchPulse/
 ├── tagger/
 │   └── index.html             # ✅ COMPLETE (v3.0) — Broadcast-grade OLED tactical pad; dual-team split buttons (Tivvy/Opp per card); live score widget; haptic feedback; collapsible event log; UNDO toast; ↔ SUB modal
 ├── tools/
-│   └── tagger_sanity.py       # ✅ COMPLETE — Post-session ledger validator CLI; 7 checks; ANSI colour report; exit 0/1; --test self-test suite (11 tests)
+│   ├── tagger_sanity.py       # ✅ COMPLETE — Post-session ledger validator CLI; 7 checks; ANSI colour report; exit 0/1; --test self-test suite (11 tests)
+│   ├── scout_harvester.py     # ✅ COMPLETE — Offline Opposition Intelligence Harvester; Alpha/Beta/Gamma task graph → data/scouting/{slug}_dossier.json
+│   └── tests/
+│       └── test_scout_harvester.py # ✅ COMPLETE — Dossier schema integrity + CLI smoke suite (pytest, offline)
 ├── reconcile/
 │   └── sync.py                # ✅ COMPLETE — Post-match reconciliation engine; ±90s temporal match, roster resolution, JSON/TXT feed, ledger output
 ├── cv/
@@ -406,6 +409,42 @@ Legacy local Python analytical engine (pre-reconcile era). Retained for referenc
 
 ### `analysis/report_prompt.md`
 Structured template for a 3-bullet halftime tactical diagnosis (4 Moments framework).
+
+---
+
+## Tools & Scripts
+
+### `tools/scout_harvester.py`
+Standalone, off-pitch Opposition Intelligence Harvester. Builds a pre-match UEFA 4-Moments dossier from local opponent material. **Decoupled by design** — never imported by `app.py` or `tagger/index.html`; stdlib only, no network, no API keys.
+
+```bash
+python tools/scout_harvester.py --opponent "Willand Rovers" --output data/scouting/
+python tools/scout_harvester.py --opponent "Willand Rovers" --source path/to/notes/   # explicit sources
+python tools/scout_harvester.py --opponent "Willand Rovers" --mock                   # force offline mock
+python -m pytest tools/tests/test_scout_harvester.py -v
+```
+
+**Sources** (`--source DIR`, else `data/scouting/sources/<slug>/` if present, else built-in MOCK corpus): `*.txt`/`*.md` match reports; `*.json` with `"type": "lineup"` (`players[]`: shirt/name/position) or `"type": "event_summary"` (`events[]`: minute/description).
+
+**Ruflo-style task graph** (declarative `TASK_GRAPH`, shared memory, dependency-ordered):
+
+| Task | Agent | Role | Output |
+|---|---|---|---|
+| `T1_harvest` | Alpha | Harvester — ingests reports, lineups, event summaries; SHA-256 fingerprint | `corpus` |
+| `T2_categorise` | Beta | Tactical Categoriser — rule lexicon + negation guard → 4-Moments buckets with confidence | `draft` |
+| `T3_verify` | Gamma | Reviewer / Verifier — enum/zone/confidence audit; strips unknown keys and filler | `dossier` |
+
+**Dossier schema** (`data/scouting/{opponent_slug}_dossier.json`, schema v1.0): each field is `{value, confidence 0–1, confidence_band, evidence_count, distribution, sources}`.
+
+| Section | Fields |
+|---|---|
+| `in_possession` | `build_up_pattern` (short_from_gk/long_from_gk/mixed), `style_preference` (direct/positional/mixed), `key_ball_progressors` (top 3 roster players) |
+| `out_of_possession` | `block_height` (high_block/mid_block/low_block), `flank_vulnerability` (left/right/both — opponent's own flank) |
+| `transition_attacking` | `counter_attack_speed` (fast/measured/slow), `outlet_channels` (flanks, half-spaces, central) |
+| `transition_defensive` | `counter_press_intensity` (high/medium/low), `rest_defence_shape` (2+1/3+1/2+2/3+2) |
+| `set_pieces` | `corner_delivery_zones` (the 6 zones from `reports/set_piece_matrix.py`), `defensive_marking` (zonal/man_to_man/hybrid) |
+
+Confidence = winning share × min(1, evidence/3). Output is byte-deterministic for identical inputs (no timestamps). Exit `0` PASS + written · `1` validation FAIL, nothing written · `2` input error. Mock output is flagged `data_provenance: "mock"` and must not be briefed as real intel.
 
 ---
 

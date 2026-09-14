@@ -19,6 +19,10 @@ data/archive/
 data/processed/tivvy_tactical_dossier.html
 reports/dossier_*.md
 
+# Ignore generated dossiers, track raw inputs
+data/scouting/*_dossier.json
+!data/scouting/sources/
+
 # Sample data & ledger (committed for demo; swap for real data)
 # data/raw/match_context.json   ← keep tracked
 # data/raw/tivvy_x_feed.json    ← keep tracked
