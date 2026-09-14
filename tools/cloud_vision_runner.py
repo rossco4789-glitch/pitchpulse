@@ -18,7 +18,8 @@ One-off setup:
 
 Flow:
     dispatch  auth → models dataset check → payload (ffmpeg 2 FPS / 720p when > 1.5 GB) → SHA-256
-              → private footage dataset (5 attempts, exponential backoff) → wait until ready
+              → private footage dataset (5 attempts, exponential backoff)
+              → poll `datasets files` until payload_<sha12> is listed at its byte size (10 min cap)
               → push kernels/templates worker → vision_job.json state DISPATCHED
     collect   kernel status → download output → worker FAILED report | output hash | payload hash
               | 4-moments schema → data/scouting/sources/<slug>/vision_metrics.json
@@ -54,7 +55,9 @@ DOWNSAMPLE_BYTES = int(1.5 * 1024 ** 3)
 MAX_ATTEMPTS     = 5
 BACKOFF_BASE_S   = 2.0
 POLL_S           = 60
-DATASET_READY_S  = 1200
+DATASET_READY_S  = 600
+READY_POLL_BASE_S = 5
+READY_POLL_MAX_S  = 60
 MODEL_FILES      = ("players.pt", "pitch.pt", "pitch_config.json")
 FOOTAGE          = ("full_wide", "highlight")
 TERMINAL         = {"complete", "error", "cancelacknowledged", "cancelrequested"}
@@ -199,27 +202,46 @@ def prepare_payload(video: Path, stage: Path) -> tuple[Path, bool]:
     return dst, False
 
 
-def check_models(ref: str) -> None:
-    cp = kaggle(["datasets", "files", ref])
-    hint = f"upload {', '.join(MODEL_FILES)} as the private Kaggle dataset {ref}, or pass --models-dataset"
+def dataset_listing(ref: str) -> dict[str, int] | None:
+    """{filename: bytes} from `kaggle datasets files`, or None if the dataset is absent or unreadable.
+
+    `kaggle datasets status` is unusable in CLI 2.2.4 (403 for our own datasets, 404 for public ones),
+    so existence and readiness both come from the file listing, which Kaggle fills only after processing.
+    """
+    try:
+        cp = kaggle(["datasets", "files", ref])
+    except (subprocess.TimeoutExpired, OSError):
+        return None
     if cp.returncode != 0:
+        return None
+    return {m.group(1): int(m.group(2)) for m in re.finditer(r"^\s*(\S+)\s+(\d+)(?:\s|$)", cp.stdout or "", re.M)}
+
+
+def check_models(ref: str) -> None:
+    listing = dataset_listing(ref)
+    hint = f"upload {', '.join(MODEL_FILES)} as the private Kaggle dataset {ref}, or pass --models-dataset"
+    if listing is None:
         raise SetupError(f"models dataset {ref} not reachable: {hint}")
-    missing = [f for f in MODEL_FILES if f not in cp.stdout]
+    missing = [f for f in MODEL_FILES if f not in listing]
     if missing:
         raise SetupError(f"models dataset {ref} lacks {', '.join(missing)}: {hint}")
 
 
-def wait_dataset_ready(ref: str) -> None:
+def wait_dataset_ready(ref: str, payload: str, size: int) -> None:
+    """Poll with exponential backoff (5 s doubling to 60 s) until `payload` is listed at `size` bytes."""
     deadline = time.monotonic() + DATASET_READY_S
+    delay = READY_POLL_BASE_S
     while True:
-        out = (kaggle(["datasets", "status", ref]).stdout or "").strip().lower()
-        if "ready" in out:
+        listing = dataset_listing(ref)
+        listed = None if listing is None else listing.get(payload)
+        if listed == size:
             return
-        if "error" in out:
-            raise RemoteError(f"dataset {ref} processing failed: {out}")
         if time.monotonic() >= deadline:
-            raise RemoteError(f"dataset {ref} not ready after {DATASET_READY_S // 60} min (last status: {out or 'none'})")
-        time.sleep(30)
+            state = ("dataset not listed" if listing is None else "payload not listed" if listed is None
+                     else f"payload listed at {listed} bytes, expected {size}")
+            raise RemoteError(f"dataset {ref} not ready after {DATASET_READY_S // 60} min ({state})")
+        time.sleep(delay)
+        delay = min(delay * 2, READY_POLL_MAX_S)
 
 
 def dispatch(args, creds: dict) -> dict:
@@ -241,6 +263,9 @@ def dispatch(args, creds: dict) -> dict:
     try:
         payload, downsampled = prepare_payload(video, data_dir)
         digest = sha256_file(payload)
+        # hash in the name: a stale file from the previous dataset version can never satisfy readiness
+        payload = payload.rename(payload.with_name(f"payload_{digest[:12]}{payload.suffix}"))
+        size = payload.stat().st_size
         (data_dir / "manifest.json").write_text(json.dumps({
             "opponent": slug, "footage": args.footage, "payload": payload.name, "payload_sha256": digest,
             "downsampled": downsampled, "opponent_kit": args.opponent_kit, "created_at": _now(),
@@ -249,13 +274,13 @@ def dispatch(args, creds: dict) -> dict:
             "title": f"pitchpulse-footage-{ks}", "id": dataset_ref, "licenses": [{"name": "other"}],
         }, indent=2), encoding="utf-8")
 
-        exists = kaggle(["datasets", "status", dataset_ref]).returncode == 0
+        exists = dataset_listing(dataset_ref) is not None
         push = (["datasets", "version", "-p", str(data_dir), "-m", f"payload {digest[:12]}"] if exists
                 else ["datasets", "create", "-p", str(data_dir)])
-        print(f"  [DISPATCH] uploading {payload.name} ({payload.stat().st_size / 1e6:.0f} MB, "
-              f"{'downsampled' if downsampled else 'original'}) → {dataset_ref}")
+        print(f"  [DISPATCH] {'versioning' if exists else 'creating'} {dataset_ref} with {payload.name} "
+              f"({size / 1e6:.0f} MB, {'downsampled' if downsampled else 'original'})")
         with_retry("dataset upload", lambda: kaggle(push, timeout=4 * 3600))
-        wait_dataset_ready(dataset_ref)
+        wait_dataset_ready(dataset_ref, payload.name, size)
 
         shutil.copy2(WORKER, kern_dir / WORKER.name)
         (kern_dir / "kernel-metadata.json").write_text(json.dumps({
@@ -269,7 +294,7 @@ def dispatch(args, creds: dict) -> dict:
         shutil.rmtree(stage, ignore_errors=True)
 
     job = write_job(slug, state="DISPATCHED", kernel_ref=kernel_ref, dataset_ref=dataset_ref,
-                    models_ref=models_ref, footage=args.footage, payload_sha256=digest,
+                    models_ref=models_ref, footage=args.footage, payload=payload.name, payload_sha256=digest,
                     downsampled=downsampled, dispatched_at=_now(), error=None)
     print(f"  [DISPATCH] {kernel_ref} pushed; state DISPATCHED → {job_path(slug)}")
     return job

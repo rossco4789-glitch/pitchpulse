@@ -142,20 +142,36 @@ def test_retry_backs_off_exponentially_then_gives_up(monkeypatch):
 
 # ── Dispatch ──────────────────────────────────────────────────────────────────
 
-def test_dispatch_only_uploads_pushes_and_records_job(env, monkeypatch):
-    video = env / "match.mp4"
-    video.write_bytes(b"fake video bytes")
-    seen, status_calls = {}, []
+FOOTAGE_REF = "tivvy/pitchpulse-footage-dorchester-town"
+MODELS_LISTING = ("name                    size  creationDate\n-----------------  ---------  -----------\n"
+                  "pitch.pt           140212306  2026-09-14 14:40:49.757000\n"
+                  "pitch_config.json       1786  2026-09-14 14:40:47.580000\n"
+                  "players.pt         136802409  2026-09-14 14:40:50.798000\n")
+
+
+def _dispatch_fake(seen: dict, *, exists: bool, payload_appears: bool = True):
+    """Kaggle CLI stand-in: `datasets files` drives existence and readiness exactly as CLI 2.2.4 behaves."""
+    seen["calls"] = []
 
     def fake(args, timeout=600):
-        if args[:2] == ["datasets", "files"]:
-            return cp(out="name size\nplayers.pt 1\npitch.pt 1\npitch_config.json 1")
+        seen["calls"].append(args[:2])
         if args[:2] == ["datasets", "status"]:
-            status_calls.append(args)
-            return cp(1, err="404") if len(status_calls) == 1 else cp(out="ready")
-        if args[:2] == ["datasets", "create"]:
+            raise AssertionError("datasets status is broken in CLI 2.2.4 and must not be called")
+        if args[:2] == ["datasets", "files"] and args[2] == "tivvy/pitchpulse-cv-models":
+            return cp(out=MODELS_LISTING)
+        if args[:2] == ["datasets", "files"] and args[2] == FOOTAGE_REF:
+            if "manifest" not in seen:  # before upload
+                return cp(out="name size creationDate\npayload_0ld0ld0ld0ld.mp4 16 2026-09-01\n") if exists \
+                    else cp(1, err="403 Client Error: Forbidden")
+            rows = "manifest.json 300 2026-09-14\n"
+            if payload_appears:
+                rows += f"{seen['manifest']['payload']} {seen['payload_size']} 2026-09-14 15:00:00\n"
+            return cp(out="name size creationDate\n" + rows)
+        if args[:2] in (["datasets", "create"], ["datasets", "version"]):
             d = Path(args[args.index("-p") + 1])
+            seen["upload_mode"] = args[1]
             seen["manifest"] = json.loads((d / "manifest.json").read_text(encoding="utf-8"))
+            seen["payload_size"] = (d / seen["manifest"]["payload"]).stat().st_size
             seen["dataset"] = json.loads((d / "dataset-metadata.json").read_text(encoding="utf-8"))
             return cp()
         if args[:2] == ["kernels", "push"]:
@@ -165,12 +181,88 @@ def test_dispatch_only_uploads_pushes_and_records_job(env, monkeypatch):
             return cp()
         raise AssertionError(f"unexpected kaggle call {args}")
 
-    monkeypatch.setattr(cvr, "kaggle", fake)
+    return fake
+
+
+def test_dataset_listing_parses_cli_table_and_treats_failure_as_absent(monkeypatch):
+    calls = []
+    monkeypatch.setattr(cvr, "kaggle", lambda args, timeout=600: (calls.append(args), cp(out=MODELS_LISTING))[1])
+    assert cvr.dataset_listing("tivvy/pitchpulse-cv-models") == \
+           {"pitch.pt": 140212306, "pitch_config.json": 1786, "players.pt": 136802409}
+    assert calls == [["datasets", "files", "tivvy/pitchpulse-cv-models"]]
+
+    monkeypatch.setattr(cvr, "kaggle", lambda args, timeout=600: cp(1, err="403 Client Error: Forbidden"))
+    assert cvr.dataset_listing(FOOTAGE_REF) is None
+
+    def timeout(args, timeout=600):
+        raise subprocess.TimeoutExpired(args, timeout)
+
+    monkeypatch.setattr(cvr, "kaggle", timeout)
+    assert cvr.dataset_listing(FOOTAGE_REF) is None
+
+
+def test_readiness_waits_for_payload_at_expected_size(monkeypatch):
+    replies = iter([cp(1, err="403 Client Error"),                                   # not processed yet
+                    cp(out="name size creationDate\npayload_abc.mp4 500 2026-09-14\n"),  # partial size
+                    cp(out="name size creationDate\npayload_abc.mp4 1024 2026-09-14\n")])
+    delays = []
+    monkeypatch.setattr(cvr.time, "sleep", delays.append)
+    monkeypatch.setattr(cvr, "kaggle", lambda args, timeout=600: next(replies))
+    cvr.wait_dataset_ready(FOOTAGE_REF, "payload_abc.mp4", 1024)
+    assert delays == [5, 10]
+
+
+def test_new_dataset_is_created_when_files_listing_fails(env, monkeypatch):
+    video = env / "match.mp4"
+    video.write_bytes(b"fake video bytes")
+    seen = {}
+    monkeypatch.setattr(cvr, "kaggle", _dispatch_fake(seen, exists=False))
+    assert cvr.main(["--video", str(video), "--opponent", SLUG, "--dispatch-only", "--opponent-kit", "#000000"]) == 0
+    assert seen["upload_mode"] == "create" and ["kernels", "push"] in seen["calls"]
+
+
+def test_existing_dataset_is_versioned_when_files_listing_succeeds(env, monkeypatch):
+    video = env / "match.mp4"
+    video.write_bytes(b"fake video bytes")
+    seen = {}
+    monkeypatch.setattr(cvr, "kaggle", _dispatch_fake(seen, exists=True))
+    assert cvr.main(["--video", str(video), "--opponent", SLUG, "--dispatch-only"]) == 0
+    assert seen["upload_mode"] == "version" and ["kernels", "push"] in seen["calls"]
+    assert cvr.read_job(SLUG)["state"] == "DISPATCHED"
+
+
+def test_payload_never_listed_times_out_with_exit_3_and_no_kernel(env, monkeypatch):
+    video = env / "match.mp4"
+    video.write_bytes(b"fake video bytes")
+    seen, clock, delays = {}, [0.0], []
+
+    def fake_sleep(s):
+        delays.append(s)
+        clock[0] += s
+
+    monkeypatch.setattr(cvr.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(cvr.time, "sleep", fake_sleep)
+    monkeypatch.setattr(cvr, "kaggle", _dispatch_fake(seen, exists=False, payload_appears=False))
+    assert cvr.main(["--video", str(video), "--opponent", SLUG, "--dispatch-only"]) == 3
+
+    assert delays[:5] == [5, 10, 20, 40, 60] and max(delays) == 60 and sum(delays) >= cvr.DATASET_READY_S
+    job = cvr.read_job(SLUG)
+    assert job["state"] == "FAILED" and "not ready after 10 min (payload not listed)" in job["error"]
+    assert ["kernels", "push"] not in seen["calls"]
+    assert not (env / "staging" / SLUG).exists()
+
+
+def test_dispatch_only_uploads_pushes_and_records_job(env, monkeypatch):
+    video = env / "match.mp4"
+    video.write_bytes(b"fake video bytes")
+    seen = {}
+    monkeypatch.setattr(cvr, "kaggle", _dispatch_fake(seen, exists=False))
     assert cvr.main(["--video", str(video), "--opponent", SLUG, "--dispatch-only", "--opponent-kit", "#000000"]) == 0
 
     job = json.loads((env / "sources" / SLUG / "vision_job.json").read_text(encoding="utf-8"))
     digest = hashlib.sha256(b"fake video bytes").hexdigest()
     assert (job["state"], job["kernel_ref"], job["payload_sha256"]) == ("DISPATCHED", "tivvy/pitchpulse-vision-dorchester-town", digest)
+    assert job["payload"] == seen["manifest"]["payload"] == f"payload_{digest[:12]}.mp4"
     assert seen["manifest"]["payload_sha256"] == digest and seen["manifest"]["opponent_kit"] == "#000000"
     assert seen["dataset"]["id"] == "tivvy/pitchpulse-footage-dorchester-town"
     k = seen["kernel"]
