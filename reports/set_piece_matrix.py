@@ -57,7 +57,7 @@ EMERALD  = "#10b981"
 PURPLE   = "#a855f7"
 CYAN     = "#22d3ee"
 TEXT     = "#F8FAFC"
-TEXT_DIM = "#64748B"
+TEXT_DIM = "#8494A9"
 
 # ── Pitch constants (105 × 68 m FIFA) ──────────────────────────────────────
 # 18-yard box (attacking end, x > 88.5)

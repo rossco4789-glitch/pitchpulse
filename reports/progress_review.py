@@ -57,7 +57,7 @@ BLUE     = "#3b82f6"
 PURPLE   = "#a855f7"
 ZINC     = "#A8B5C7"
 TEXT     = "#F8FAFC"
-TEXT_DIM = "#64748B"
+TEXT_DIM = "#8494A9"
 
 _HALF_SPACE   = {"A_LH", "A_RH"}
 _ZONE_14      = {"A_LC", "A_RC"}
@@ -674,7 +674,7 @@ body{background:#0F172A;color:#F8FAFC;font-family:'Inter',system-ui,sans-serif;
 .finding{padding:18px 26px}
 .finding-lbl{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:#f43f5e;font-weight:700;margin-bottom:7px}
 .finding-txt{font-size:.8rem;color:#A8B5C7;line-height:1.55}
-footer{padding:12px 26px;font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#64748B;border-top:1px solid #334155}
+footer{padding:12px 26px;font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#8494A9;border-top:1px solid #334155}
 </style>"""
 
 

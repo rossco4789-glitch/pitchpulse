@@ -104,7 +104,7 @@ st.markdown("""
   --purple:     #a855f7;
   --text:       #F8FAFC;
   --text-2:     #A8B5C7;
-  --text-3:     #64748B;
+  --text-3:     #8494A9;
   --mono:       'JetBrains Mono', 'Fira Code', monospace;
   --sans:       'Inter', system-ui, sans-serif;
   --display:    'Barlow Condensed', Impact, sans-serif;
@@ -314,7 +314,7 @@ def _tile(label: str, value: str, sub: str = "", color: str = "#f59e0b") -> str:
 
 
 def _status_row(label: str, ok: bool) -> str:
-    col = "#22c55e" if ok else "#64748B"
+    col = "#22c55e" if ok else "#8494A9"
     state = "READY" if ok else "——"
     pulse = "animation:ppulse 2.5s ease-in-out infinite;" if ok else ""
     return f"""
@@ -538,7 +538,7 @@ with st.sidebar:
     st.markdown("""
     <div style="position:fixed;bottom:16px;left:0;width:260px;padding:0 16px;
                 box-sizing:border-box">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:#64748B;
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:#8494A9;
                   text-align:center">LOCAL · OFFLINE · NO CLOUD</div>
     </div>
     """, unsafe_allow_html=True)
@@ -600,7 +600,7 @@ with tab1:
 
     st.markdown("""
     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.8rem;
-                letter-spacing:.14em;text-transform:uppercase;color:#64748B;
+                letter-spacing:.14em;text-transform:uppercase;color:#8494A9;
                 margin-bottom:10px;padding-top:4px">MATCHDAY WORKFLOW</div>
     """, unsafe_allow_html=True)
 
@@ -786,7 +786,7 @@ with tab1:
                           <span style="font-family:'Inter',sans-serif;font-size:.8rem;
                                        color:#A8B5C7">{s['player']} ({opp})</span>
                           <span style="font-family:'JetBrains Mono',monospace;font-size:.72rem;
-                                       color:#64748B;margin-left:auto">{s.get('minute_raw', s['minute'])}′</span>
+                                       color:#8494A9;margin-left:auto">{s.get('minute_raw', s['minute'])}′</span>
                         </div>"""
                     st.markdown(f"""
                     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;
@@ -1641,7 +1641,7 @@ with tab3:
             elif active:
                 bg, txt = "rgba(245,158,11,.15)", "#f59e0b"
             else:
-                bg, txt = "rgba(255,255,255,0.04)", "#64748B"
+                bg, txt = "rgba(255,255,255,0.04)", "#8494A9"
             return (f'<div style="display:flex;align-items:center;gap:8px">'
                     f'<span style="width:8px;height:8px;border-radius:50%;background:{txt}"></span>'
                     f'<span style="font-family:\'Inter\',sans-serif;font-size:.78rem;color:{txt}">{label}</span>'
@@ -1798,7 +1798,7 @@ with tab3:
               {_agent_card_header(agent_name, moment, color)}
               <div style="padding:6px 24px 4px">
                 <div style="font-family:'JetBrains Mono',monospace;font-size:.68rem;
-                            color:#64748B;letter-spacing:.06em">{tags}</div>
+                            color:#8494A9;letter-spacing:.06em">{tags}</div>
               </div>
             """, unsafe_allow_html=True)
             with st.expander("View analysis", expanded=False):
@@ -2003,7 +2003,7 @@ with tab4:
             <div style="background:#1E293B;border:1px solid #334155;
                         border-radius:12px;padding:48px;text-align:center">
               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.4rem;
-                          color:#64748B;letter-spacing:.04em;margin-bottom:12px">
+                          color:#8494A9;letter-spacing:.04em;margin-bottom:12px">
                 NO DOSSIER YET
               </div>
               <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#A8B5C7;
@@ -2115,7 +2115,7 @@ with tab4:
     ]
     _status_html = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'
     for _label, _present in _file_statuses:
-        _col  = "#22c55e" if _present else "#64748B"
+        _col  = "#22c55e" if _present else "#8494A9"
         _dot  = "●" if _present else "○"
         _status_html += (
             f'<div style="display:flex;align-items:center;gap:6px;'
@@ -2133,7 +2133,7 @@ with tab4:
         st.markdown(
             '<div style="background:#1E293B;border:1px solid #334155;'
             'border-radius:8px;padding:10px 16px;font-family:\'Inter\',sans-serif;'
-            'font-size:.78rem;color:#64748B">Workspace is already clear — nothing to archive.</div>',
+            'font-size:.78rem;color:#8494A9">Workspace is already clear — nothing to archive.</div>',
             unsafe_allow_html=True,
         )
     else:
@@ -2242,7 +2242,7 @@ with tab5:
                 f'font-family:\'JetBrains Mono\',monospace;font-size:.75rem">'
                 f'<span style="color:#22c55e">●</span>'
                 f'<span style="color:#86efac">{len(paths)} ledger file{"s" if len(paths) != 1 else ""} found</span>'
-                f'<span style="color:#64748B;margin-left:6px">'
+                f'<span style="color:#8494A9;margin-left:6px">'
                 + "  ·  ".join(p.stem for p in paths) +
                 f'</span></div>',
                 unsafe_allow_html=True,

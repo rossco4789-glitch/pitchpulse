@@ -451,8 +451,8 @@ ELI5: Numbers that don't wobble when they change let the DoF compare 62% and 18%
 
 - Team encoding is fixed: Gold = Tivvy, Cardinal = Opponent. Never swap for decoration.
 - **Slate Border** `#334155` — all 1px hairline borders/dividers (replaces `rgba(255,255,255,.04–.14)`).
-- **Text tokens** — primary `#F8FAFC`, secondary `#A8B5C7`, tertiary/meta `#64748B`.
-  - Measured against `#0F172A`: primary ≈17.1:1 (AAA), secondary ≈8.59:1 (AAA; ≈7.04:1 on `#1E293B` cards, still AAA — replaced `#94A3B8`, which was 6.96:1 / 5.71:1), tertiary ≈3.75:1 (**meta only** — large or non-essential text; never for data the analyst must read). Pitch-overlay text in the tagger stays on white ≥70% opacity to keep AAA.
+- **Text tokens** — primary `#F8FAFC`, secondary `#A8B5C7`, tertiary/meta `#8494A9`.
+  - Measured against `#0F172A`: primary ≈17.1:1 (AAA), secondary ≈8.59:1 (AAA; ≈7.04:1 on `#1E293B` cards, still AAA — replaced `#94A3B8`, which was 6.96:1 / 5.71:1), tertiary ≈5.77:1 (AA; ≈4.73:1 on `#1E293B` cards, still AA — replaced `#64748B`, which was 3.75:1 / 3.07:1). Tertiary is capped at AA on purpose: AAA would make it indistinguishable from secondary. Use for meta only (timestamps, captions, inactive states), never for data the analyst must read. Pitch-overlay text in the tagger stays on white ≥70% opacity to keep AAA.
 
 #### True Slate Migration — ✅ complete (2026-09-14)
 All legacy zinc/OLED surfaces are migrated. Mapping applied:
@@ -464,7 +464,7 @@ All legacy zinc/OLED surfaces are migrated. Mapping applied:
 | `#1a1a22` (raised chips, popovers, plot grid) | `#334155` |
 | `#ededf0` `#e4e4e7`, `rgba(255,255,255,.87)` | `#F8FAFC` |
 | `#71717a` `#a1a1aa`, `rgba(255,255,255,.45)` | `#A8B5C7` |
-| `#3f3f46` `#52525b` | `#64748B` |
+| `#3f3f46` `#52525b` | `#8494A9` |
 
 - Files: `app.py` (`:root` + inline HTML), `tagger/index.html` (`:root` `--bg/--surface/--card/--border/--text*`, Tailwind `white` → `#F8FAFC`), `reports/visualizer.py`, `reports/set_piece_matrix.py`, `reports/progress_review.py`, `reports/dof_card.py`, `reports/packager.py`.
 - **Deliberate exception:** matplotlib `LINE` (pitch markings, spines, heatmap cell edges) is `#475569`, not `#334155` — `#334155` on `#0F172A` is ≈1.4:1 and pitch markings disappear; `#475569` keeps them legible.
