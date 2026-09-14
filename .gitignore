@@ -39,5 +39,5 @@ data/processed/*_scouting.html
 
 # Sample data & ledger (committed for demo; swap for real data)
 # data/samples/2026-09-05_st_blazey/  ← keep tracked (moved out of data/raw so
-#   reconcile's tivvy_events_*.json glob and match_context.json never load demo data live)
-# data/processed/match_ledger.json     ← keep tracked (sample run)
+#   reconcile's tivvy_events_*.json glob and match_context.json never load demo data live;
+#   its match_ledger.json sample run lives there too)
