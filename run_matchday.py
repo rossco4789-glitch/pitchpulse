@@ -16,8 +16,8 @@ Usage:
   python run_matchday.py --skip-reconcile         # skip Step 1 (use existing ledger)
   python run_matchday.py --skip-visuals           # skip Step 2 (agents only)
   python run_matchday.py --skip-reconcile --skip-visuals   # agents only, fastest path
-  python run_matchday.py --date 2026-09-19 --opponent "Willand Rovers"   # run_id 2026-09-19_willand_rovers
-  python run_matchday.py --run-id 2026-09-19_willand_rovers              # explicit run_id wins
+  python run_matchday.py --date 2026-09-15 --opponent "Dorchester Town"  # run_id 2026-09-15_dorchester_town
+  python run_matchday.py --run-id 2026-09-15_dorchester_town             # explicit run_id wins
 
 Run ID (eval ledger key shared by tagger_sanity and the packager gate):
   --run-id given              → used verbatim
@@ -49,6 +49,7 @@ if str(ROOT) not in sys.path:
 # ── Paths ──────────────────────────────────────────────────────────────────────
 PROC_DIR    = ROOT / "data" / "processed"
 LEDGER_PATH = PROC_DIR / "match_ledger.json"
+CONTEXT_PATH = ROOT / "data" / "raw" / "match_context.json"
 
 _COL = 72
 
@@ -82,13 +83,32 @@ def _match_date(value: str) -> str:
         raise argparse.ArgumentTypeError(f"expected YYYY-MM-DD, got '{value}'")
 
 
+def _slug(name: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", (name or "").lower()).strip("_")
+
+
 def resolve_run_id(run_id: str | None, date: str | None, opponent: str | None) -> str:
     """Explicit --run-id wins; else {date}_{opponent_slug}; else {today}_matchday."""
     if run_id:
         return run_id
     day  = date or datetime.now().strftime("%Y-%m-%d")
-    slug = re.sub(r"[^a-z0-9]+", "_", (opponent or "").lower()).strip("_") or "matchday"
-    return f"{day}_{slug}"
+    return f"{day}_{_slug(opponent) or 'matchday'}"
+
+
+def check_match_context(opponent: str | None, context_path: Path = CONTEXT_PATH) -> str | None:
+    """Return a warning if match_context.json belongs to a different opponent than --opponent."""
+    if not context_path.exists():
+        return None
+    try:
+        ctx_opp = json.loads(context_path.read_text(encoding="utf-8")).get("opponent", "")
+    except (json.JSONDecodeError, OSError):
+        return f"{context_path.name} is unreadable — dossier header and DoF card will lack match context."
+    if opponent and _slug(ctx_opp) != _slug(opponent):
+        return (f"STALE CONTEXT: {context_path.name} is for '{ctx_opp}', not '{opponent}'. "
+                "Parse this match's report first: python data/parse_report.py <report.docx>")
+    if not opponent:
+        return f"match_context.json opponent is '{ctx_opp}' — pass --opponent to verify it is this match."
+    return None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -342,7 +362,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--opponent", type=str, default=None,
-        help='Opponent name, e.g. "Willand Rovers" (run_id fallback component)',
+        help='Opponent name, e.g. "Dorchester Town" (run_id fallback component)',
     )
     args = parser.parse_args()
     run_id = resolve_run_id(args.run_id, args.date, args.opponent)
@@ -354,6 +374,10 @@ def main() -> None:
     print(f"  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     print(f"  Run ID : {run_id}")
     _rule("═")
+
+    ctx_warning = check_match_context(args.opponent)
+    if ctx_warning:
+        _warn(ctx_warning)
 
     # ── Step 1: Reconciliation ─────────────────────────────────────────────────
     _step_header(1, "POST-MATCH RECONCILIATION", skipped=args.skip_reconcile)

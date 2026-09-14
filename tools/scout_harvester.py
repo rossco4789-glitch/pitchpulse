@@ -6,9 +6,9 @@ Standalone, off-pitch pre-match scouting tool. Turns local opponent material
 (match reports, lineups, event summaries) into a UEFA 4-Moments dossier.
 
 Usage:
-    python tools/scout_harvester.py --opponent "Willand Rovers" --output data/scouting/
-    python tools/scout_harvester.py --opponent "Willand Rovers" --source path/to/notes/
-    python tools/scout_harvester.py --opponent "Willand Rovers" --mock
+    python tools/scout_harvester.py --opponent "Dorchester Town" --output data/scouting/
+    python tools/scout_harvester.py --opponent "Dorchester Town" --source path/to/notes/
+    python tools/scout_harvester.py --opponent "Dorchester Town" --mock
 
 Sources (--source DIR, else data/scouting/sources/<slug>/ if it exists):
     *.txt / *.md   narrative match reports
@@ -597,7 +597,7 @@ def print_summary(memory: dict, path: Path | None) -> None:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Build a UEFA 4-Moments opposition dossier from local sources.")
-    ap.add_argument("--opponent", required=True, help='Opponent name, e.g. "Willand Rovers"')
+    ap.add_argument("--opponent", required=True, help='Opponent name, e.g. "Dorchester Town"')
     ap.add_argument("--output", type=Path, default=Path("data/scouting"), help="Output directory")
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--source", type=Path, help="Directory of .txt/.md reports and .json lineups/event summaries")

@@ -285,9 +285,9 @@ def _generate_bullets(ledger: dict, ctx: dict) -> list[str]:
                   "A direct-play runner in behind the aerial contest creates "
                   "the Attacking Transition goal opportunity.")
     else:
-        b3 = ("LEVER: Increase aerial and second-ball tagging volume to unlock "
-              "direct-play pattern analysis. This is the primary non-league "
-              "possession mechanism and must be quantified match-to-match.")
+        b3 = ("LEVER: Tag every aerial duel and second ball next match. "
+              "Direct play is the primary non-league possession mechanism; "
+              "without that volume it cannot be measured match-to-match.")
 
     return [b1, b2, b3]
 

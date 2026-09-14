@@ -98,8 +98,8 @@ Flags: `--skip-reconcile`, `--skip-visuals`, `--latest`, `--run-id`, `--date YYY
 The resolved id is printed in the banner, stamped into `match_ledger.json` as `run_id` (on reconcile), used by the inline tagger sanity audit (Step 1b, non-blocking) to log findings, and passed to `reports.packager.check_gate()` before Step 4 writes HTML — unresolved ERRORs exit `1`.
 
 ```bash
-python run_matchday.py --date 2026-09-19 --opponent "Willand Rovers"
-python run_matchday.py --run-id 2026-09-19_willand_rovers --skip-reconcile
+python run_matchday.py --date 2026-09-15 --opponent "Dorchester Town"
+python run_matchday.py --run-id 2026-09-15_dorchester_town --skip-reconcile
 ```
 
 ELI5: One name for the whole matchday means a data error found at the start is always the same error the packager checks at the end.
@@ -458,9 +458,9 @@ ELI5: It keeps a notebook of every data mistake and re-tests the old mistakes ea
 Standalone, off-pitch Opposition Intelligence Harvester. Builds a pre-match UEFA 4-Moments dossier from local opponent material. **Decoupled by design** — never imported by `app.py` or `tagger/index.html`; stdlib only, no network, no API keys.
 
 ```bash
-python tools/scout_harvester.py --opponent "Willand Rovers" --output data/scouting/
-python tools/scout_harvester.py --opponent "Willand Rovers" --source path/to/notes/   # explicit sources
-python tools/scout_harvester.py --opponent "Willand Rovers" --mock                   # force offline mock
+python tools/scout_harvester.py --opponent "Dorchester Town" --output data/scouting/
+python tools/scout_harvester.py --opponent "Dorchester Town" --source path/to/notes/   # explicit sources
+python tools/scout_harvester.py --opponent "Dorchester Town" --mock                   # force offline mock
 python -m pytest tools/tests/test_scout_harvester.py -v
 ```
 

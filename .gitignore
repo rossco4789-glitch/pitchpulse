@@ -29,7 +29,6 @@ data/scouting/*_dossier.json
 !data/scouting/sources/
 
 # Sample data & ledger (committed for demo; swap for real data)
-# data/raw/match_context.json   ← keep tracked
-# data/raw/tivvy_x_feed.json    ← keep tracked
-# data/raw/tivvy_events_v2_sample.json ← keep tracked
+# data/samples/2026-09-05_st_blazey/  ← keep tracked (moved out of data/raw so
+#   reconcile's tivvy_events_*.json glob and match_context.json never load demo data live)
 # data/processed/match_ledger.json     ← keep tracked (sample run)

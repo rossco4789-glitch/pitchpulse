@@ -1428,6 +1428,13 @@ def run_approval_gate(ledger: dict) -> "Path | None":
 # ══════════════════════════════════════════════════════════════════════════════
 
 def main() -> None:
+    # UTF-8 output so dossier glyphs survive redirection on Windows cp1252 consoles
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        except AttributeError:
+            pass
+
     parser = argparse.ArgumentParser(
         description="PitchPulse tactical analysis agents — Tiverton Town FC"
     )
