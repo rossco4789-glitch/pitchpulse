@@ -66,9 +66,10 @@ KAGGLE_CLI_HINT  = "pip install kaggle, then reopen the terminal"
 TOKEN_HINT       = "kaggle.com → Settings → API → Create New Token, then save the file as ~/.kaggle/kaggle.json"
 
 # Shared with tools/templates/kaggle_vision_worker.py (a test keeps the two in step)
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MIN_SAMPLES    = 30
-DROP_RULES     = ("no_pitch_detection", "too_few_landmarks", "degenerate_geometry", "unstable_homography")
+DROP_RULES     = ("no_pitch_detection", "too_few_landmarks", "drop_insufficient_pitch_area", "drop_singular_matrix",
+                  "drop_insufficient_inliers", "drop_reprojection_error_high")
 MOMENTS = {
     "in_possession":        ("settled_width_m",),
     "out_of_possession":    ("block_height_m", "compactness_depth_m", "compactness_width_m", "line_of_engagement_m"),

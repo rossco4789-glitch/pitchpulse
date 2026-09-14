@@ -15,12 +15,16 @@ Outputs (/kaggle/working):
     vision_metrics.json                 4-moments metrics (see tools/cloud_vision_runner.py MOMENTS)
     vision_metrics.sha256               SHA-256 of the exact JSON bytes
 
-Rejection rules (a frame that fails is counted under frames.dropped and never estimated):
-    no_pitch_detection     pose model found no pitch
-    too_few_landmarks      < 6 landmarks at confidence ≥ 0.5 (H needs 4; 6 leaves redundancy to test the fit)
-    degenerate_geometry    landmark hull < 150 m² (near-collinear points give an ill-posed H)
-    unstable_homography    no H, non-finite H, RANSAC inliers < 80 % or < 6, RMSE > 0.5 m, or cond(H) > 1e7
+Rejection rules, checked in this order (a frame that fails is counted under frames.dropped, never estimated):
+    no_pitch_detection            pose model found no pitch
+    too_few_landmarks             < 6 landmarks at confidence ≥ 0.5 (H needs 4; 6 leaves redundancy to test the fit)
+    drop_insufficient_pitch_area  landmark hull < 150 m² (near-collinear points give an ill-posed H)
+    drop_singular_matrix          no H, non-finite H, OpenCV error, or cond(H) > 1e7
+    drop_insufficient_inliers     RANSAC (1.0 m threshold) keeps < 80 % of landmarks or < 6
+    drop_reprojection_error_high  inlier RMSE > 0.5 m
     Players projected outside the landmark hull (+5 m) are discarded.
+
+Sampling: the frame nearest each 0.5 s target is kept (exactly 2.0 FPS for 25, 29.97, 30, 50 and 60 FPS sources).
 
 Contract:
     Frames are read at 2 FPS and inferred in 500-frame chunks with torch.cuda.empty_cache() after each;
@@ -53,6 +57,7 @@ KP_CONF          = 0.5
 MIN_LANDMARKS    = 6
 MIN_HULL_M2      = 150.0
 MAX_RMSE_M       = 0.5
+RANSAC_THRESHOLD_M = 1.0    # wider than MAX_RMSE_M so keypoint noise and systematic fit error land in separate buckets
 MIN_INLIER_RATIO = 0.8
 MAX_COND         = 1e7
 HULL_MARGIN_M    = 5.0
@@ -63,9 +68,10 @@ WINDOW_S         = 300      # attack direction and coverage are judged per 5-min
 SILHOUETTE_MIN   = 0.5
 
 # Mirrored from tools/cloud_vision_runner.py
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MIN_SAMPLES    = 30
-DROP_RULES     = ("no_pitch_detection", "too_few_landmarks", "degenerate_geometry", "unstable_homography")
+DROP_RULES     = ("no_pitch_detection", "too_few_landmarks", "drop_insufficient_pitch_area", "drop_singular_matrix",
+                  "drop_insufficient_inliers", "drop_reprojection_error_high")
 MOMENTS = {
     "in_possession":        ("settled_width_m",),
     "out_of_possession":    ("block_height_m", "compactness_depth_m", "compactness_width_m", "line_of_engagement_m"),
@@ -88,19 +94,19 @@ def fit_homography(image_xy, world_xy, conf) -> tuple[np.ndarray | None, str | N
     if len(img) < MIN_LANDMARKS:
         return None, "too_few_landmarks"
     if cv2.contourArea(cv2.convexHull(world)) < MIN_HULL_M2:
-        return None, "degenerate_geometry"
+        return None, "drop_insufficient_pitch_area"
     try:
-        H, mask = cv2.findHomography(img, world, cv2.RANSAC, MAX_RMSE_M)
+        H, mask = cv2.findHomography(img, world, cv2.RANSAC, RANSAC_THRESHOLD_M)
     except cv2.error:
-        return None, "unstable_homography"
-    if H is None or mask is None or not np.all(np.isfinite(H)):
-        return None, "unstable_homography"
+        return None, "drop_singular_matrix"
+    if H is None or mask is None or not np.all(np.isfinite(H)) or np.linalg.cond(H) > MAX_COND:
+        return None, "drop_singular_matrix"
     inliers = mask.ravel().astype(bool)
     if inliers.sum() < MIN_LANDMARKS or inliers.mean() < MIN_INLIER_RATIO:
-        return None, "unstable_homography"
+        return None, "drop_insufficient_inliers"
     rmse = float(np.sqrt(np.mean(np.sum((project(H, img[inliers]) - world[inliers]) ** 2, axis=1))))
-    if rmse > MAX_RMSE_M or np.linalg.cond(H) > MAX_COND:
-        return None, "unstable_homography"
+    if rmse > MAX_RMSE_M:
+        return None, "drop_reprojection_error_high"
     return H, None
 
 
@@ -256,15 +262,47 @@ def compute_metrics(rows: list[dict], footage: str, opponent_kit: str | None) ->
 
 # ── Video and inference ───────────────────────────────────────────────────────
 
+class TimestampSampler:
+    """Keeps the frame nearest each 1/SAMPLE_FPS target time.
+
+    An integer frame step drifts (25 FPS → round(12.5) = 12 → 2.083 FPS); targeting timestamps gives exactly
+    SAMPLE_FPS samples per second of video, each within half a source frame of its target, and never takes
+    a frame twice when the source is slower than SAMPLE_FPS.
+    """
+
+    def __init__(self, fps: float, rate: float = SAMPLE_FPS):
+        if not fps or not 0 < fps <= 1000:
+            raise ValueError(f"video reports an unusable frame rate ({fps!r})")
+        self.fps, self.interval, self.next_t = float(fps), 1.0 / rate, 0.0
+
+    def take(self, idx: int) -> bool:
+        reach = idx / self.fps + 0.5 / self.fps
+        if reach < self.next_t:
+            return False
+        while self.next_t <= reach:
+            self.next_t += self.interval
+        return True
+
+
+def sample_indices(fps: float, n_frames: int):
+    sampler = TimestampSampler(fps)
+    return (i for i in range(n_frames) if sampler.take(i))
+
+
 def sampled_frames(path: Path):
     cap = cv2.VideoCapture(str(path))
     if not cap.isOpened():
         raise RuntimeError(f"cannot open video {path.name}")
-    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
-    step, idx = max(1, round(fps / SAMPLE_FPS)), 0
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    try:
+        sampler = TimestampSampler(fps)
+    except ValueError as exc:
+        cap.release()
+        raise RuntimeError(f"{path.name}: {exc}") from exc
+    idx = 0
     try:
         while True:
-            if idx % step == 0:
+            if sampler.take(idx):
                 ok, frame = cap.read()
                 if not ok:
                     break
@@ -414,7 +452,8 @@ def run(input_dir: Path = INPUT, output_dir: Path = OUTPUT) -> None:
         "team_split": team_split,
         "models": {"ultralytics": PINNED, "players_sha256": _sha256(players_pt), "pitch_sha256": _sha256(pitch_pt)},
         "rules": {"sample_fps": SAMPLE_FPS, "kp_conf": KP_CONF, "min_landmarks": MIN_LANDMARKS,
-                  "min_hull_m2": MIN_HULL_M2, "max_rmse_m": MAX_RMSE_M, "min_inlier_ratio": MIN_INLIER_RATIO,
+                  "min_hull_m2": MIN_HULL_M2, "max_rmse_m": MAX_RMSE_M, "ransac_threshold_m": RANSAC_THRESHOLD_M,
+                  "min_inlier_ratio": MIN_INLIER_RATIO,
                   "max_cond": MAX_COND, "min_samples": MIN_SAMPLES, "silhouette_min": SILHOUETTE_MIN},
     }, output_dir)
 

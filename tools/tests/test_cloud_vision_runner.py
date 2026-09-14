@@ -9,6 +9,7 @@ Run: python -m pytest tools/tests/test_cloud_vision_runner.py -v
 import hashlib
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -307,7 +308,7 @@ def _doc(sha="a" * 64, **over):
     moments = {m: {n: {"value": None, "n": 0, "iqr": None, "reason": "possession_not_observable_without_ball_tracking"}
                    for n in names} for m, names in cvr.MOMENTS.items()}
     moments["out_of_possession"]["block_height_m"] = {"value": 31.5, "n": 120, "iqr": [28.0, 34.0], "reason": None}
-    doc = {"schema_version": 1, "status": "OK", "footage": "full_wide", "input_sha256": sha, "moments": moments,
+    doc = {"schema_version": cvr.SCHEMA_VERSION, "status": "OK", "footage": "full_wide", "input_sha256": sha, "moments": moments,
            "frames": {"sampled": 10, "accepted": 7, "dropped": {r: (3 if r == "too_few_landmarks" else 0) for r in cvr.DROP_RULES}}}
     doc.update(over)
     return doc
@@ -486,16 +487,67 @@ def test_homography_rejects_low_confidence_landmarks():
     assert worker.fit_homography(_image_points(BOX_WORLD[:3]), BOX_WORLD[:3], np.ones(3)) == (None, "too_few_landmarks")
 
 
-def test_homography_rejects_collinear_landmarks():
+def test_homography_rejects_collinear_landmarks_as_insufficient_area():
     line = np.array([[105.0, y] for y in (10, 20, 30, 40, 50, 60)])
-    assert worker.fit_homography(_image_points(line), line, np.ones(6)) == (None, "degenerate_geometry")
+    assert worker.fit_homography(_image_points(line), line, np.ones(6)) == (None, "drop_insufficient_pitch_area")
 
 
-def test_homography_rejects_inconsistent_landmarks():
+def test_homography_rejects_inconsistent_landmarks_as_insufficient_inliers():
     world = BOX_WORLD.copy()
     image = _image_points(world)
-    world[:3] += 5.0  # three landmarks labelled 5 m away from where the image shows them
-    assert worker.fit_homography(image, world, np.ones(8)) == (None, "unstable_homography")
+    world[:3] += 5.0  # three landmarks labelled 5 m away from where the image shows them → 5/8 inliers
+    assert worker.fit_homography(image, world, np.ones(8)) == (None, "drop_insufficient_inliers")
+
+
+def test_homography_rejects_high_reprojection_error(monkeypatch):
+    world = BOX_WORLD.copy()
+    image = _image_points(world)
+    world[:, 0] += np.where(np.arange(8) % 2 == 0, 0.75, -0.75)  # every label 0.75 m off: all inside 1.0 m RANSAC
+    monkeypatch.setattr(worker.cv2, "findHomography", lambda *a, **k: (H_TRUE.copy(), np.ones((8, 1), np.uint8)))
+    assert worker.fit_homography(image, world, np.ones(8)) == (None, "drop_reprojection_error_high")
+
+
+@pytest.mark.parametrize("result", [
+    (None, None),
+    (np.array([[1.0, 0, 0], [0, 1e-9, 0], [0, 0, 1.0]]), np.ones((8, 1), np.uint8)),   # cond ≈ 1e9
+    (np.array([[np.nan, 0, 0], [0, 1.0, 0], [0, 0, 1.0]]), np.ones((8, 1), np.uint8)),
+    "cv2_error",
+], ids=["none", "ill_conditioned", "non_finite", "opencv_error"])
+def test_homography_rejects_singular_matrix(monkeypatch, result):
+    def fake(*a, **k):
+        if result == "cv2_error":
+            raise worker.cv2.error("degenerate input")
+        return result
+
+    monkeypatch.setattr(worker.cv2, "findHomography", fake)
+    assert worker.fit_homography(_image_points(BOX_WORLD), BOX_WORLD, np.ones(8)) == (None, "drop_singular_matrix")
+
+
+def test_every_rejection_reason_is_a_schema_drop_rule():
+    import inspect
+    reasons = set(re.findall(r'return None, "(\w+)"', inspect.getsource(worker.fit_homography)))
+    assert reasons | {"no_pitch_detection"} == set(cvr.DROP_RULES)
+
+
+def test_schema_rejects_legacy_drop_buckets():
+    doc = _doc()
+    doc["frames"]["dropped"] = {"no_pitch_detection": 0, "too_few_landmarks": 3, "degenerate_geometry": 0, "unstable_homography": 0}
+    assert any("dropped counts" in e for e in cvr.validate_metrics(doc))
+    assert any("schema_version" in e for e in cvr.validate_metrics(_doc(schema_version=1)))
+
+
+@pytest.mark.parametrize("fps", [25, 29.97, 30, 50, 60])
+def test_timestamp_sampling_is_exactly_2fps(fps):
+    n_frames = int(round(300 * fps))                      # a 300 s clip
+    times = [i / fps for i in worker.sample_indices(fps, n_frames)]
+    assert len(times) == 600                              # the old integer step gave 625 at 25 FPS
+    assert max(abs(t - k * 0.5) for k, t in enumerate(times)) <= 0.5 / fps + 1e-9
+
+
+def test_timestamp_sampling_never_repeats_slow_source_frames():
+    assert list(worker.sample_indices(1, 10)) == list(range(10))
+    with pytest.raises(ValueError, match="frame rate"):
+        worker.TimestampSampler(0)
 
 
 def _rows(windows=(0, 300), noise_seed=0):
@@ -519,7 +571,7 @@ def test_metrics_from_settled_block_pass_runner_schema():
     assert (oop["block_height_m"]["value"], oop["block_height_m"]["n"]) == (15.0, 80)
     assert (oop["compactness_depth_m"]["value"], oop["compactness_width_m"]["value"], oop["line_of_engagement_m"]["value"]) == (18.5, 54.0, 33.5)
     assert info["silhouette"] > 0.9
-    doc = {"schema_version": 1, "status": "OK", "footage": "full_wide", "input_sha256": "c" * 64, "moments": moments,
+    doc = {"schema_version": cvr.SCHEMA_VERSION, "status": "OK", "footage": "full_wide", "input_sha256": "c" * 64, "moments": moments,
            "frames": {"sampled": 80, "accepted": 80, "dropped": {r: 0 for r in cvr.DROP_RULES}}}
     assert cvr.validate_metrics(doc) == []
 
