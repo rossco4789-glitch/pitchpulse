@@ -512,6 +512,20 @@ def build_html(
 
 # ── CLI entry point ────────────────────────────────────────────────────────────
 
+def check_gate(run_id: str) -> None:
+    """Delivery gate — exit 1 if the eval ledger holds unresolved ERRORs for run_id."""
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import evals
+    print(f"  [PACK] Eval gate: run_id '{run_id}'")
+    blocking = evals.gate(run_id)
+    if blocking:
+        print(f"  [PACK] BLOCKED — {len(blocking)} unresolved eval ERROR(s) for run '{run_id}':")
+        for b in blocking:
+            print(f"    · {b['fp']}  {b['tool']}:{b['check']} [{b['key']}] — {b['detail']}")
+        print('  [PACK] Fix the data, then: python tools/evals.py --resolve FP "note"\n')
+        sys.exit(1)
+
+
 def main() -> None:
     import argparse
 
@@ -560,19 +574,10 @@ def main() -> None:
     out_path  = Path(args.out)
 
     # Delivery gate — unresolved eval ERRORs for this run block the dossier
-    sys.path.insert(0, str(ROOT / 'tools'))
-    import evals
     import time
-    run_id = args.run_id or (md_path.stem.removeprefix('dossier_')
-                             if re.fullmatch(r'dossier_\d{4}-\d{2}-\d{2}', md_path.stem)
-                             else time.strftime('%Y-%m-%d'))
-    blocking = evals.gate(run_id)
-    if blocking:
-        print(f"  [PACK] BLOCKED — {len(blocking)} unresolved eval ERROR(s) for run '{run_id}':")
-        for b in blocking:
-            print(f"    · {b['fp']}  {b['tool']}:{b['check']} [{b['key']}] — {b['detail']}")
-        print('  [PACK] Fix the data, then: python tools/evals.py --resolve FP "note"\n')
-        sys.exit(1)
+    check_gate(args.run_id or (md_path.stem.removeprefix('dossier_')
+                               if re.fullmatch(r'dossier_\d{4}-\d{2}-\d{2}', md_path.stem)
+                               else time.strftime('%Y-%m-%d')))
 
     out = build_html(dossier_md, plots_dir, out_path)
     size_kb = round(out.stat().st_size / 1024, 1)

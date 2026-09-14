@@ -88,7 +88,21 @@ Master matchday orchestration script. Runs the full pipeline in four sequential 
 3. `agents/synthesis.py` → CLI approval gate → `reports/dossier_<date>.md`
 4. `reports/packager.py` → `data/processed/tivvy_tactical_dossier.html`  *(runs only on approve)*
 
-Flags: `--skip-reconcile`, `--skip-visuals`, `--latest`
+Flags: `--skip-reconcile`, `--skip-visuals`, `--latest`, `--run-id`, `--date YYYY-MM-DD`, `--opponent NAME`
+
+**Run ID contract** — one id keys the eval ledger for the whole run:
+- `--run-id X` → used verbatim
+- `--date` and/or `--opponent` → `{YYYY-MM-DD}_{opponent_slug}` (missing date = today, missing opponent = `matchday`)
+- neither → `{today}_matchday`
+
+The resolved id is printed in the banner, stamped into `match_ledger.json` as `run_id` (on reconcile), used by the inline tagger sanity audit (Step 1b, non-blocking) to log findings, and passed to `reports.packager.check_gate()` before Step 4 writes HTML — unresolved ERRORs exit `1`.
+
+```bash
+python run_matchday.py --date 2026-09-19 --opponent "Willand Rovers"
+python run_matchday.py --run-id 2026-09-19_willand_rovers --skip-reconcile
+```
+
+ELI5: One name for the whole matchday means a data error found at the start is always the same error the packager checks at the end.
 
 ### `tools/tagger_sanity.py`
 Post-session ledger and tagger-export validator. Run after downloading the tagger JSON to catch data quality issues before reconciliation.

@@ -501,6 +501,16 @@ def _eval_case(check: str, msg: str, events: list[dict]) -> tuple[str, list[dict
     return "", None
 
 
+def log_findings(findings: list[tuple], events: list[dict], run_id: str) -> list[tuple]:
+    """Write findings to the eval ledger; returns findings with regression-escalated severities."""
+    import evals
+    logged = []
+    for sev, check, msg in findings:
+        key, sample = _eval_case(check, msg, events)
+        logged.append((evals.record("tagger_sanity", check, sev, key, msg, run_id, sample), check, msg))
+    return logged
+
+
 def main() -> None:
     args = sys.argv[1:]
 
@@ -527,15 +537,7 @@ def main() -> None:
         sys.exit(1)
 
     events   = extract_events(data)
-    findings = run_checks(events)
-
-    import evals
-    logged = []
-    for sev, check, msg in findings:
-        key, sample = _eval_case(check, msg, events)
-        logged.append((evals.record("tagger_sanity", check, sev, key, msg, run_id, sample), check, msg))
-    findings = logged
-
+    findings = log_findings(run_checks(events), events, run_id)
     exit_code = print_report(findings, len(events))
     print(f"  Eval ledger: {len(findings)} finding(s) logged under run_id '{run_id}'")
     sys.exit(exit_code)

@@ -16,9 +16,17 @@ Usage:
   python run_matchday.py --skip-reconcile         # skip Step 1 (use existing ledger)
   python run_matchday.py --skip-visuals           # skip Step 2 (agents only)
   python run_matchday.py --skip-reconcile --skip-visuals   # agents only, fastest path
+  python run_matchday.py --date 2026-09-19 --opponent "Willand Rovers"   # run_id 2026-09-19_willand_rovers
+  python run_matchday.py --run-id 2026-09-19_willand_rovers              # explicit run_id wins
+
+Run ID (eval ledger key shared by tagger_sanity and the packager gate):
+  --run-id given              → used verbatim
+  --date and/or --opponent    → {YYYY-MM-DD}_{opponent_slug}  (missing date = today, missing opponent = matchday)
+  neither                     → {today}_matchday
 
 Error policy:
   Step 1 failure → hard stop  (no ledger = no downstream work)
+  Sanity ERRORs  → warn here, block at Step 4 via the eval gate
   Step 2 failure → warn only  (visuals are non-blocking for the dossier)
   Step 3 failure → hard stop  (dossier is the matchday deliverable)
 """
@@ -26,6 +34,7 @@ Error policy:
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import json
 import traceback
@@ -66,11 +75,27 @@ def _warn(msg: str) -> None: print(f"  ⚠  {msg}")
 def _err(msg: str)  -> None: print(f"  ✗  {msg}")
 
 
+def _match_date(value: str) -> str:
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").strftime("%Y-%m-%d")
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected YYYY-MM-DD, got '{value}'")
+
+
+def resolve_run_id(run_id: str | None, date: str | None, opponent: str | None) -> str:
+    """Explicit --run-id wins; else {date}_{opponent_slug}; else {today}_matchday."""
+    if run_id:
+        return run_id
+    day  = date or datetime.now().strftime("%Y-%m-%d")
+    slug = re.sub(r"[^a-z0-9]+", "_", (opponent or "").lower()).strip("_") or "matchday"
+    return f"{day}_{slug}"
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Step 1 — Reconciliation
 # ══════════════════════════════════════════════════════════════════════════════
 
-def step_reconcile() -> Path:
+def step_reconcile(run_id: str) -> Path:
     """
     Import and run reconcile.sync inline.
     Hard-stops on failure — no ledger means no pipeline.
@@ -108,11 +133,39 @@ def step_reconcile() -> Path:
     )
 
     ledger = build_ledger(matched, unmatched_tags, unmatched_club)
+    ledger["run_id"] = run_id
     write_ledger(ledger, LEDGER_OUT)
     print_audit(ledger)
 
-    _ok(f"Ledger written → {LEDGER_OUT.relative_to(ROOT)}")
+    _ok(f"Ledger written → {LEDGER_OUT.relative_to(ROOT)}  [run_id {run_id}]")
     return LEDGER_OUT
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Step 1b — Tagger sanity audit → eval ledger
+# ══════════════════════════════════════════════════════════════════════════════
+
+def step_sanity(ledger_path: Path, run_id: str) -> int:
+    """
+    Run tools/tagger_sanity checks inline and log findings under run_id.
+    Non-blocking here — unresolved ERRORs stop Step 4 via the eval gate.
+    Returns the number of ERROR findings.
+    """
+    tools_dir = str(ROOT / "tools")
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    import tagger_sanity
+
+    with open(ledger_path, encoding="utf-8") as f:
+        events = tagger_sanity.extract_events(json.load(f))
+
+    findings = tagger_sanity.log_findings(tagger_sanity.run_checks(events), events, run_id)
+    tagger_sanity.print_report(findings, len(events))
+    errors = sum(1 for f in findings if f[0] == "ERROR")
+    _ok(f"{len(findings)} finding(s) logged to eval ledger under run_id '{run_id}'")
+    if errors:
+        _warn(f"{errors} ERROR(s) — Step 4 packaging will be blocked until resolved.")
+    return errors
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -190,17 +243,20 @@ def step_agents(ledger_path: Path) -> "Path | None":
 # Step 4 — HTML dossier packager
 # ══════════════════════════════════════════════════════════════════════════════
 
-def step_package(dossier_md_path: Path, plots_dir: Path) -> Path:
+def step_package(dossier_md_path: Path, plots_dir: Path, run_id: str) -> Path:
     """
     Package the approved dossier markdown into a self-contained HTML report
     with embedded pitch-plot PNGs (base64), OLED dark theme, and A4 print CSS.
+    Exits 1 via the eval gate if run_id has unresolved ERRORs.
     Returns the path of the written HTML file.
     """
     try:
-        from reports.packager import build_html
+        from reports.packager import build_html, check_gate
     except ImportError as exc:
         _err(f"Cannot import reports.packager: {exc}")
         sys.exit(1)
+
+    check_gate(run_id)
 
     dossier_md = dossier_md_path.read_text(encoding="utf-8")
     html_out   = PROC_DIR / "tivvy_tactical_dossier.html"
@@ -269,13 +325,27 @@ def main() -> None:
         "--skip-visuals", action="store_true",
         help="Skip Step 2 — bypass visualiser and go straight to agents",
     )
+    parser.add_argument(
+        "--run-id", type=str, default=None,
+        help="Eval ledger run id shared by tagger_sanity and the packager gate",
+    )
+    parser.add_argument(
+        "--date", type=_match_date, default=None,
+        help="Match date YYYY-MM-DD (run_id fallback component)",
+    )
+    parser.add_argument(
+        "--opponent", type=str, default=None,
+        help='Opponent name, e.g. "Willand Rovers" (run_id fallback component)',
+    )
     args = parser.parse_args()
+    run_id = resolve_run_id(args.run_id, args.date, args.opponent)
 
     print()
     _rule("═")
     print("  PITCHPULSE — MATCHDAY PIPELINE")
     print("  Tiverton Town FC | Tactical Performance Intelligence")
     print(f"  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+    print(f"  Run ID : {run_id}")
     _rule("═")
 
     # ── Step 1: Reconciliation ─────────────────────────────────────────────────
@@ -292,7 +362,11 @@ def main() -> None:
         ledger_path = LEDGER_PATH
         _ok(f"Using existing ledger → {ledger_path.relative_to(ROOT)}")
     else:
-        ledger_path = step_reconcile()
+        ledger_path = step_reconcile(run_id)
+
+    # ── Step 1b: Tagger sanity → eval ledger ───────────────────────────────────
+    _step_header(1, "TAGGER SANITY AUDIT  (eval ledger)")
+    step_sanity(ledger_path, run_id)
 
     # ── Step 2: Visualisations ─────────────────────────────────────────────────
     _step_header(2, "PITCH VISUALISATIONS", skipped=args.skip_visuals)
@@ -314,7 +388,7 @@ def main() -> None:
     # ── Step 4: HTML packager ──────────────────────────────────────────────────
     if dossier_path:
         _step_header(4, "HTML DOSSIER PACKAGER")
-        step_package(dossier_path, plots_dir)
+        step_package(dossier_path, plots_dir, run_id)
 
     # ── Step 5: DoF match card ─────────────────────────────────────────────────
     _step_header(5, "DOF MATCH CARD  (1080×1920 WhatsApp PNG)")
