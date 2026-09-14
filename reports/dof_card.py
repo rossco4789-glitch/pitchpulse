@@ -40,8 +40,8 @@ CREST_PATH   = ROOT / "assets" / "tivvy_crest.png"
 OUT_PATH     = PLOTS_DIR / "dof_match_card.png"
 
 # ── Palette ────────────────────────────────────────────────────────────────────
-BG       = "#09090b"   # OLED black
-CARD_BG  = "#18181b"   # tile panel
+BG       = "#0F172A"   # OLED black
+CARD_BG  = "#1E293B"   # tile panel
 GOLD     = "#f59e0b"   # Tivvy amber
 GOLD_DIM = "#78350f"   # muted amber for borders
 WHITE    = "#f8fafc"

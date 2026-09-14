@@ -5,7 +5,7 @@ Self-contained HTML matchday dossier packager for Tiverton Town FC.
 Converts a dossier markdown string (produced by agents/synthesis.py) into a
 fully offline HTML file with:
   - Base64-embedded pitch-plot PNGs (graceful placeholder if missing/empty)
-  - OLED dark theme (#09090b) with Tivvy gold (#f59e0b) headers
+  - True Slate dark theme (#0F172A) with Tivvy gold (#f59e0b) headers
   - 2-column CSS Grid layout (55 % text / 45 % plot) per moment section
   - @media print — white A4, break-inside: avoid on cards, break-before: page
     per moment section
@@ -226,13 +226,13 @@ _CSS = """
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:         #09090b;
-  --surface:    #111113;
-  --border:     rgba(255,255,255,.09);
+  --bg:         #0F172A;
+  --surface:    #1E293B;
+  --border:     #334155;
   --gold:       #f59e0b;
   --gold-dim:   rgba(245,158,11,.12);
-  --text:       rgba(255,255,255,.87);
-  --text-muted: rgba(255,255,255,.45);
+  --text:       #F8FAFC;
+  --text-muted: #94A3B8;
   --green:      #34d399;
   --green-dim:  rgba(52,211,153,.11);
   --amber:      #fbbf24;

@@ -46,18 +46,18 @@ from cv.zones import ZONES
 PROC_DIR = ROOT / "data" / "processed"
 
 # ── OLED colour palette ────────────────────────────────────────────────────────
-OLED_BG  = "#09090b"
-SURFACE  = "#18181b"
-LINE     = "#3f3f46"
+OLED_BG  = "#0F172A"
+SURFACE  = "#1E293B"
+LINE     = "#475569"
 GOLD     = "#f59e0b"
 CRIMSON  = "#f43f5e"
 EMERALD  = "#10b981"
 CYAN     = "#22d3ee"
 BLUE     = "#3b82f6"
 PURPLE   = "#a855f7"
-ZINC     = "#71717a"
-TEXT     = "#e4e4e7"
-TEXT_DIM = "#52525b"
+ZINC     = "#94A3B8"
+TEXT     = "#F8FAFC"
+TEXT_DIM = "#64748B"
 
 _HALF_SPACE   = {"A_LH", "A_RH"}
 _ZONE_14      = {"A_LC", "A_RC"}
@@ -553,7 +553,7 @@ def _narrate_nl(df) -> str:
 _STYLE = """
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#09090b;--sf:#18181b;--bd:rgba(255,255,255,.06);--am:#f59e0b;--tx:#e4e4e7;--dim:#71717a}
+:root{--bg:#0F172A;--sf:#1E293B;--bd:#334155;--am:#f59e0b;--tx:#F8FAFC;--dim:#94A3B8}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.6;padding:32px 24px;max-width:1100px;margin:0 auto}
 h1{font-family:'Barlow Condensed',Impact,sans-serif;font-size:2rem;font-weight:900;color:var(--am);letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
@@ -571,7 +571,7 @@ p{color:var(--dim);margin-bottom:12px;max-width:820px}strong{color:var(--tx)}
 .plot{width:100%;border-radius:8px;margin:10px 0;border:1px solid var(--bd)}
 table{width:100%;border-collapse:collapse;font-size:.75rem;font-family:'JetBrains Mono',monospace;margin-top:10px}
 th{color:var(--dim);text-transform:uppercase;letter-spacing:.08em;font-size:.63rem;padding:7px 10px;border-bottom:1px solid var(--bd);text-align:left}
-td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.025);color:var(--tx)}
+td{padding:6px 10px;border-bottom:1px solid #334155;color:var(--tx)}
 tr:hover td{background:rgba(255,255,255,.02)}
 footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--bd);font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--dim)}
 </style>"""
@@ -653,28 +653,28 @@ _DOF_STYLE = """
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#09090b;color:#e4e4e7;font-family:'Inter',system-ui,sans-serif;
+body{background:#0F172A;color:#F8FAFC;font-family:'Inter',system-ui,sans-serif;
      min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{width:100%;max-width:680px;background:#111116;border:1px solid rgba(255,255,255,.08);border-radius:16px;overflow:hidden}
-.head{background:linear-gradient(135deg,#111116,#1a1610);padding:22px 26px;border-bottom:1px solid rgba(245,158,11,.15)}
+.card{width:100%;max-width:680px;background:#1E293B;border:1px solid #334155;border-radius:16px;overflow:hidden}
+.head{background:linear-gradient(135deg,#1E293B,#1a1610);padding:22px 26px;border-bottom:1px solid rgba(245,158,11,.15)}
 .head h1{font-family:'Barlow Condensed',Impact,sans-serif;font-size:1.5rem;font-weight:900;color:#f59e0b;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
-.sub{font-size:.72rem;color:#71717a;letter-spacing:.06em;text-transform:uppercase}
+.sub{font-size:.72rem;color:#94A3B8;letter-spacing:.06em;text-transform:uppercase}
 .chips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 .chip{font-family:'JetBrains Mono',monospace;font-size:.78rem;padding:3px 12px;border-radius:5px;font-weight:700}
 .w{background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3)}
 .d{background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.25)}
 .l{background:rgba(244,63,94,.12);color:#f43f5e;border:1px solid rgba(244,63,94,.25)}
 .grid{display:grid;grid-template-columns:repeat(3,1fr)}
-.cell{padding:18px 20px;border-right:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06)}
+.cell{padding:18px 20px;border-right:1px solid #334155;border-bottom:1px solid #334155}
 .cell:nth-child(3n){border-right:none}
-.lbl{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:#71717a;font-weight:600;margin-bottom:6px}
+.lbl{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;font-weight:600;margin-bottom:6px}
 .val{font-family:'JetBrains Mono',monospace;font-size:1.3rem;font-weight:700;color:#f59e0b;line-height:1}
 .trend{font-size:.7rem;margin-top:5px}
-.up{color:#10b981}.dn{color:#f43f5e}.warn{color:#f59e0b}.neutral{color:#71717a}
+.up{color:#10b981}.dn{color:#f43f5e}.warn{color:#f59e0b}.neutral{color:#94A3B8}
 .finding{padding:18px 26px}
 .finding-lbl{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:#f43f5e;font-weight:700;margin-bottom:7px}
-.finding-txt{font-size:.8rem;color:#a1a1aa;line-height:1.55}
-footer{padding:12px 26px;font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#3f3f46;border-top:1px solid rgba(255,255,255,.04)}
+.finding-txt{font-size:.8rem;color:#94A3B8;line-height:1.55}
+footer{padding:12px 26px;font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#64748B;border-top:1px solid #334155}
 </style>"""
 
 

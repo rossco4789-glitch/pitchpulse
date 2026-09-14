@@ -10,18 +10,21 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      theme: { extend: { fontFamily: { sans: ['Inter','system-ui','-apple-system','sans-serif'] } } }
+      theme: { extend: { fontFamily: { sans: ['Inter','system-ui','-apple-system','sans-serif'] },
+                         colors: { white: '#F8FAFC' } } }
     }
   </script>
   <style>
     *, *::before, *::after { -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
     html { height: 100%; }
-    body { height: 100%; height: 100dvh; overscroll-behavior: none; background: #09090b;
+    body { height: 100%; height: 100dvh; overscroll-behavior: none; background: var(--bg); color: var(--text);
            font-family: 'Inter', system-ui, -apple-system, sans-serif;
            font-variant-numeric: tabular-nums; }
 
     /* ── Impeccable Design System tokens (PROJECT_INDEX.md) ───────────────── */
     :root { --slate:#0F172A; --pitch:#1E293B; --gold:#F59E0B; --cardinal:#EF4444; --emerald:#10B981;
+            --bg:#0F172A; --surface:#1E293B; --card:#1E293B; --border:#334155;
+            --text:#F8FAFC; --text-2:#94A3B8; --text-3:#64748B;
             --touch:48px; }
     /* Governance: every tap target ≥ 48px thumb height */
     button { min-height: var(--touch); }
@@ -63,7 +66,7 @@
     }
     #event-log-drawer.log-open { max-height: 320px; }
     .log-row { display:flex; align-items:center; gap:8px; padding:4px 16px;
-               border-bottom:1px solid rgba(255,255,255,.05); }
+               border-bottom:1px solid var(--border); }
     .log-row:last-child { border-bottom:none; }
     .log-del { width:48px; height:48px; border-radius:8px; border:none; display:flex;
                align-items:center; justify-content:center; font-size:12px; font-weight:900;
@@ -78,7 +81,7 @@
     .score-num { font-size:22px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1; }
     .score-btn { width:48px; height:48px; border-radius:8px; display:flex; align-items:center; justify-content:center;
                  font-size:18px; font-weight:900; line-height:1;
-                 background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1);
+                 background:rgba(255,255,255,.07); border:1px solid var(--border);
                  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 2px 6px rgba(0,0,0,.4);
                  transition: transform .1s, background .1s; }
     .score-btn:active { transform:scale(.9); background:rgba(255,255,255,.15); }
@@ -91,7 +94,7 @@
     #pitch-overlay {
       position: fixed; inset: 0; z-index: 60;
       display: flex; flex-direction: column;
-      background: rgba(9,9,11,.97);
+      background: rgba(15,23,42,.97);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
       opacity: 0; transform: translateY(12px);
@@ -128,8 +131,8 @@
 
   <!-- ═══ HUD Header ══════════════════════════════════════════════════════ -->
   <header class="shrink-0 sticky top-0 z-20 flex items-center justify-between gap-3 px-4 py-2.5"
-    style="background:rgba(9,9,11,.88); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
-           border-bottom:1px solid rgba(255,255,255,.07);">
+    style="background:rgba(15,23,42,.88); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+           border-bottom:1px solid var(--border);">
 
     <!-- Brand + rec dot -->
     <div class="flex items-center gap-2">
@@ -160,7 +163,7 @@
 
   <!-- ═══ Score Bar ════════════════════════════════════════════════════════ -->
   <div id="score-bar" class="shrink-0 flex items-center justify-between px-4 py-1.5"
-    style="background:rgba(9,9,11,.80); border-bottom:1px solid rgba(255,255,255,.06);">
+    style="background:rgba(15,23,42,.80); border-bottom:1px solid var(--border);">
 
     <!-- Home side -->
     <div class="flex items-center gap-2">
@@ -190,7 +193,7 @@
 
   <!-- ═══ Event Log Strip ════════════════════════════════════════════════ -->
   <div id="event-log-strip" class="shrink-0"
-    style="border-bottom:1px solid rgba(255,255,255,.06);">
+    style="border-bottom:1px solid var(--border);">
 
     <!-- Toggle bar -->
     <button onclick="toggleEventLog()"
@@ -219,26 +222,26 @@
 
   <!-- ═══ Clock Controls ══════════════════════════════════════════════════ -->
   <section class="shrink-0 px-3 py-2.5 no-scrollbar overflow-x-auto"
-    style="border-bottom:1px solid rgba(255,255,255,.06);">
+    style="border-bottom:1px solid var(--border);">
     <div class="flex gap-2 w-max">
       <button onclick="startPeriod('1H')"
         class="btn-inset shrink-0 text-[11px] font-black tracking-[.1em] px-4 py-2.5 rounded-full transition-all duration-150 ease-out active:scale-[0.95]"
-        style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.85);">
+        style="background:rgba(255,255,255,.06); border:1px solid var(--border); color:rgba(255,255,255,.85);">
         ▶ START 1H
       </button>
       <button onclick="startPeriod('HT')"
         class="btn-inset shrink-0 text-[11px] font-black tracking-[.1em] px-4 py-2.5 rounded-full transition-all duration-150 ease-out active:scale-[0.95]"
-        style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.85);">
+        style="background:rgba(255,255,255,.06); border:1px solid var(--border); color:rgba(255,255,255,.85);">
         ■ HALF TIME
       </button>
       <button onclick="startPeriod('2H')"
         class="btn-inset shrink-0 text-[11px] font-black tracking-[.1em] px-4 py-2.5 rounded-full transition-all duration-150 ease-out active:scale-[0.95]"
-        style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.85);">
+        style="background:rgba(255,255,255,.06); border:1px solid var(--border); color:rgba(255,255,255,.85);">
         ▶ START 2H
       </button>
       <button onclick="startPeriod('FT')"
         class="btn-inset shrink-0 text-[11px] font-black tracking-[.1em] px-4 py-2.5 rounded-full transition-all duration-150 ease-out active:scale-[0.95]"
-        style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.85);">
+        style="background:rgba(255,255,255,.06); border:1px solid var(--border); color:rgba(255,255,255,.85);">
         ■ FULL TIME
       </button>
       <button id="btn-pause" onclick="togglePause()" disabled
@@ -258,7 +261,7 @@
 
   <!-- ═══ Roster Strip ════════════════════════════════════════════════════ -->
   <section class="shrink-0 px-3 py-2 no-scrollbar overflow-x-auto"
-    style="border-bottom:1px solid rgba(255,255,255,.06);">
+    style="border-bottom:1px solid var(--border);">
     <div id="roster-strip" class="flex gap-1.5 w-max"><!-- JS --></div>
   </section>
 
@@ -266,10 +269,10 @@
   <main class="flex-1 px-3 py-3 flex flex-col gap-2.5 overflow-y-auto min-h-0">
 
     <!-- SHOT -->
-    <div class="flex rounded-2xl overflow-hidden" style="min-height:72px; border:1px solid rgba(255,255,255,.08);">
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:72px; border:1px solid var(--border);">
       <button onclick="triggerAction('SHOT','tiverton')"
         class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
-        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        style="background:rgba(120,53,15,.3); border-right:1px solid var(--border);">
         <svg class="w-6 h-6" style="color:#fb7185" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>
           <line x1="12" y1="4" x2="12" y2="9.4"/><line x1="12" y1="14.6" x2="12" y2="20"/>
@@ -292,10 +295,10 @@
     </div>
 
     <!-- BOX ENTRY -->
-    <div class="flex rounded-2xl overflow-hidden" style="min-height:72px; border:1px solid rgba(255,255,255,.08);">
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:72px; border:1px solid var(--border);">
       <button onclick="triggerAction('BOX_ENTRY','tiverton')"
         class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
-        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        style="background:rgba(120,53,15,.3); border-right:1px solid var(--border);">
         <svg class="w-6 h-6" style="color:#22d3ee" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="13 17 18 12 13 7"/><line x1="3" y1="12" x2="18" y2="12"/>
           <path d="M15 5h4a1 1 0 011 1v12a1 1 0 01-1 1h-4"/>
@@ -316,10 +319,10 @@
     </div>
 
     <!-- DEF TURNOVER -->
-    <div class="flex rounded-2xl overflow-hidden" style="min-height:72px; border:1px solid rgba(255,255,255,.08);">
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:72px; border:1px solid var(--border);">
       <button onclick="triggerAction('DEF_TURNOVER','tiverton')"
         class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
-        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        style="background:rgba(120,53,15,.3); border-right:1px solid var(--border);">
         <svg class="w-6 h-6" style="color:#fbbf24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           <line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/>
@@ -340,10 +343,10 @@
     </div>
 
     <!-- HIGH REGAIN -->
-    <div class="flex rounded-2xl overflow-hidden" style="min-height:72px; border:1px solid rgba(255,255,255,.08);">
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:72px; border:1px solid var(--border);">
       <button onclick="triggerAction('HIGH_REGAIN','tiverton')"
         class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
-        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        style="background:rgba(120,53,15,.3); border-right:1px solid var(--border);">
         <svg class="w-6 h-6" style="color:#34d399" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
         </svg>
@@ -362,10 +365,10 @@
     </div>
 
     <!-- SET PIECE -->
-    <div class="flex rounded-2xl overflow-hidden" style="min-height:68px; border:1px solid rgba(255,255,255,.08);">
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:68px; border:1px solid var(--border);">
       <button onclick="triggerAction('SET_PIECE','tiverton')"
         class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
-        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        style="background:rgba(120,53,15,.3); border-right:1px solid var(--border);">
         <svg class="w-6 h-6" style="color:#c084fc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="4" y1="21" x2="4" y2="4"/><path d="M4 4l14 5-14 5"/>
         </svg>
@@ -384,10 +387,10 @@
     </div>
 
     <!-- AERIAL DUEL -->
-    <div class="flex rounded-2xl overflow-hidden" style="min-height:68px; border:1px solid rgba(255,255,255,.08);">
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:68px; border:1px solid var(--border);">
       <button onclick="triggerAction('AERIAL_DUEL','tiverton')"
         class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
-        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        style="background:rgba(120,53,15,.3); border-right:1px solid var(--border);">
         <svg class="w-5 h-5" style="color:#fb923c" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
         </svg>
@@ -406,10 +409,10 @@
     </div>
 
     <!-- SECOND BALL -->
-    <div class="flex rounded-2xl overflow-hidden" style="min-height:68px; border:1px solid rgba(255,255,255,.08);">
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:68px; border:1px solid var(--border);">
       <button onclick="triggerAction('SECOND_BALL','tiverton')"
         class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
-        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        style="background:rgba(120,53,15,.3); border-right:1px solid var(--border);">
         <svg class="w-5 h-5" style="color:#818cf8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="9"/>
           <path d="M12 3a4.5 4.5 0 014.5 4.5M12 21a4.5 4.5 0 01-4.5-4.5"/>
@@ -432,10 +435,10 @@
     </div>
 
     <!-- SUB -->
-    <div class="flex rounded-2xl overflow-hidden" style="min-height:60px; border:1px solid rgba(255,255,255,.08);">
+    <div class="flex rounded-2xl overflow-hidden" style="min-height:60px; border:1px solid var(--border);">
       <button onclick="triggerSub('tiverton')"
         class="act-tivvy flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 ease-out"
-        style="background:rgba(120,53,15,.3); border-right:1px solid rgba(255,255,255,.07);">
+        style="background:rgba(120,53,15,.3); border-right:1px solid var(--border);">
         <svg class="w-5 h-5" style="color:#4ade80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/>
         </svg>
@@ -457,11 +460,11 @@
 
   <!-- ═══ Bottom Dock ══════════════════════════════════════════════════════ -->
   <footer class="shrink-0 px-3 py-2.5 flex gap-2"
-    style="background:rgba(9,9,11,.75); backdrop-filter:blur(14px); border-top:1px solid rgba(255,255,255,.07);">
+    style="background:rgba(15,23,42,.75); backdrop-filter:blur(14px); border-top:1px solid var(--border);">
 
     <button id="btn-undo" onclick="undoLast()"
       class="btn-inset flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[11px] font-black tracking-[.1em] transition-all duration-150 active:scale-[0.95]"
-      style="background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); color:rgba(255,255,255,.55); opacity:.28; cursor:not-allowed;"
+      style="background:rgba(255,255,255,.05); border:1px solid var(--border); color:rgba(255,255,255,.55); opacity:.28; cursor:not-allowed;"
       disabled>
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="9 14 4 9 9 4"/>
@@ -472,7 +475,7 @@
 
     <button id="btn-copy" onclick="copyJSON()"
       class="btn-inset flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[11px] font-black tracking-[.1em] transition-all duration-150 active:scale-[0.95]"
-      style="background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); color:rgba(255,255,255,.55);">
+      style="background:rgba(255,255,255,.05); border:1px solid var(--border); color:rgba(255,255,255,.55);">
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <rect x="9" y="9" width="13" height="13" rx="2"/>
         <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
@@ -501,9 +504,9 @@
   ══════════════════════════════════════════════════════════════════════════ -->
   <div id="sub-modal"
     style="position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center;
-           background:rgba(9,9,11,.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+           background:rgba(15,23,42,.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
            opacity:0; pointer-events:none; transition:opacity .15s ease;">
-    <div style="width:calc(100% - 48px); max-width:320px; background:#18181b;
+    <div style="width:calc(100% - 48px); max-width:320px; background:var(--surface);
                 border:1px solid rgba(74,222,128,.22); border-radius:20px; padding:24px 20px 20px;">
 
       <div id="sub-team-label" style="font-size:11px; font-weight:900; letter-spacing:.18em; color:#fbbf24;
@@ -516,7 +519,7 @@
         <div style="font-size:9px; font-weight:900; letter-spacing:.2em;
                     color:rgba(255,255,255,.3); margin-bottom:8px;">PLAYER OFF</div>
         <select id="sub-off"
-          style="width:100%; background:#09090b; border:1px solid rgba(255,255,255,.12);
+          style="width:100%; background:var(--bg); border:1px solid var(--border);
                  border-radius:10px; color:#f8fafc; font-size:16px; font-weight:700;
                  padding:12px 14px; -webkit-appearance:none; appearance:none; text-align:center;">
         </select>
@@ -527,7 +530,7 @@
         <div style="font-size:9px; font-weight:900; letter-spacing:.2em;
                     color:rgba(255,255,255,.3); margin-bottom:8px;">PLAYER ON</div>
         <select id="sub-on"
-          style="width:100%; background:#09090b; border:1px solid rgba(255,255,255,.12);
+          style="width:100%; background:var(--bg); border:1px solid var(--border);
                  border-radius:10px; color:#f8fafc; font-size:16px; font-weight:700;
                  padding:12px 14px; -webkit-appearance:none; appearance:none; text-align:center;">
         </select>
@@ -536,7 +539,7 @@
       <!-- Action buttons -->
       <div style="display:flex; gap:10px;">
         <button onclick="closeSubModal()"
-          style="flex:1; padding:13px; border-radius:12px; border:1px solid rgba(255,255,255,.09);
+          style="flex:1; padding:13px; border-radius:12px; border:1px solid var(--border);
                  background:rgba(255,255,255,.04); color:rgba(255,255,255,.35);
                  font-size:11px; font-weight:900; letter-spacing:.12em;">
           CANCEL
@@ -563,7 +566,7 @@
 
     <!-- Header strip: confirms action + player + clock + direction -->
     <div class="shrink-0 flex items-center justify-between gap-3 px-4 py-3"
-      style="border-bottom:1px solid rgba(255,255,255,.08);">
+      style="border-bottom:1px solid var(--border);">
       <div class="flex items-center gap-3">
         <span id="ov-action"
           class="text-[13px] font-black tracking-[.12em]"
@@ -703,7 +706,7 @@
 
     <!-- Overlay footer: tap-to-place hint + cancel -->
     <div class="shrink-0 px-4 pb-4 pt-1 flex items-center justify-between"
-      style="border-top:1px solid rgba(255,255,255,.06);">
+      style="border-top:1px solid var(--border);">
       <button onclick="closePitchOverlay()"
         class="text-[11px] font-semibold tracking-wider text-white/80 active:text-white px-4 transition-colors">
         CANCEL
@@ -897,7 +900,7 @@
         b.className = 'shrink-0 min-w-[44px] h-10 rounded-xl text-[13px] font-black transition-all duration-150 active:scale-[0.93]';
         b.style.cssText = isActive
           ? 'background:#f59e0b; border:1.5px solid rgba(251,191,36,.8); color:#000; box-shadow:0 0 0 3px rgba(251,191,36,.25), inset 0 1px 0 rgba(255,255,255,.25);'
-          : 'background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.65);';
+          : 'background:rgba(255,255,255,.05); border:1px solid var(--border); color:rgba(255,255,255,.65);';
         b.addEventListener('click', () => { activePlayer = val; buildRoster(); });
         return b;
       };
@@ -959,7 +962,7 @@
           const b = document.createElement('button');
           b.textContent = CHIP_DISPLAY[c] || c;
           b.className = 'ov-chip text-[12px] font-black tracking-wider px-5 py-3 rounded-xl transition-all duration-100 active:scale-[0.95]';
-          b.style.cssText = 'background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); color:rgba(255,255,255,.8);';
+          b.style.cssText = 'background:rgba(255,255,255,.07); border:1px solid var(--border); color:rgba(255,255,255,.8);';
           b.addEventListener('click', e => {
             e.stopPropagation(); // don't bubble to pitch
             selectChip(b, c);

@@ -45,17 +45,17 @@ from cv.zones import ZONES, ZONE_ORDER, get_zone_by_coords, get_zone_centroid
 PLOTS_DIR = ROOT / "data" / "processed" / "plots"
 
 # ── OLED colour palette (matches PitchPulse tagger) ───────────────────────────
-OLED_BG  = "#09090b"
-SURFACE  = "#18181b"
-LINE     = "#3f3f46"
+OLED_BG  = "#0F172A"
+SURFACE  = "#1E293B"
+LINE     = "#475569"
 GOLD     = "#f59e0b"
 CRIMSON  = "#f43f5e"
 ORANGE   = "#fb923c"
-ZINC     = "#71717a"
+ZINC     = "#94A3B8"
 EMERALD  = "#10b981"
 CYAN     = "#22d3ee"
-TEXT     = "#e4e4e7"
-TEXT_DIM = "#52525b"
+TEXT     = "#F8FAFC"
+TEXT_DIM = "#64748B"
 
 # ── Shared mplsoccer pitch keyword arguments ───────────────────────────────────
 _PITCH_KW: dict = dict(

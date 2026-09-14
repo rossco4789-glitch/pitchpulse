@@ -450,7 +450,26 @@ ELI5: Numbers that don't wobble when they change let the DoF compare 62% and 18%
 | Emerald `--emerald` | `#10B981` | Completed actions / success |
 
 - Team encoding is fixed: Gold = Tivvy, Cardinal = Opponent. Never swap for decoration.
-- Migration note: legacy zinc surfaces (`--bg #08080a`, `--surface #111116`) remain in `app.py`; tokens are declared and must be used for new work. A full surface migration is a separate task.
+- **Slate Border** `#334155` — all 1px hairline borders/dividers (replaces `rgba(255,255,255,.04–.14)`).
+- **Text tokens** — primary `#F8FAFC`, secondary `#94A3B8`, tertiary/meta `#64748B`.
+  - Measured against `#0F172A`: primary ≈17.1:1 (AAA), secondary ≈6.96:1 (AA, just under AAA), tertiary ≈3.75:1 (**meta only** — large or non-essential text; never for data the analyst must read). Pitch-overlay text in the tagger stays on white ≥70% opacity to keep AAA.
+
+#### True Slate Migration — ✅ complete (2026-09-14)
+All legacy zinc/OLED surfaces are migrated. Mapping applied:
+
+| Legacy | True Slate |
+|--------|------------|
+| `#08080a` `#09090b` `#0b0b0e`, `rgba(9,9,11,a)` | `#0F172A` / `rgba(15,23,42,a)` |
+| `#111116` `#111113` `#18181b` | `#1E293B` |
+| `#1a1a22` (raised chips, popovers, plot grid) | `#334155` |
+| `#ededf0` `#e4e4e7`, `rgba(255,255,255,.87)` | `#F8FAFC` |
+| `#71717a` `#a1a1aa`, `rgba(255,255,255,.45)` | `#94A3B8` |
+| `#3f3f46` `#52525b` | `#64748B` |
+
+- Files: `app.py` (`:root` + inline HTML), `tagger/index.html` (`:root` `--bg/--surface/--card/--border/--text*`, Tailwind `white` → `#F8FAFC`), `reports/visualizer.py`, `reports/set_piece_matrix.py`, `reports/progress_review.py`, `reports/dof_card.py`, `reports/packager.py`.
+- **Deliberate exception:** matplotlib `LINE` (pitch markings, spines, heatmap cell edges) is `#475569`, not `#334155` — `#334155` on `#0F172A` is ≈1.4:1 and pitch markings disappear; `#475569` keeps them legible.
+- Unchanged by design: team/category tints (Tivvy amber, opponent red action halves), `#000` text on gold badges.
+- Existing PNGs in `data/processed/plots/` and the DoF card keep the old canvas until regenerated on the next pipeline run.
 
 ---
 

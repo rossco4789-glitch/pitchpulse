@@ -89,10 +89,10 @@ st.markdown("""
 
 /* ── TOKENS ────────────────────────────────────────────────────────────────── */
 :root {
-  --bg:         #08080a;
-  --surface:    #111116;
-  --surface-hi: #1a1a22;
-  --border:     rgba(255,255,255,0.055);
+  --bg:         #0F172A;
+  --surface:    #1E293B;
+  --surface-hi: #334155;
+  --border:     #334155;
   --amber:      #f59e0b;
   --amber-dim:  rgba(245,158,11,0.11);
   --amber-glow: rgba(245,158,11,0.22);
@@ -102,9 +102,9 @@ st.markdown("""
   --red-dim:    rgba(239,68,68,0.12);
   --blue:       #3b82f6;
   --purple:     #a855f7;
-  --text:       #ededf0;
-  --text-2:     #71717a;
-  --text-3:     #3f3f46;
+  --text:       #F8FAFC;
+  --text-2:     #94A3B8;
+  --text-3:     #64748B;
   --mono:       'JetBrains Mono', 'Fira Code', monospace;
   --sans:       'Inter', system-ui, sans-serif;
   --display:    'Barlow Condensed', Impact, sans-serif;
@@ -126,7 +126,7 @@ st.markdown("""
 
 /* ── SIDEBAR ─────────────────────────────────────────────────────────────── */
 [data-testid="stSidebar"] {
-  background: #0b0b0e !important;
+  background: #0F172A !important;
   border-right: 1px solid var(--border) !important;
 }
 [data-testid="stSidebar"] .block-container { padding-top: 1rem !important; }
@@ -182,14 +182,14 @@ st.markdown("""
 .stButton > button[kind="primary"] {
   background: var(--amber) !important;
   border-color: var(--amber) !important;
-  color: #09090b !important;
+  color: #0F172A !important;
   font-weight: 700 !important;
   letter-spacing: .04em !important;
 }
 .stButton > button[kind="primary"]:hover {
   background: #d97706 !important;
   border-color: #d97706 !important;
-  color: #09090b !important;
+  color: #0F172A !important;
   box-shadow: 0 0 28px rgba(245,158,11,.28) !important;
 }
 .stButton > button:disabled { opacity: .35 !important; cursor: not-allowed !important; }
@@ -301,11 +301,11 @@ st.markdown("""
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _tile(label: str, value: str, sub: str = "", color: str = "#f59e0b") -> str:
-    sub_html = f'<div style="color:#71717a;font-size:.72rem;font-family:var(--sans);margin-top:6px">{sub}</div>' if sub else ""
+    sub_html = f'<div style="color:#94A3B8;font-size:.72rem;font-family:var(--sans);margin-top:6px">{sub}</div>' if sub else ""
     return f"""
-    <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
+    <div style="background:#1E293B;border:1px solid #334155;
                 border-radius:10px;padding:20px 20px;text-align:center;">
-      <div style="color:#71717a;font-size:.65rem;text-transform:uppercase;
+      <div style="color:#94A3B8;font-size:.65rem;text-transform:uppercase;
                   letter-spacing:.14em;font-family:'Inter',sans-serif;margin-bottom:10px">{label}</div>
       <div style="color:{color};font-size:1.9rem;font-weight:500;
                   font-family:'JetBrains Mono',monospace;line-height:1">{value}</div>
@@ -314,15 +314,15 @@ def _tile(label: str, value: str, sub: str = "", color: str = "#f59e0b") -> str:
 
 
 def _status_row(label: str, ok: bool) -> str:
-    col = "#22c55e" if ok else "#3f3f46"
+    col = "#22c55e" if ok else "#64748B"
     state = "READY" if ok else "——"
     pulse = "animation:ppulse 2.5s ease-in-out infinite;" if ok else ""
     return f"""
     <div style="display:flex;align-items:center;gap:10px;padding:5px 0;
-                border-bottom:1px solid rgba(255,255,255,0.04)">
+                border-bottom:1px solid #334155">
       <span style="width:7px;height:7px;border-radius:50%;background:{col};
                    flex-shrink:0;{pulse}"></span>
-      <span style="font-family:'Inter',sans-serif;font-size:.8rem;color:#ededf0;flex:1">{label}</span>
+      <span style="font-family:'Inter',sans-serif;font-size:.8rem;color:#F8FAFC;flex:1">{label}</span>
       <span style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:{col}">{state}</span>
     </div>"""
 
@@ -332,19 +332,19 @@ def _section_label(text: str, color: str = "#f59e0b") -> str:
     <div style="display:flex;align-items:center;gap:12px;margin:28px 0 16px">
       <span style="width:3px;height:18px;background:{color};border-radius:2px;flex-shrink:0"></span>
       <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.05rem;
-                   color:#ededf0;letter-spacing:.06em;text-transform:uppercase">{text}</span>
+                   color:#F8FAFC;letter-spacing:.06em;text-transform:uppercase">{text}</span>
     </div>"""
 
 
 def _agent_card_header(title: str, subtitle: str, color: str) -> str:
     return f"""
     <div style="display:flex;align-items:center;gap:14px;padding:20px 24px 16px;
-                border-bottom:1px solid rgba(255,255,255,0.04)">
+                border-bottom:1px solid #334155">
       <span style="width:4px;align-self:stretch;background:{color};border-radius:4px;flex-shrink:0"></span>
       <div>
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.1rem;
-                    letter-spacing:.05em;text-transform:uppercase;color:#ededf0">{title}</div>
-        <div style="font-family:'Inter',sans-serif;font-size:.73rem;color:#71717a;
+                    letter-spacing:.05em;text-transform:uppercase;color:#F8FAFC">{title}</div>
+        <div style="font-family:'Inter',sans-serif;font-size:.73rem;color:#94A3B8;
                     margin-top:2px;letter-spacing:.02em">{subtitle}</div>
       </div>
     </div>"""
@@ -355,7 +355,7 @@ def _badge(text: str, bg: str, fg: str = "#fff") -> str:
 
 
 def _divider() -> str:
-    return '<hr style="border:none;border-top:1px solid rgba(255,255,255,0.055);margin:24px 0">'
+    return '<hr style="border:none;border-top:1px solid #334155;margin:24px 0">'
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -485,7 +485,7 @@ with st.sidebar:
                   font-size:2.1rem;color:#f59e0b;letter-spacing:-.01em;line-height:1">
         PITCHPULSE
       </div>
-      <div style="font-family:'Inter',sans-serif;font-size:.7rem;color:#71717a;
+      <div style="font-family:'Inter',sans-serif;font-size:.7rem;color:#94A3B8;
                   letter-spacing:.12em;text-transform:uppercase;margin-top:3px">
         Tiverton Town FC
       </div>
@@ -495,7 +495,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     # System status
-    st.markdown(_section_label("System Status", "#71717a"), unsafe_allow_html=True)
+    st.markdown(_section_label("System Status", "#94A3B8"), unsafe_allow_html=True)
     ledger_ok = LEDGER_PATH.exists()
     ctx_ok    = CONTEXT_PATH.exists()
     calib_ok  = CALIB_PATH.exists()
@@ -514,7 +514,7 @@ with st.sidebar:
     # Active ledger stats
     if st.session_state["ledger"]:
         summary = st.session_state["ledger"].get("summary", {})
-        st.markdown(_section_label("Active Ledger", "#71717a"), unsafe_allow_html=True)
+        st.markdown(_section_label("Active Ledger", "#94A3B8"), unsafe_allow_html=True)
         cols = st.columns(2)
         cols[0].markdown(
             _tile("Tagged", str(summary.get("total_events", "—"))),
@@ -527,18 +527,18 @@ with st.sidebar:
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
         cols2 = st.columns(2)
         cols2[0].markdown(
-            _tile("Unmatched", str(summary.get("unmatched_tags", "—")), color="#71717a"),
+            _tile("Unmatched", str(summary.get("unmatched_tags", "—")), color="#94A3B8"),
             unsafe_allow_html=True,
         )
         cols2[1].markdown(
-            _tile("Subs", str(summary.get("substitutions", "—")), color="#71717a"),
+            _tile("Subs", str(summary.get("substitutions", "—")), color="#94A3B8"),
             unsafe_allow_html=True,
         )
 
     st.markdown("""
     <div style="position:fixed;bottom:16px;left:0;width:260px;padding:0 16px;
                 box-sizing:border-box">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:#3f3f46;
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:#64748B;
                   text-align:center">LOCAL · OFFLINE · NO CLOUD</div>
     </div>
     """, unsafe_allow_html=True)
@@ -553,7 +553,7 @@ st.markdown("""
   <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:10px">
     <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2.8rem;
                  color:#f59e0b;letter-spacing:-.02em;line-height:1">COMMAND CENTRE</span>
-    <span style="font-family:'Inter',sans-serif;font-size:.75rem;color:#71717a;
+    <span style="font-family:'Inter',sans-serif;font-size:.75rem;color:#94A3B8;
                  letter-spacing:.1em;text-transform:uppercase">UEFA 4 Moments Framework</span>
   </div>
   <div style="width:100%;height:1px;background:linear-gradient(90deg,#f59e0b 120px,rgba(245,158,11,.15) 400px,transparent 700px)"></div>
@@ -585,22 +585,22 @@ with tab1:
                        icon_bg: str = "rgba(245,158,11,.12)",
                        icon_border: str = "rgba(245,158,11,.3)",
                        border_left: bool = False) -> str:
-        bl = "border-left:1px solid rgba(255,255,255,0.055);" if border_left else ""
+        bl = "border-left:1px solid #334155;" if border_left else ""
         return f"""
         <div style="padding:0 14px;{bl}text-align:center">
           <div style="width:42px;height:42px;border-radius:50%;background:{icon_bg};
                       border:1px solid {icon_border};margin:0 auto 12px;
                       line-height:42px;text-align:center;font-size:1.1rem">{icon}</div>
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;
-                      letter-spacing:.06em;text-transform:uppercase;color:#ededf0;
+                      letter-spacing:.06em;text-transform:uppercase;color:#F8FAFC;
                       margin-bottom:6px">{title}</div>
-          <div style="font-family:'Inter',sans-serif;font-size:.75rem;color:#71717a;
+          <div style="font-family:'Inter',sans-serif;font-size:.75rem;color:#94A3B8;
                       line-height:1.55">{body}</div>
         </div>"""
 
     st.markdown("""
     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.8rem;
-                letter-spacing:.14em;text-transform:uppercase;color:#3f3f46;
+                letter-spacing:.14em;text-transform:uppercase;color:#64748B;
                 margin-bottom:10px;padding-top:4px">MATCHDAY WORKFLOW</div>
     """, unsafe_allow_html=True)
 
@@ -662,7 +662,7 @@ with tab1:
             staged_docx = _stage_upload(docx_file, docx_file.name)
             st.markdown(
                 f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.75rem;'
-                f'color:#71717a;margin-bottom:8px">staged → {staged_docx.relative_to(ROOT)}</div>',
+                f'color:#94A3B8;margin-bottom:8px">staged → {staged_docx.relative_to(ROOT)}</div>',
                 unsafe_allow_html=True,
             )
             if st.button("⚙  Parse Report", type="primary", key="btn_parse"):
@@ -691,10 +691,10 @@ with tab1:
         ctx = st.session_state["ctx"]
         if ctx is None:
             st.markdown("""
-            <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
+            <div style="background:#1E293B;border:1px solid #334155;
                         border-radius:12px;padding:40px;text-align:center">
               <div style="font-size:2rem;margin-bottom:12px">📋</div>
-              <div style="font-family:'Inter',sans-serif;font-size:.82rem;color:#71717a">
+              <div style="font-family:'Inter',sans-serif;font-size:.82rem;color:#94A3B8">
                 No match context loaded yet.<br>Upload and parse a .docx report.
               </div>
             </div>
@@ -713,24 +713,24 @@ with tab1:
             result_color = {"W": "#22c55e", "D": "#f59e0b", "L": "#ef4444"}.get(result, "#f59e0b")
 
             st.markdown(f"""
-            <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
+            <div style="background:#1E293B;border:1px solid #334155;
                         border-radius:12px;padding:24px 28px;margin-bottom:16px">
               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2rem;
-                          color:#ededf0;letter-spacing:-.01em;margin-bottom:4px">
+                          color:#F8FAFC;letter-spacing:-.01em;margin-bottom:4px">
                 Tiverton Town
                 <span style="color:#f59e0b">{tiv_g}–{opp_g}</span>
                 {opp}
               </div>
               <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
-                <span style="background:{result_color};color:#08080a;font-family:'Barlow Condensed',sans-serif;
+                <span style="background:{result_color};color:#0F172A;font-family:'Barlow Condensed',sans-serif;
                              font-weight:700;font-size:.8rem;letter-spacing:.08em;padding:3px 10px;border-radius:5px">
                   {result}
                 </span>
-                <span style="background:#1a1a22;color:#ededf0;font-family:'Inter',sans-serif;
+                <span style="background:#334155;color:#F8FAFC;font-family:'Inter',sans-serif;
                              font-size:.75rem;padding:3px 10px;border-radius:5px">{comp}</span>
-                <span style="background:#1a1a22;color:#ededf0;font-family:'Inter',sans-serif;
+                <span style="background:#334155;color:#F8FAFC;font-family:'Inter',sans-serif;
                              font-size:.75rem;padding:3px 10px;border-radius:5px">{venue} ({home})</span>
-                <span style="background:#1a1a22;color:#71717a;font-family:'JetBrains Mono',monospace;
+                <span style="background:#334155;color:#94A3B8;font-family:'JetBrains Mono',monospace;
                              font-size:.72rem;padding:3px 10px;border-radius:5px">{date}</span>
               </div>
             </div>
@@ -743,22 +743,22 @@ with tab1:
                 if lineup:
                     rows = ""
                     for p in lineup:
-                        flag = " <span style='color:#71717a'>(sub)</span>" if p.get("is_sub") else ""
+                        flag = " <span style='color:#94A3B8'>(sub)</span>" if p.get("is_sub") else ""
                         rows += f"""
                         <div style="display:flex;gap:10px;align-items:baseline;padding:4px 0;
-                                    border-bottom:1px solid rgba(255,255,255,0.04)">
+                                    border-bottom:1px solid #334155">
                           <span style="font-family:'JetBrains Mono',monospace;font-size:.72rem;
                                        color:#f59e0b;width:20px;text-align:right">
                             {p.get('number', '?')}
                           </span>
                           <span style="font-family:'Inter',sans-serif;font-size:.8rem;
-                                       color:#ededf0">{p.get('name', '?')}{flag}</span>
+                                       color:#F8FAFC">{p.get('name', '?')}{flag}</span>
                         </div>"""
                     st.markdown(f"""
                     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;
                                 font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;
-                                color:#71717a;margin-bottom:8px">Starting XI</div>
-                    <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
+                                color:#94A3B8;margin-bottom:8px">Starting XI</div>
+                    <div style="background:#1E293B;border:1px solid #334155;
                                 border-radius:10px;padding:12px 14px">{rows}</div>
                     """, unsafe_allow_html=True)
 
@@ -771,28 +771,28 @@ with tab1:
                     for s in tiv_sc:
                         rows += f"""
                         <div style="display:flex;gap:8px;align-items:baseline;padding:4px 0;
-                                    border-bottom:1px solid rgba(255,255,255,0.04)">
+                                    border-bottom:1px solid #334155">
                           <span style="color:#f59e0b">⚽</span>
                           <span style="font-family:'Inter',sans-serif;font-size:.8rem;
-                                       color:#ededf0">{s['player']}</span>
+                                       color:#F8FAFC">{s['player']}</span>
                           <span style="font-family:'JetBrains Mono',monospace;font-size:.72rem;
-                                       color:#71717a;margin-left:auto">{s.get('minute_raw', s['minute'])}′</span>
+                                       color:#94A3B8;margin-left:auto">{s.get('minute_raw', s['minute'])}′</span>
                         </div>"""
                     for s in opp_sc:
                         rows += f"""
                         <div style="display:flex;gap:8px;align-items:baseline;padding:4px 0;
-                                    border-bottom:1px solid rgba(255,255,255,0.04)">
-                          <span style="color:#71717a">⚽</span>
+                                    border-bottom:1px solid #334155">
+                          <span style="color:#94A3B8">⚽</span>
                           <span style="font-family:'Inter',sans-serif;font-size:.8rem;
-                                       color:#71717a">{s['player']} ({opp})</span>
+                                       color:#94A3B8">{s['player']} ({opp})</span>
                           <span style="font-family:'JetBrains Mono',monospace;font-size:.72rem;
-                                       color:#3f3f46;margin-left:auto">{s.get('minute_raw', s['minute'])}′</span>
+                                       color:#64748B;margin-left:auto">{s.get('minute_raw', s['minute'])}′</span>
                         </div>"""
                     st.markdown(f"""
                     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;
                                 font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;
-                                color:#71717a;margin-bottom:8px">Scorers</div>
-                    <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
+                                color:#94A3B8;margin-bottom:8px">Scorers</div>
+                    <div style="background:#1E293B;border:1px solid #334155;
                                 border-radius:10px;padding:12px 14px">{rows}</div>
                     """, unsafe_allow_html=True)
 
@@ -801,7 +801,7 @@ with tab1:
     st.markdown(_divider(), unsafe_allow_html=True)
     st.markdown(_section_label("Matchday Checklist"), unsafe_allow_html=True)
     st.markdown(
-        '<div style="font-family:\'Inter\',sans-serif;font-size:.77rem;color:#71717a;'
+        '<div style="font-family:\'Inter\',sans-serif;font-size:.77rem;color:#94A3B8;'
         'margin-bottom:14px">Work through each phase in order. Ticks persist across tab '
         'switches for this session. Reset all when starting a new matchday.</div>',
         unsafe_allow_html=True,
@@ -897,7 +897,7 @@ with tab1:
 with tab2:
     st.markdown(_section_label("Video Frame Extraction"), unsafe_allow_html=True)
     st.markdown(
-        '<div style="font-family:\'Inter\',sans-serif;font-size:.8rem;color:#71717a;'
+        '<div style="font-family:\'Inter\',sans-serif;font-size:.8rem;color:#94A3B8;'
         'margin-bottom:16px">Enter the path to your local Veo file. '
         'Scrub to a frame with clear pitch markings, click the image to pick a pixel, '
         'then use it to calibrate the camera or log a video-assisted event.</div>',
@@ -936,13 +936,13 @@ with tab2:
             import plotly.express as px
             fig = px.imshow(frame, title=f"Frame {st.session_state['frame_index']} — click to pick pixel")
             fig.update_layout(
-                paper_bgcolor="#08080a", plot_bgcolor="#08080a", font_color="#ededf0",
-                title_font=dict(family="Barlow Condensed", size=14, color="#71717a"),
+                paper_bgcolor="#0F172A", plot_bgcolor="#0F172A", font_color="#F8FAFC",
+                title_font=dict(family="Barlow Condensed", size=14, color="#94A3B8"),
                 coloraxis_showscale=False,
                 margin=dict(l=0, r=0, t=32, b=0),
             )
-            fig.update_xaxes(title="U (px)", color="#71717a", gridcolor="#1a1a22", tickfont=dict(family="JetBrains Mono", size=10))
-            fig.update_yaxes(title="V (px)", color="#71717a", gridcolor="#1a1a22", tickfont=dict(family="JetBrains Mono", size=10))
+            fig.update_xaxes(title="U (px)", color="#94A3B8", gridcolor="#334155", tickfont=dict(family="JetBrains Mono", size=10))
+            fig.update_yaxes(title="V (px)", color="#94A3B8", gridcolor="#334155", tickfont=dict(family="JetBrains Mono", size=10))
             event_data = st.plotly_chart(fig, on_select="rerun", use_container_width=True, key="frame_chart")
             if event_data and hasattr(event_data, "selection") and event_data.selection.points:
                 pt = event_data.selection.points[0]
@@ -1007,18 +1007,18 @@ with tab2:
                 u, v = pt["pixel"]; xw, yw = pt["world"]
                 rows += f"""
                 <div style="display:flex;gap:16px;padding:5px 0;
-                            border-bottom:1px solid rgba(255,255,255,0.04);
+                            border-bottom:1px solid #334155;
                             font-family:'JetBrains Mono',monospace;font-size:.75rem">
-                  <span style="color:#71717a;width:20px">{i+1}</span>
-                  <span style="color:#ededf0;flex:1">{pt['label']}</span>
+                  <span style="color:#94A3B8;width:20px">{i+1}</span>
+                  <span style="color:#F8FAFC;flex:1">{pt['label']}</span>
                   <span style="color:#f59e0b">U={u} V={v}</span>
-                  <span style="color:#71717a">→ ({xw}m, {yw}m)</span>
+                  <span style="color:#94A3B8">→ ({xw}m, {yw}m)</span>
                 </div>"""
             st.markdown(f"""
-            <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
+            <div style="background:#1E293B;border:1px solid #334155;
                         border-radius:10px;padding:14px 18px;margin:12px 0">
               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.8rem;
-                          letter-spacing:.1em;color:#71717a;margin-bottom:8px">
+                          letter-spacing:.1em;color:#94A3B8;margin-bottom:8px">
                 CALIBRATION POINTS &nbsp;
                 <span style="color:{'#f59e0b' if n_pts >= 4 else '#ef4444'}">{n_pts}/4+</span>
               </div>
@@ -1103,12 +1103,12 @@ with tab2:
             zone_id   = get_zone_by_coords(x_m, y_m)
             st.session_state["last_pitch_coord"] = (x_m, y_m)
             st.markdown(
-                f'<div style="background:#111116;border:1px solid rgba(245,158,11,.25);'
+                f'<div style="background:#1E293B;border:1px solid rgba(245,158,11,.25);'
                 f'border-radius:10px;padding:14px 18px;display:inline-flex;gap:24px;'
                 f'font-family:\'JetBrains Mono\',monospace;font-size:.8rem;margin:10px 0">'
-                f'<span style="color:#71717a">Pitch coord</span>'
+                f'<span style="color:#94A3B8">Pitch coord</span>'
                 f'<span style="color:#f59e0b">{x_m:.1f}m, {y_m:.1f}m</span>'
-                f'<span style="color:#71717a">Zone</span>'
+                f'<span style="color:#94A3B8">Zone</span>'
                 f'<span style="color:#f59e0b">{zone_id}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -1163,7 +1163,7 @@ with tab2:
     # ── Sync Offsets ──────────────────────────────────────────────────────────
     st.markdown(
         '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
-        'font-size:.8rem;letter-spacing:.1em;color:#71717a;margin:10px 0 6px">KICK-OFF SYNC OFFSETS</div>',
+        'font-size:.8rem;letter-spacing:.1em;color:#94A3B8;margin:10px 0 6px">KICK-OFF SYNC OFFSETS</div>',
         unsafe_allow_html=True,
     )
     sync_col1, sync_col2, sync_col3, sync_col4 = st.columns(4)
@@ -1211,7 +1211,7 @@ with tab2:
     # ── Event table with per-row Clip button ─────────────────────────────────
     st.markdown(
         '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
-        'font-size:.8rem;letter-spacing:.1em;color:#71717a;margin:10px 0 6px">KEY MOMENTS — CLIP EXPORT</div>',
+        'font-size:.8rem;letter-spacing:.1em;color:#94A3B8;margin:10px 0 6px">KEY MOMENTS — CLIP EXPORT</div>',
         unsafe_allow_html=True,
     )
 
@@ -1246,10 +1246,10 @@ with tab2:
             # Header row
             st.markdown(
                 '<div style="display:grid;grid-template-columns:50px 70px 90px 130px 110px 80px 90px;'
-                'gap:0;background:#111116;border:1px solid rgba(255,255,255,0.06);'
+                'gap:0;background:#1E293B;border:1px solid #334155;'
                 'border-radius:10px 10px 0 0;padding:8px 12px;'
                 'font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
-                'font-size:.72rem;letter-spacing:.09em;color:#71717a">'
+                'font-size:.72rem;letter-spacing:.09em;color:#94A3B8">'
                 '<span>#</span><span>MIN</span><span>PERIOD</span>'
                 '<span>EVENT</span><span>SUB-TYPE</span><span>ZONE</span><span></span>'
                 '</div>',
@@ -1264,17 +1264,17 @@ with tab2:
                 _bg = "rgba(255,255,255,0.015)" if _i % 2 == 0 else "transparent"
                 st.markdown(
                     f'<div style="display:grid;grid-template-columns:50px 70px 90px 130px 110px 80px 90px;'
-                    f'gap:0;background:{_bg};border-left:1px solid rgba(255,255,255,0.06);'
-                    f'border-right:1px solid rgba(255,255,255,0.06);'
-                    f'border-bottom:1px solid rgba(255,255,255,0.04);'
+                    f'gap:0;background:{_bg};border-left:1px solid #334155;'
+                    f'border-right:1px solid #334155;'
+                    f'border-bottom:1px solid #334155;'
                     f'padding:7px 12px;align-items:center;'
-                    f'font-family:\'JetBrains Mono\',monospace;font-size:.72rem;color:#ededf0">'
-                    f'<span style="color:#71717a">{_i+1}</span>'
+                    f'font-family:\'JetBrains Mono\',monospace;font-size:.72rem;color:#F8FAFC">'
+                    f'<span style="color:#94A3B8">{_i+1}</span>'
                     f'<span style="color:#f59e0b">{_min_label}</span>'
                     f'<span style="color:#86efac">{_row["period"]}</span>'
                     f'<span>{_row["event_type"]}</span>'
-                    f'<span style="color:#a1a1aa">{_row["sub_type"]}</span>'
-                    f'<span style="color:#71717a">{_row["zone_id"]}</span>'
+                    f'<span style="color:#94A3B8">{_row["sub_type"]}</span>'
+                    f'<span style="color:#94A3B8">{_row["zone_id"]}</span>'
                     f'<span></span>'
                     f'</div>',
                     unsafe_allow_html=True,
@@ -1308,7 +1308,7 @@ with tab2:
                         st.error(f"Clip failed: {_msg}")
 
             st.markdown(
-                '<div style="border:1px solid rgba(255,255,255,0.06);'
+                '<div style="border:1px solid #334155;'
                 'border-top:none;border-radius:0 0 10px 10px;height:4px"></div>',
                 unsafe_allow_html=True,
             )
@@ -1319,7 +1319,7 @@ with tab2:
                 st.markdown(_divider(), unsafe_allow_html=True)
                 st.markdown(
                     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
-                    'font-size:.8rem;letter-spacing:.1em;color:#71717a;margin:10px 0 6px">'
+                    'font-size:.8rem;letter-spacing:.1em;color:#94A3B8;margin:10px 0 6px">'
                     'LAST CLIP PREVIEW</div>',
                     unsafe_allow_html=True,
                 )
@@ -1375,13 +1375,13 @@ with tab2:
             st.markdown(_divider(), unsafe_allow_html=True)
             st.markdown(
                 '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
-                'font-size:.8rem;letter-spacing:.1em;color:#71717a;margin:10px 0 6px">'
+                'font-size:.8rem;letter-spacing:.1em;color:#94A3B8;margin:10px 0 6px">'
                 'TACTICAL SECTION EXPORT</div>',
                 unsafe_allow_html=True,
             )
             st.markdown(
                 '<div style="font-family:\'Inter\',sans-serif;font-size:.76rem;'
-                'color:#71717a;margin-bottom:12px;max-width:560px;line-height:1.6">'
+                'color:#94A3B8;margin-bottom:12px;max-width:560px;line-height:1.6">'
                 'Slice the full 90-minute file into 4 fixed analytical windows '
                 'for manager review — no event data needed. '
                 'Uses the kick-off offsets set above.</div>',
@@ -1391,10 +1391,10 @@ with tab2:
             # Section preview table
             st.markdown(
                 '<div style="display:grid;grid-template-columns:220px 90px 90px;gap:0;'
-                'background:#111116;border:1px solid rgba(255,255,255,0.06);'
+                'background:#1E293B;border:1px solid #334155;'
                 'border-radius:10px 10px 0 0;padding:7px 14px;'
                 'font-family:\'Barlow Condensed\',sans-serif;font-weight:700;'
-                'font-size:.72rem;letter-spacing:.09em;color:#71717a">'
+                'font-size:.72rem;letter-spacing:.09em;color:#94A3B8">'
                 '<span>SECTION</span><span>FROM</span><span>TO</span></div>',
                 unsafe_allow_html=True,
             )
@@ -1408,11 +1408,11 @@ with tab2:
                 _bg = "rgba(255,255,255,0.015)" if _si % 2 == 0 else "transparent"
                 st.markdown(
                     f'<div style="display:grid;grid-template-columns:220px 90px 90px;gap:0;'
-                    f'background:{_bg};border-left:1px solid rgba(255,255,255,0.06);'
-                    f'border-right:1px solid rgba(255,255,255,0.06);'
-                    f'border-bottom:1px solid rgba(255,255,255,0.04);'
+                    f'background:{_bg};border-left:1px solid #334155;'
+                    f'border-right:1px solid #334155;'
+                    f'border-bottom:1px solid #334155;'
                     f'padding:6px 14px;font-family:\'JetBrains Mono\',monospace;'
-                    f'font-size:.72rem;color:#ededf0">'
+                    f'font-size:.72rem;color:#F8FAFC">'
                     f'<span style="color:#f59e0b">{_slabel}</span>'
                     f'<span style="color:#86efac">{_sfrom}</span>'
                     f'<span style="color:#86efac">{_sto}</span>'
@@ -1420,7 +1420,7 @@ with tab2:
                     unsafe_allow_html=True,
                 )
             st.markdown(
-                '<div style="border:1px solid rgba(255,255,255,0.06);'
+                '<div style="border:1px solid #334155;'
                 'border-top:none;border-radius:0 0 10px 10px;height:4px"></div>',
                 unsafe_allow_html=True,
             )
@@ -1611,7 +1611,7 @@ with tab3:
 
     # ── Big pipeline CTA ──────────────────────────────────────────────────────
     st.markdown("""
-    <div style="background:linear-gradient(135deg,#111116 0%,#1a1610 100%);
+    <div style="background:linear-gradient(135deg,#1E293B 0%,#1a1610 100%);
                 border:1px solid rgba(245,158,11,.2);border-radius:14px;
                 padding:32px 36px;margin-bottom:24px;
                 animation: amberglow 4s ease-in-out infinite">
@@ -1619,7 +1619,7 @@ with tab3:
                   color:#f59e0b;letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px">
         Run Full Pipeline
       </div>
-      <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#71717a;max-width:520px">
+      <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#94A3B8;max-width:520px">
         Matches tagger tags against the club feed, produces the shot map and zone heatmaps,
         then runs all four agents — In Possession, Press &amp; LoE, Set Pieces, Non-League Physics.
         Review each section and sign off before the dossier is written to disk.
@@ -1641,7 +1641,7 @@ with tab3:
             elif active:
                 bg, txt = "rgba(245,158,11,.15)", "#f59e0b"
             else:
-                bg, txt = "rgba(255,255,255,0.04)", "#3f3f46"
+                bg, txt = "rgba(255,255,255,0.04)", "#64748B"
             return (f'<div style="display:flex;align-items:center;gap:8px">'
                     f'<span style="width:8px;height:8px;border-radius:50%;background:{txt}"></span>'
                     f'<span style="font-family:\'Inter\',sans-serif;font-size:.78rem;color:{txt}">{label}</span>'
@@ -1750,7 +1750,7 @@ with tab3:
                   </div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;
                               margin-bottom:18px">
-                    <div style="color:#a1a1aa;font-size:.78rem">
+                    <div style="color:#94A3B8;font-size:.78rem">
                       <span style="color:#fbbf24;font-weight:700">TIVVY</span><br>
                       Shots: <b style="color:#fff">{brief['t_shots']}</b>
                         ({brief['t_on_tgt']} on tgt)&nbsp;&nbsp;
@@ -1759,7 +1759,7 @@ with tab3:
                       Corners: ATT&nbsp;<b style="color:#fff">{brief['t_att_corn']}</b>
                         / DEF&nbsp;<b style="color:#fff">{brief['t_def_corn']}</b>
                     </div>
-                    <div style="color:#a1a1aa;font-size:.78rem">
+                    <div style="color:#94A3B8;font-size:.78rem">
                       <span style="color:#ef4444;font-weight:700">OPP</span><br>
                       Shots: <b style="color:#fff">{brief['o_shots']}</b>
                         ({brief['o_on_tgt']} on tgt)&nbsp;&nbsp;
@@ -1791,14 +1791,14 @@ with tab3:
             "Non-League Physics": ("#22c55e", "All 4 Moments — Physical Battle", "AERIAL_DUEL · SECOND_BALL · Quantitative Superiority · Direct Play"),
         }
         for agent_name, markdown_text in outputs.items():
-            color, moment, tags = AGENT_META.get(agent_name, ("#71717a", "", ""))
+            color, moment, tags = AGENT_META.get(agent_name, ("#94A3B8", "", ""))
             st.markdown(f"""
-            <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
+            <div style="background:#1E293B;border:1px solid #334155;
                         border-radius:12px;margin-bottom:14px;overflow:hidden">
               {_agent_card_header(agent_name, moment, color)}
               <div style="padding:6px 24px 4px">
                 <div style="font-family:'JetBrains Mono',monospace;font-size:.68rem;
-                            color:#3f3f46;letter-spacing:.06em">{tags}</div>
+                            color:#64748B;letter-spacing:.06em">{tags}</div>
               </div>
             """, unsafe_allow_html=True)
             with st.expander("View analysis", expanded=False):
@@ -1812,9 +1812,9 @@ with tab3:
 
     if not outputs:
         st.markdown("""
-        <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
+        <div style="background:#1E293B;border:1px solid #334155;
                     border-radius:12px;padding:40px;text-align:center">
-          <div style="font-family:'Inter',sans-serif;font-size:.82rem;color:#71717a">
+          <div style="font-family:'Inter',sans-serif;font-size:.82rem;color:#94A3B8">
             Run the pipeline above — the approval gate unlocks once all four agents have run.
           </div>
         </div>
@@ -1829,10 +1829,10 @@ with tab3:
           <div>
             <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.3rem;
                         letter-spacing:.04em;color:#22c55e">DOSSIER APPROVED</div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:.75rem;color:#71717a;
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.75rem;color:#94A3B8;
                         margin-top:4px">{path_str}</div>
           </div>
-          <div style="margin-left:auto;font-family:'Inter',sans-serif;font-size:.8rem;color:#71717a">
+          <div style="margin-left:auto;font-family:'Inter',sans-serif;font-size:.8rem;color:#94A3B8">
             Switch to the Deliverables tab to preview and download.
           </div>
         </div>
@@ -1842,7 +1842,7 @@ with tab3:
 
         with col_app:
             st.markdown("""
-            <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#71717a;
+            <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#94A3B8;
                         margin-bottom:12px">
               Happy with the analysis? Approve to write the dossier, package the HTML report,
               and generate the DoF match card ready for WhatsApp.
@@ -1878,7 +1878,7 @@ with tab3:
         with col_rej:
             rejection_count = st.session_state.get("rejection_count", 0)
             st.markdown(f"""
-            <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#71717a;
+            <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#94A3B8;
                         margin-bottom:12px">
               Not right? Add your note and all four agents re-run with it in context.
               Cycle {rejection_count} / 3.
@@ -1929,7 +1929,7 @@ with tab4:
     with col_dof:
         st.markdown("""
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.85rem;
-                    letter-spacing:.1em;text-transform:uppercase;color:#71717a;margin-bottom:12px">
+                    letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:12px">
           Director of Football Card
         </div>
         """, unsafe_allow_html=True)
@@ -1945,10 +1945,10 @@ with tab4:
                 )
         else:
             st.markdown("""
-            <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
+            <div style="background:#1E293B;border:1px solid #334155;
                         border-radius:12px;padding:48px;text-align:center">
               <div style="font-size:2rem;margin-bottom:12px">🖼</div>
-              <div style="font-family:'Inter',sans-serif;font-size:.78rem;color:#71717a">
+              <div style="font-family:'Inter',sans-serif;font-size:.78rem;color:#94A3B8">
                 Sign off the dossier in the Agent Cockpit tab — the card generates on approval.
               </div>
             </div>
@@ -1963,14 +1963,14 @@ with tab4:
                 st.markdown(f"""
                 <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;
                             font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;
-                            color:#71717a;margin:16px 0 8px">{label}</div>
+                            color:#94A3B8;margin:16px 0 8px">{label}</div>
                 """, unsafe_allow_html=True)
                 st.image(str(p), use_container_width=True)
 
     with col_doss:
         st.markdown("""
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.85rem;
-                    letter-spacing:.1em;text-transform:uppercase;color:#71717a;margin-bottom:12px">
+                    letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:12px">
           Tactical Dossier
         </div>
         """, unsafe_allow_html=True)
@@ -2000,13 +2000,13 @@ with tab4:
             )
         else:
             st.markdown("""
-            <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
+            <div style="background:#1E293B;border:1px solid #334155;
                         border-radius:12px;padding:48px;text-align:center">
               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.4rem;
-                          color:#3f3f46;letter-spacing:.04em;margin-bottom:12px">
+                          color:#64748B;letter-spacing:.04em;margin-bottom:12px">
                 NO DOSSIER YET
               </div>
-              <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#71717a;
+              <div style="font-family:'Inter',sans-serif;font-size:.8rem;color:#94A3B8;
                           max-width:320px;margin:0 auto;line-height:1.6">
                 Head to the Agent Cockpit tab, run the pipeline, read through each section,
                 and approve — the HTML report and DoF card land here.
@@ -2075,9 +2075,9 @@ with tab4:
             )
     elif not ledger_loaded:
         st.markdown("""
-        <div style="background:#111116;border:1px solid rgba(255,255,255,0.055);
+        <div style="background:#1E293B;border:1px solid #334155;
                     border-radius:12px;padding:24px;text-align:center">
-          <div style="font-family:'Inter',sans-serif;font-size:.78rem;color:#71717a">
+          <div style="font-family:'Inter',sans-serif;font-size:.78rem;color:#94A3B8">
             Load a match ledger in the Agent Cockpit tab, then click
             <strong>📐 Regenerate Set-Piece Matrix</strong>.
           </div>
@@ -2086,9 +2086,9 @@ with tab4:
 
     # ── Archive & Clear ───────────────────────────────────────────────────────
     st.markdown(_divider(), unsafe_allow_html=True)
-    st.markdown(_section_label("Archive & Clear Workspace", color="#71717a"), unsafe_allow_html=True)
+    st.markdown(_section_label("Archive & Clear Workspace", color="#94A3B8"), unsafe_allow_html=True)
     st.markdown(
-        '<div style="font-family:\'Inter\',sans-serif;font-size:.78rem;color:#71717a;'
+        '<div style="font-family:\'Inter\',sans-serif;font-size:.78rem;color:#94A3B8;'
         'margin-bottom:16px;max-width:600px;line-height:1.6">'
         'Once you have verified delivery — dossier sent, DoF card shared — archive this match '
         'and open a clean workspace for the next game. All files are moved to '
@@ -2115,15 +2115,15 @@ with tab4:
     ]
     _status_html = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'
     for _label, _present in _file_statuses:
-        _col  = "#22c55e" if _present else "#3f3f46"
+        _col  = "#22c55e" if _present else "#64748B"
         _dot  = "●" if _present else "○"
         _status_html += (
             f'<div style="display:flex;align-items:center;gap:6px;'
-            f'background:#111116;border:1px solid rgba(255,255,255,0.06);'
+            f'background:#1E293B;border:1px solid #334155;'
             f'border-radius:6px;padding:4px 10px;'
             f'font-family:\'JetBrains Mono\',monospace;font-size:.72rem">'
             f'<span style="color:{_col}">{_dot}</span>'
-            f'<span style="color:#a1a1aa">{_label}</span>'
+            f'<span style="color:#94A3B8">{_label}</span>'
             f'</div>'
         )
     _status_html += '</div>'
@@ -2131,9 +2131,9 @@ with tab4:
 
     if not _anything_to_archive:
         st.markdown(
-            '<div style="background:#111116;border:1px solid rgba(255,255,255,0.06);'
+            '<div style="background:#1E293B;border:1px solid #334155;'
             'border-radius:8px;padding:10px 16px;font-family:\'Inter\',sans-serif;'
-            'font-size:.78rem;color:#3f3f46">Workspace is already clear — nothing to archive.</div>',
+            'font-size:.78rem;color:#64748B">Workspace is already clear — nothing to archive.</div>',
             unsafe_allow_html=True,
         )
     else:
@@ -2187,7 +2187,7 @@ with tab4:
 with tab5:
     st.markdown(_section_label("Tactical Progress Review"), unsafe_allow_html=True)
     st.markdown(
-        '<div style="font-family:\'Inter\',sans-serif;font-size:.8rem;color:#71717a;'
+        '<div style="font-family:\'Inter\',sans-serif;font-size:.8rem;color:#94A3B8;'
         'margin-bottom:20px;max-width:680px">Aggregate multiple match ledgers into '
         'a rolling window report. Tracks the 4 Moments across 4–8 games to separate '
         'tactical habits from single-match noise.</div>',
@@ -2242,7 +2242,7 @@ with tab5:
                 f'font-family:\'JetBrains Mono\',monospace;font-size:.75rem">'
                 f'<span style="color:#22c55e">●</span>'
                 f'<span style="color:#86efac">{len(paths)} ledger file{"s" if len(paths) != 1 else ""} found</span>'
-                f'<span style="color:#3f3f46;margin-left:6px">'
+                f'<span style="color:#64748B;margin-left:6px">'
                 + "  ·  ".join(p.stem for p in paths) +
                 f'</span></div>',
                 unsafe_allow_html=True,
@@ -2356,7 +2356,7 @@ with tab5:
                 )
                 table_rows += f"""
                 <tr>
-                  <td style="color:#71717a">{r['match_date']}</td>
+                  <td style="color:#94A3B8">{r['match_date']}</td>
                   <td>{r['opponent']}</td>
                   <td style="color:{result_color};font-weight:700">{r['result']}</td>
                   <td>{r['tiv_goals']}–{r['opp_goals']}</td>
@@ -2373,26 +2373,26 @@ with tab5:
             <table style="width:100%;border-collapse:collapse;
                           font-family:'JetBrains Mono',monospace;font-size:.75rem">
               <thead>
-                <tr style="border-bottom:1px solid rgba(255,255,255,0.08)">
-                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                <tr style="border-bottom:1px solid #334155">
+                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">Date</th>
-                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">Opponent</th>
-                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">Result</th>
-                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">Score</th>
-                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">LoE Idx</th>
-                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">CP%</th>
-                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">½-Space%</th>
-                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">Aerial WR(D)</th>
-                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">2nd Ball%</th>
-                  <th style="padding:7px 10px;color:#71717a;text-align:left;text-transform:uppercase;
+                  <th style="padding:7px 10px;color:#94A3B8;text-align:left;text-transform:uppercase;
                              font-size:.62rem;letter-spacing:.08em">RD</th>
                 </tr>
               </thead>

@@ -47,17 +47,17 @@ if str(ROOT) not in sys.path:
 PLOTS_DIR = ROOT / "data" / "processed" / "plots"
 
 # ── Colour palette (mirrors visualizer.py) ─────────────────────────────────
-OLED_BG  = "#09090b"
-SURFACE  = "#18181b"
-LINE     = "#3f3f46"
+OLED_BG  = "#0F172A"
+SURFACE  = "#1E293B"
+LINE     = "#475569"
 GOLD     = "#f59e0b"
 CRIMSON  = "#f43f5e"
-ZINC     = "#71717a"
+ZINC     = "#94A3B8"
 EMERALD  = "#10b981"
 PURPLE   = "#a855f7"
 CYAN     = "#22d3ee"
-TEXT     = "#e4e4e7"
-TEXT_DIM = "#52525b"
+TEXT     = "#F8FAFC"
+TEXT_DIM = "#64748B"
 
 # ── Pitch constants (105 × 68 m FIFA) ──────────────────────────────────────
 # 18-yard box (attacking end, x > 88.5)
@@ -91,7 +91,7 @@ _ZONE_FILL: dict[str, str] = {
     "Penalty Spot / 12-Yd": "#f43f5e",  # crimson
     "Back Post":            "#22d3ee",  # cyan
     "Edge / Cutback":       "#10b981",  # emerald
-    "Second Ball":          "#71717a",  # zinc
+    "Second Ball":          "#94A3B8",  # zinc
 }
 _ZONE_ALPHA = 0.10
 
