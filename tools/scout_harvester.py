@@ -14,7 +14,9 @@ Sources (--source DIR, else data/scouting/sources/<slug>/ if it exists):
     *.txt / *.md   narrative match reports
     *.json         {"type": "lineup", "players": [{"shirt": 8, "name": "...", "position": "CM"}]}
                    {"type": "event_summary", "events": [{"minute": 12, "description": "..."}]}
-No sources found → built-in MOCK corpus (flagged data_provenance="mock").
+Any other file type in the source folder (e.g. .docx, .pdf) → exit 2; convert it to .md/.txt first.
+No source folder and no --mock → exit 2. Only --mock uses the built-in MOCK corpus (data_provenance="mock").
+A dossier with zero tactical evidence fails validation (exit 1) — it is never written as a PASS.
 
 Orchestration follows Ruflo concepts (role-scoped agents, declarative task graph,
 shared memory namespace) implemented in stdlib Python — no Ruflo runtime, network
@@ -26,8 +28,8 @@ or API keys. Deliberately NOT imported by app.py or tagger/index.html.
 
 Exit codes:
     0  — dossier written (validation PASS)
-    1  — validation FAIL (nothing written)
-    2  — input error (bad --source, unreadable JSON)
+    1  — validation FAIL, including zero tactical evidence (nothing written)
+    2  — input error (bad or missing --source, unsupported source file, unreadable JSON)
 """
 
 import argparse
@@ -251,6 +253,12 @@ def _mock_documents(opponent: str) -> list[dict]:
 
 
 def load_source_dir(src: Path) -> list[dict]:
+    unsupported = sorted(p.name for p in src.iterdir()
+                         if p.is_file() and not p.name.startswith(".")
+                         and p.suffix.lower() not in (".txt", ".md", ".json"))
+    if unsupported:
+        raise ValueError(f"unsupported source file(s) in {src}: {', '.join(unsupported)} — convert to .md/.txt "
+                         "(their text is not read, and skipping them silently would drop intel)")
     docs = []
     for p in sorted(src.iterdir(), key=lambda p: p.name):
         suffix = p.suffix.lower()
@@ -492,6 +500,10 @@ def agent_gamma(memory: dict) -> dict:
     body, errors, warnings = validate_dossier(memory["draft"], {d["id"] for d in corpus["documents"]})
     if not req["opponent"].strip() or req["slug"] != slugify(req["opponent"]):
         errors.insert(0, f"opponent/slug mismatch: {req['opponent']!r} vs {req['slug']!r}")
+    evidence = sum(item["evidence_count"] for fields in body.values() for item in fields.values())
+    if not errors and evidence == 0:
+        errors.append(f"no tactical evidence extracted from {len(corpus['documents'])} source document(s) — "
+                      "nothing to brief; rewrite the notes in explicit tactical terms or brief manually")
     if corpus["provenance"] == "mock":
         warnings.insert(0, "MOCK corpus — illustrative only, not real opposition intel")
     return {
@@ -618,7 +630,10 @@ def main(argv=None) -> int:
         source_dir = args.source
     elif not args.mock:
         default = ROOT / "data" / "scouting" / "sources" / slug
-        source_dir = default if default.is_dir() else None
+        if not default.is_dir():
+            print(_c(RED, f"✗ no sources: {default} does not exist — pass --source DIR, or --mock for the demo corpus"))
+            return 2
+        source_dir = default
 
     try:
         memory = run_pipeline({"opponent": opponent, "slug": slug,

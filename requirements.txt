@@ -2,3 +2,4 @@ pandas
 mplsoccer
 opencv-python        # cv/calibration.py, cv/picker.py — Tier 1 homography (CPU only)
 streamlit            # app.py — desktop dashboard (local only, no cloud)
+python-docx          # data/parse_report.py — club .docx match reports

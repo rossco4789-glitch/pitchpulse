@@ -177,6 +177,56 @@ def test_bad_source_json_exits_2_and_writes_nothing(tmp_path):
     assert not (tmp_path / "out").exists()
 
 
+# ── Fail-loud regressions (scratchpad audit, 14 Sep 2026) ─────────────────────
+# Before: realistic coach shorthand and irrelevant notes passed with 0/10 fields, a .docx beside a
+# .md was skipped silently, and a missing source folder fell back to the MOCK corpus with exit 0.
+
+COACH_SHORTHAND = (
+    "Watched them v Hungerford Saturday. Keeper kicks it long nearly every time, big lad up top (9) wins most of it.\n"
+    "Rarely play out short. Their 6 just sits in front of the back four. Left back bombs on, get Slough in behind him.\n"
+    "When they lose it they don't really chase, drop off into shape quick. 4-4-2, fairly deep.\n"
+    "Corners whipped to the back stick, big CB attacks it. They mark man for man on ours.\n"
+)
+IRRELEVANT_NOTES = "Travel 2h 10m. Pitch is 3G. Kick off 19:45. Weather looked poor.\n"
+
+
+def _src(tmp_path, files: dict):
+    src = tmp_path / "src"
+    src.mkdir()
+    for name, text in files.items():
+        (src / name).write_text(text, encoding="utf-8")
+    return src
+
+
+@pytest.mark.parametrize("text", [COACH_SHORTHAND, IRRELEVANT_NOTES], ids=["coach_shorthand", "irrelevant"])
+def test_zero_evidence_fails_validation_and_writes_nothing(tmp_path, capsys, text):
+    src = _src(tmp_path, {"notes.md": text})
+    assert sh.main(["--opponent", "Test FC", "--output", str(tmp_path / "out"), "--source", str(src)]) == 1
+    assert not (tmp_path / "out").exists()
+    assert "no tactical evidence" in capsys.readouterr().out
+
+
+def test_unsupported_file_beside_markdown_exits_2(tmp_path, capsys):
+    src = _src(tmp_path, {"one_line.md": "They press high from goal kicks.\n"})
+    (src / "coach_report.docx").write_bytes(b"PK\x03\x04 placeholder")
+    assert sh.main(["--opponent", "Test FC", "--output", str(tmp_path / "out"), "--source", str(src)]) == 2
+    assert not (tmp_path / "out").exists()
+    assert "coach_report.docx" in capsys.readouterr().out
+
+
+def test_missing_default_sources_without_mock_exits_2(tmp_path, capsys):
+    opponent = "No Such Opponent FC"
+    assert not (ROOT / "data" / "scouting" / "sources" / sh.slugify(opponent)).exists()
+    assert sh.main(["--opponent", opponent, "--output", str(tmp_path / "out")]) == 2
+    assert not (tmp_path / "out").exists()
+    assert "--mock" in capsys.readouterr().out
+
+
+def test_hidden_files_do_not_block_valid_sources(tmp_path):
+    src = _src(tmp_path, {"report.txt": "They defended in a low block.\n", ".DS_Store": "x"})
+    assert sh.main(["--opponent", "Test FC", "--output", str(tmp_path / "out"), "--source", str(src)]) == 0
+
+
 # ── Decoupling boundary ───────────────────────────────────────────────────────
 
 def test_harvester_not_coupled_to_app_or_tagger():

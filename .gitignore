@@ -27,6 +27,9 @@ reports/dossier_*.md
 # Ignore generated dossiers, track raw inputs
 data/scouting/*_dossier.json
 !data/scouting/sources/
+# Scout fetcher: raw page cache and evidence JSON hold third-party text — keep local
+data/scouting/cache/
+data/scouting/evidence/
 
 # Sample data & ledger (committed for demo; swap for real data)
 # data/samples/2026-09-05_st_blazey/  ← keep tracked (moved out of data/raw so

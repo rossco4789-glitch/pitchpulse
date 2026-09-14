@@ -19,6 +19,7 @@ PitchPulse/
 │   ├── tagger_sanity.py       # ✅ COMPLETE — Post-session ledger validator CLI; 7 checks; ANSI colour report; exit 0/1; --test self-test suite (11 tests)
 │   ├── scout_harvester.py     # ✅ COMPLETE — Offline Opposition Intelligence Harvester; Alpha/Beta/Gamma task graph → data/scouting/{slug}_dossier.json
 │   ├── evals.py               # ✅ COMPLETE — Self-improving eval ledger (stdlib); record/gate/replay/digest → data/evals/
+│   ├── scout_fetcher.py       # ✅ COMPLETE — Public match-evidence fetcher (stdlib urllib/html.parser); league table, team sheets, events, club articles → data/scouting/evidence/
 │   └── tests/
 │       └── test_scout_harvester.py # ✅ COMPLETE — Dossier schema integrity + CLI smoke suite (pytest, offline)
 ├── reconcile/
@@ -433,6 +434,26 @@ Structured template for a 3-bullet halftime tactical diagnosis (4 Moments framew
 
 ## Tools & Scripts
 
+### `tools/scout_fetcher.py`
+Pre-match public evidence fetcher. Stdlib only (`urllib.request`, `urllib.robotparser`, `html.parser`). Run off-pitch before a scouting brief; never on matchday.
+
+```bash
+python tools/scout_fetcher.py --opponent "Dorchester Town" --club-site https://www.dorchestertownfc.co.uk --players "Corby Moore,Ollie Haste,Will Spetch" --last 3
+python tools/scout_fetcher.py --opponent "Dorchester Town" --offline   # cached pages only
+python -m pytest tools/tests/test_scout_fetcher.py -v
+```
+
+| Source | Extracted |
+|---|---|
+| footballwebpages.co.uk league table | Division, season, last-updated stamp, full standings |
+| footballwebpages.co.uk fixtures/results | Date, venue, competition, team-first score, match URL; league record re-derived from results and checked against the table |
+| footballwebpages.co.uk match pages | Starting XI (first 11 team-sheet entries), bench, goals, cards, substitutions → per-player `started / sub_on / unused_sub / not_in_squad` |
+| Club site `/players/<slug>` and `/news/reaction-*` | Profile position and bio; sentences with tactical keywords from post-match reaction articles |
+
+**Contract:** identified User-Agent, `robots.txt` respected (host skipped if unreachable), 1 request/second, 15 s timeout. HTTP/network/timeout/parse failures never raise: each becomes a warning and the page falls back to `data/scouting/cache/`, else the section stays empty. Formation, in-match positions, corner takers and aerial duel counts are not published by these sources and are recorded under `not_published` — the tool never infers them. Cache and evidence JSON are gitignored (third-party text); briefs paraphrase and cite.
+
+ELI5: It reads the public team sheets and interviews so the brief says what actually happened, not what we guessed.
+
 ### `tools/evals.py`
 Self-improving evaluation loop. Stdlib only (`hashlib`, `json`, `pathlib`, `sys`, `time`), fully offline.
 
@@ -464,7 +485,7 @@ python tools/scout_harvester.py --opponent "Dorchester Town" --mock             
 python -m pytest tools/tests/test_scout_harvester.py -v
 ```
 
-**Sources** (`--source DIR`, else `data/scouting/sources/<slug>/` if present, else built-in MOCK corpus): `*.txt`/`*.md` match reports; `*.json` with `"type": "lineup"` (`players[]`: shirt/name/position) or `"type": "event_summary"` (`events[]`: minute/description).
+**Sources** (`--source DIR`, else `data/scouting/sources/<slug>/` if present; otherwise exit `2`. The MOCK corpus is used only with explicit `--mock`. Any other file type in the folder, such as `.docx` or `.pdf`, exits `2`): `*.txt`/`*.md` match reports; `*.json` with `"type": "lineup"` (`players[]`: shirt/name/position) or `"type": "event_summary"` (`events[]`: minute/description).
 
 **Ruflo-style task graph** (declarative `TASK_GRAPH`, shared memory, dependency-ordered):
 
@@ -484,7 +505,7 @@ python -m pytest tools/tests/test_scout_harvester.py -v
 | `transition_defensive` | `counter_press_intensity` (high/medium/low), `rest_defence_shape` (2+1/3+1/2+2/3+2) |
 | `set_pieces` | `corner_delivery_zones` (the 6 zones from `reports/set_piece_matrix.py`), `defensive_marking` (zonal/man_to_man/hybrid) |
 
-Confidence = winning share × min(1, evidence/3). Output is byte-deterministic for identical inputs (no timestamps). Exit `0` PASS + written · `1` validation FAIL, nothing written · `2` input error. Mock output is flagged `data_provenance: "mock"` and must not be briefed as real intel.
+Confidence = winning share × min(1, evidence/3). Output is byte-deterministic for identical inputs (no timestamps). Exit `0` PASS + written · `1` validation FAIL, including a dossier with zero tactical evidence, nothing written · `2` input error (missing sources, unsupported file, bad JSON). Mock output is flagged `data_provenance: "mock"` and must not be briefed as real intel.
 
 ---
 
