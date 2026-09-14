@@ -448,6 +448,33 @@ Confidence = winning share × min(1, evidence/3). Output is byte-deterministic f
 
 ---
 
+## Agent Behavioral Governance & Writing Standards
+
+Two layers govern how Claude writes code and coach-facing text in this repo.
+
+| Layer | Lives in | Loaded | Governs |
+|---|---|---|---|
+| Karpathy engineering guardrails | `CLAUDE.md` §6 | Every session (always in context) | All code changes |
+| `avoid-ai-writing` prose auditor | `.claude/skills/avoid-ai-writing/SKILL.md` | On demand, when writing coach-facing text | Briefings, dossiers, Tab 4, scouting output |
+
+### Karpathy engineering guardrails (`CLAUDE.md` §6)
+- **Think Before Coding** — state assumptions; inspect target files before editing.
+- **Simplicity First** — minimum code that solves the task; no speculative abstraction.
+- **Surgical Changes** — touch only required lines; never reformat untouched blocks.
+- **Goal-Driven & Test-First** — define the passing check up front; run it before declaring done.
+
+### `avoid-ai-writing` prose auditor
+Applies to `agents/synthesis.py`, `app.py` Tab 4 Deliverables Hub, `reports/packager.py`, `reports/dof_card.py`, `analysis/report_prompt.md`, and `tools/scout_harvester.py`.
+
+- **Hard bans:** AI filler (delve, testament to, tapestry, spearhead, in conclusion, it's worth noting, crucial, robust…), sycophancy (Certainly!, I'd be happy to…), and structural tics ("not just X but Y", reflexive triplets, recap closers).
+- **Required style:** diagnosis first, active voice with a named actor, numeric evidence, and a closing tactical lever.
+- **Preserved:** the formal UEFA vocabulary mandated by `CLAUDE.md` §2 is precise jargon, not filler.
+- **Check:** grep the changed generator for banned terms; zero matches passes (command in the skill file).
+
+`.gitignore` ignores `.claude/*` but re-includes `.claude/skills/`, so skills are version-controlled while local Claude Code state (`launch.json`) stays untracked.
+
+---
+
 ## Impeccable Design System & Visual Governance
 
 Applies to `tagger/index.html`, `app.py`, and every generated deliverable (dossier HTML, DoF card). New or edited UI code must use these tokens; no one-off values.

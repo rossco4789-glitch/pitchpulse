@@ -6,8 +6,9 @@ __pycache__/
 *.py[cod]
 *.pyo
 
-# Claude Code internals
-.claude/
+# Claude Code internals (project skills are tracked governance)
+.claude/*
+!.claude/skills/
 
 # Large binary / generated outputs (do not commit)
 data/clips/

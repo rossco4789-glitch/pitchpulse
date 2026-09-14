@@ -60,4 +60,19 @@ Format: `ELI5: <one sentence>`
 
 ---
 
+## 6. ENGINEERING GUARDRAILS (KARPATHY PRINCIPLES)
+
+- **Think Before Coding:** State assumptions and verify file structure before modifying code. If a requirement is ambiguous, ask rather than guess.
+- **Simplicity First:** Write the minimum code that solves the task. No speculative features, premature abstraction, or configurability nobody asked for.
+- **Surgical Changes:** Touch only the lines the feature requires. Do not reformat, rename, or "improve" untouched blocks; match existing style.
+- **Goal-Driven & Test-First:** Define the passing check before implementing, run it after, and never declare completion without a green result.
+
+---
+
+## 7. WRITING STANDARDS
+
+All coach-facing prose (match briefings, dossiers, Tab 4 Deliverables Hub, scouting reports) must follow `.claude/skills/avoid-ai-writing/SKILL.md`: no AI filler or sycophancy, active voice, numeric evidence, and a closing tactical lever.
+
+---
+
 *These standards are non-negotiable and apply to every task in this project.*
