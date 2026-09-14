@@ -523,6 +523,43 @@ def test_homography_rejects_singular_matrix(monkeypatch, result):
     assert worker.fit_homography(_image_points(BOX_WORLD), BOX_WORLD, np.ones(8)) == (None, "drop_singular_matrix")
 
 
+VIRTUAL_BOX_POINTS = (11, 12, 19, 20)
+
+
+def test_mask_landmarks_zeroes_only_excluded_numbers():
+    conf = np.linspace(0.6, 0.95, 32)
+    masked = worker.mask_landmarks(conf, VIRTUAL_BOX_POINTS)
+    zero_idx = [n - 1 for n in VIRTUAL_BOX_POINTS]
+    assert np.all(masked[zero_idx] == 0.0)
+    assert np.allclose(np.delete(masked, zero_idx), np.delete(conf, zero_idx))
+    assert conf[10] > 0  # caller's array is not mutated
+    assert np.array_equal(worker.mask_landmarks(conf, ()), conf)
+
+
+def test_load_pitch_config_reads_and_validates_exclusions(tmp_path):
+    path = tmp_path / "pitch_config.json"
+    path.write_text(json.dumps({"landmarks_m": [[1.0, 1.0]] * 32, "exclude_landmarks": list(VIRTUAL_BOX_POINTS)}), encoding="utf-8")
+    world, exclude = worker.load_pitch_config(path)
+    assert world.shape == (32, 2) and exclude == VIRTUAL_BOX_POINTS
+    path.write_text(json.dumps({"landmarks_m": [[1.0, 1.0]] * 32}), encoding="utf-8")
+    assert worker.load_pitch_config(path)[1] == ()
+    path.write_text(json.dumps({"landmarks_m": [[1.0, 1.0]] * 32, "exclude_landmarks": [0, 33]}), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"\[0, 33\] outside 1..32"):
+        worker.load_pitch_config(path)
+
+
+def test_excluded_landmarks_are_omitted_from_the_homography_fit():
+    world = np.vstack([BOX_WORLD, [[94.0, 34.0], [99.5, 34.0], [90.0, 30.0]]])
+    image = _image_points(world)
+    labels = world.copy()
+    labels[8:] += 5.0  # landmarks 9-11 annotated 5 m from where the model places them, like #11 on the benchmark
+    conf = np.ones(11)
+    assert worker.fit_homography(image, labels, conf) == (None, "drop_insufficient_inliers")  # 8/11 = 73 %
+    H, reason = worker.fit_homography(image, labels, worker.mask_landmarks(conf, (9, 10, 11)))
+    assert reason is None
+    assert np.abs(worker.project(H, image[:8]) - BOX_WORLD).max() < 0.05
+
+
 def test_every_rejection_reason_is_a_schema_drop_rule():
     import inspect
     reasons = set(re.findall(r'return None, "(\w+)"', inspect.getsource(worker.fit_homography)))

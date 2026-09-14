@@ -9,7 +9,8 @@ Inputs (/kaggle/input/**):
     manifest.json, payload.*            footage dataset written by the runner
     players.pt                          YOLO detector with classes including "player" and "goalkeeper"
     pitch.pt                            YOLO pose model, one keypoint per pitch landmark
-    pitch_config.json                   {"landmarks_m": [[x, y], ...]} in the 105×68 m frame, index-aligned with pitch.pt
+    pitch_config.json                   {"landmarks_m": [[x, y], ...]} in the 105×68 m frame, index-aligned with pitch.pt,
+                                        optional "exclude_landmarks": [1-based numbers] whose confidence is zeroed
 
 Outputs (/kaggle/working):
     vision_metrics.json                 4-moments metrics (see tools/cloud_vision_runner.py MOMENTS)
@@ -108,6 +109,31 @@ def fit_homography(image_xy, world_xy, conf) -> tuple[np.ndarray | None, str | N
     if rmse > MAX_RMSE_M:
         return None, "drop_reprojection_error_high"
     return H, None
+
+
+def load_pitch_config(path: Path) -> tuple[np.ndarray, tuple[int, ...]]:
+    """Landmark world coordinates and the validated 1-based landmark numbers to exclude."""
+    cfg = json.loads(path.read_text(encoding="utf-8"))
+    world = np.asarray(cfg["landmarks_m"], float)
+    if world.ndim != 2 or world.shape[1] != 2 or not ((world >= 0) & (world <= [PITCH_L, PITCH_W])).all():
+        raise ValueError("pitch_config.json landmarks_m must be [[x, y], ...] inside 105×68 m")
+    exclude = tuple(int(n) for n in cfg.get("exclude_landmarks", []))
+    bad = [n for n in exclude if not 1 <= n <= len(world)]
+    if bad:
+        raise ValueError(f"pitch_config.json exclude_landmarks {bad} outside 1..{len(world)}")
+    return world, exclude
+
+
+def mask_landmarks(conf, exclude) -> np.ndarray:
+    """Zero the confidence of excluded landmarks (1-based) so no count, hull, fit or residual uses them.
+
+    The benchmark diagnostic (14 Sep 2026) found landmark 11 — penalty line at goal-box width, no painted
+    intersection — outside RANSAC consensus in 44/44 detections; 12, 19 and 20 are its mirror points.
+    """
+    out = np.array(conf, dtype=float, copy=True)
+    if exclude:
+        out[[n - 1 for n in exclude]] = 0.0
+    return out
 
 
 def gpu_compatibility_error(name: str, capability: tuple[int, int], arch_list: list[str]) -> str | None:
@@ -325,12 +351,12 @@ def chunked(iterable, size: int):
         yield buf
 
 
-def frame_players(frame, pitch_result, player_result, world_xy, names) -> tuple[str | None, list[dict]]:
+def frame_players(frame, pitch_result, player_result, world_xy, names, exclude=()) -> tuple[str | None, list[dict]]:
     kp = pitch_result.keypoints
     if kp is None or kp.conf is None or len(kp) == 0:
         return "no_pitch_detection", []
     best = int(pitch_result.boxes.conf.argmax()) if pitch_result.boxes is not None and len(pitch_result.boxes) else 0
-    xy, conf = kp.xy[best].cpu().numpy(), kp.conf[best].cpu().numpy()
+    xy, conf = kp.xy[best].cpu().numpy(), mask_landmarks(kp.conf[best].cpu().numpy(), exclude)
     H, reason = fit_homography(xy, world_xy, conf)
     if reason:
         return reason, []
@@ -357,7 +383,7 @@ def _predict(batch, pitch_model, player_model):
                 list(player_model.predict(images, imgsz=IMGSZ, conf=0.3, half=True, verbose=False)))
 
 
-def process_chunk(chunk, pitch_model, player_model, world_xy, stats, rows) -> None:
+def process_chunk(chunk, pitch_model, player_model, world_xy, stats, rows, exclude=()) -> None:
     import torch
     try:
         for i in range(0, len(chunk), BATCH):
@@ -373,7 +399,7 @@ def process_chunk(chunk, pitch_model, player_model, world_xy, stats, rows) -> No
                     player_res += d
             for (t, frame), pr, dr in zip(batch, pitch_res, player_res):
                 stats["sampled"] += 1
-                reason, players = frame_players(frame, pr, dr, world_xy, player_model.names)
+                reason, players = frame_players(frame, pr, dr, world_xy, player_model.names, exclude)
                 if reason:
                     stats["dropped"][reason] += 1
                     continue
@@ -416,9 +442,7 @@ def run(input_dir: Path = INPUT, output_dir: Path = OUTPUT) -> None:
     if digest != manifest["payload_sha256"]:
         raise ValueError("payload SHA-256 does not match manifest; dataset upload was corrupted")
 
-    world = np.asarray(json.loads(_find(input_dir, "pitch_config.json").read_text(encoding="utf-8"))["landmarks_m"], float)
-    if world.ndim != 2 or world.shape[1] != 2 or not ((world >= 0) & (world <= [PITCH_L, PITCH_W])).all():
-        raise ValueError("pitch_config.json landmarks_m must be [[x, y], ...] inside 105×68 m")
+    world, exclude = load_pitch_config(_find(input_dir, "pitch_config.json"))
 
     import torch
     if not torch.cuda.is_available():
@@ -442,7 +466,7 @@ def run(input_dir: Path = INPUT, output_dir: Path = OUTPUT) -> None:
     stats = {"sampled": 0, "accepted": 0, "dropped": {r: 0 for r in DROP_RULES}}
     rows: list[dict] = []
     for k, chunk in enumerate(chunked(sampled_frames(payload), CHUNK)):
-        process_chunk(chunk, pitch_model, player_model, world, stats, rows)
+        process_chunk(chunk, pitch_model, player_model, world, stats, rows, exclude)
         print(f"chunk {k}: sampled {stats['sampled']} accepted {stats['accepted']} dropped {stats['dropped']}", flush=True)
 
     moments, team_split = compute_metrics(rows, manifest["footage"], manifest.get("opponent_kit"))
@@ -454,7 +478,8 @@ def run(input_dir: Path = INPUT, output_dir: Path = OUTPUT) -> None:
         "rules": {"sample_fps": SAMPLE_FPS, "kp_conf": KP_CONF, "min_landmarks": MIN_LANDMARKS,
                   "min_hull_m2": MIN_HULL_M2, "max_rmse_m": MAX_RMSE_M, "ransac_threshold_m": RANSAC_THRESHOLD_M,
                   "min_inlier_ratio": MIN_INLIER_RATIO,
-                  "max_cond": MAX_COND, "min_samples": MIN_SAMPLES, "silhouette_min": SILHOUETTE_MIN},
+                  "max_cond": MAX_COND, "min_samples": MIN_SAMPLES, "silhouette_min": SILHOUETTE_MIN,
+                  "exclude_landmarks": list(exclude)},
     }, output_dir)
 
 
