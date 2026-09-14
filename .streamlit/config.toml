@@ -1,10 +1,10 @@
 [theme]
 base                     = "dark"
-primaryColor             = "#f59e0b"   # Tivvy Amber
-backgroundColor          = "#09090b"   # OLED black
-secondaryBackgroundColor = "#18181b"   # near-black surface
-textColor                = "#f8fafc"   # off-white
-font                     = "monospace"
+primaryColor             = "#F59E0B"   # Tivvy Gold (primary)
+backgroundColor          = "#090D16"   # Obsidian ground
+secondaryBackgroundColor = "#0F172A"   # True Slate panels / sidebar
+textColor                = "#F8FAFC"   # off-white
+font                     = "sans serif"
 
 [server]
 headless         = true

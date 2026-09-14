@@ -60,6 +60,7 @@ CLIPS_DIR        = ROOT / "data" / "clips"
 VEO_RAW_DIR      = RAW_DIR / "veo"
 
 SP_MATRIX_PATH = PLOTS_DIR / "set_piece_matrix.png"
+FIXTURE_PATH   = ROOT / "data" / "fixture.json"   # next fixture — edit weekly
 
 for _d in (RAW_DIR, STAGED_DIR, PROC_DIR, PLOTS_DIR, REPORTS_DIR, CLIPS_DIR, VEO_RAW_DIR):
     _d.mkdir(parents=True, exist_ok=True)
@@ -77,14 +78,11 @@ st.set_page_config(
 # ══════════════════════════════════════════════════════════════════════════════
 
 st.markdown("""
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;900&family=Inter:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-
 <style>
+/* Offline by design: no web-font requests — local font stacks below */
 /* ── ERASE STREAMLIT CHROME ─────────────────────────────────────────────── */
-#MainMenu, footer, header, [data-testid="stToolbar"],
-.stDeployButton, [data-testid="stDecoration"] { visibility: hidden !important; }
+#MainMenu, footer, header, [data-testid="stToolbar"], [data-testid="stMainMenu"],
+.stDeployButton, [data-testid="stAppDeployButton"], [data-testid="stDecoration"] { visibility: hidden !important; }
 [data-testid="stHeader"] { display: none !important; }
 
 /* ── TOKENS ────────────────────────────────────────────────────────────────── */
@@ -105,9 +103,14 @@ st.markdown("""
   --text:       #F8FAFC;
   --text-2:     #A8B5C7;
   --text-3:     #8494A9;
-  --mono:       'JetBrains Mono', 'Fira Code', monospace;
-  --sans:       'Inter', system-ui, sans-serif;
-  --display:    'Barlow Condensed', Impact, sans-serif;
+  --mono:       'JetBrains Mono', 'Cascadia Mono', Consolas, 'Fira Code', monospace;
+  --sans:       'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  --display:    'Barlow Condensed', 'Arial Narrow', 'Segoe UI', sans-serif;
+  /* Command-centre skin */
+  --obsidian:   #090D16;
+  --hairline:   #1E293B;
+  --cyan:       #06B6D4;
+  --cyan-dim:   rgba(6,182,212,0.12);
   /* Impeccable Design System (PROJECT_INDEX.md) */
   --slate:      #0F172A;
   --pitch:      #1E293B;
@@ -116,12 +119,13 @@ st.markdown("""
   --emerald:    #10B981;
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px; --sp-8: 32px; --sp-12: 48px;
 }
-.stApp { font-variant-numeric: tabular-nums; }
+.stApp { font-variant-numeric: tabular-nums; font-family: var(--sans);
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
 
 /* ── GROUND ────────────────────────────────────────────────────────────────── */
 .stApp,
 [data-testid="stAppViewContainer"],
-[data-testid="stAppViewBlockContainer"] { background: var(--bg) !important; }
+[data-testid="stAppViewBlockContainer"] { background: var(--obsidian) !important; }
 .block-container { padding-top: 1.5rem !important; max-width: 1400px !important; }
 
 /* ── SIDEBAR ─────────────────────────────────────────────────────────────── */
@@ -134,30 +138,36 @@ st.markdown("""
 [data-testid="stSidebar"] label { color: var(--text-2) !important; font-size: .75rem !important; }
 
 /* ── TABS ────────────────────────────────────────────────────────────────── */
-.stTabs [data-baseweb="tab-list"] {
-  background: var(--surface) !important;
-  border-radius: 10px !important;
+/* Streamlit 1.61: tabs are div[data-testid="stTab"] inside div[role="tablist"] (no data-baseweb) */
+.stTabs [role="tablist"] {
+  background: var(--slate) !important;
+  border-radius: 999px !important;
   padding: 4px !important;
-  gap: 2px !important;
-  border: 1px solid var(--border) !important;
-  margin-bottom: 0 !important;
+  gap: 4px !important;
+  border: 1px solid var(--hairline) !important;
+  margin-bottom: 8px !important;
 }
-.stTabs [data-baseweb="tab"] {
+.stTabs [data-testid="stTab"] {
   background: transparent !important;
   color: var(--text-2) !important;
-  border-radius: 7px !important;
-  padding: 8px 22px !important;
+  border-radius: 999px !important;
+  padding: 8px 20px !important;
   font-family: var(--sans) !important;
   font-weight: 600 !important;
   font-size: .82rem !important;
   letter-spacing: .025em !important;
-  border: none !important;
+  border: 1px solid transparent !important;
+  border-bottom: 2px solid transparent !important;
   outline: none !important;
-  transition: color .2s !important;
+  transition: color .2s, border-color .2s, box-shadow .2s !important;
 }
+.stTabs [data-testid="stTab"]:hover { color: var(--text) !important; }
 .stTabs [aria-selected="true"] {
-  background: var(--amber-dim) !important;
-  color: var(--amber) !important;
+  background: var(--cyan-dim) !important;
+  color: var(--text) !important;
+  border-color: rgba(6,182,212,.35) !important;
+  border-bottom: 2px solid var(--cyan) !important;
+  box-shadow: 0 6px 18px -8px rgba(6,182,212,.55) !important;
 }
 .stTabs [data-baseweb="tab-border"],
 .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
@@ -254,8 +264,10 @@ st.markdown("""
   border-radius: 8px !important; color: #93c5fd !important; }
 
 /* ── EXPANDERS ───────────────────────────────────────────────────────────── */
-.stExpander { border: 1px solid var(--border) !important; border-radius: 10px !important;
-  background: var(--surface) !important; }
+.stExpander { border: 1px solid var(--hairline) !important; border-radius: 8px !important;
+  background: var(--slate) !important; }
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > [data-testid="stVerticalBlock"]) {
+  border-color: var(--hairline) !important; border-radius: 8px !important; }
 .stExpander > details > summary { color: var(--text) !important; font-family: var(--sans) !important;
   font-weight: 600 !important; font-size: .85rem !important; }
 .stExpander > details > summary:hover { color: var(--amber) !important; }
@@ -265,8 +277,47 @@ st.markdown("""
   font-size: .72rem !important; text-transform: uppercase !important; letter-spacing: .08em !important; }
 [data-testid="stMetricValue"] { color: var(--amber) !important; font-family: var(--mono) !important;
   font-variant-numeric: tabular-nums !important; line-height: 1.1 !important; }
-[data-testid="stMetric"] { background: var(--surface) !important; border: 1px solid var(--border) !important;
-  border-radius: 12px !important; padding: var(--sp-4) var(--sp-6) !important; height: 100% !important; }
+[data-testid="stMetric"] { background: var(--slate) !important; border: 1px solid var(--hairline) !important;
+  border-radius: 8px !important; padding: var(--sp-4) var(--sp-6) !important; height: 100% !important; }
+
+/* ── EXECUTIVE METRIC CARDS (render_metric_card) ─────────────────────────── */
+.pp-card { position: relative; background: var(--slate); border: 1px solid var(--hairline);
+  border-radius: 8px; padding: 16px 18px 14px; height: 100%; box-sizing: border-box; overflow: hidden; }
+.pp-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--accent); box-shadow: 0 0 14px 1px var(--accent); }
+.pp-card-title { font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-2); }
+.pp-card-value { font-family: var(--sans); font-size: 32px; font-weight: 700; color: var(--text);
+  line-height: 1.1; margin: 8px 0 10px; font-variant-numeric: tabular-nums; }
+.pp-card-foot { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pp-pill { font-family: var(--mono); font-size: 11px; color: var(--text-2); background: #131C2E;
+  border: 1px solid var(--hairline); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+
+/* ── COMMAND BAR + STATUS RAIL ───────────────────────────────────────────── */
+[data-testid="stElementContainer"]:has(.pp-command-bar) { position: sticky; top: 0; z-index: 990; }
+.pp-command-bar { display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  flex-wrap: wrap; background: rgba(9,13,22,.94); backdrop-filter: blur(12px);
+  border: 1px solid var(--hairline); border-radius: 8px; padding: 12px 18px; margin-bottom: 12px; }
+.pp-fixture-kicker { font-family: var(--mono); font-size: 11px; color: var(--text-3); letter-spacing: .1em; text-transform: uppercase; }
+.pp-fixture-opp { font-family: var(--display); font-weight: 800; font-size: 1.6rem; color: var(--text);
+  letter-spacing: .02em; text-transform: uppercase; line-height: 1.1; }
+.pp-fixture-meta { font-family: var(--sans); font-size: .8rem; color: var(--text-2); margin-top: 2px; }
+.pp-status { font-family: var(--mono); font-size: 11px; padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--st); color: var(--st); background: rgba(15,23,42,.9);
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.pp-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--st);
+  box-shadow: 0 0 8px var(--st); }
+
+/* ── TELEMETRY PANELS ────────────────────────────────────────────────────── */
+.pp-subhead { font-family: var(--mono); font-size: 11px; color: var(--text-3); letter-spacing: .1em;
+  text-transform: uppercase; margin: 4px 0 10px; }
+.pp-panel { background: var(--slate); border: 1px solid var(--hairline); border-radius: 8px;
+  padding: 10px 12px; max-height: 430px; overflow: auto; }
+.pp-log { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+.pp-log th { color: var(--text-3); text-align: left; font-weight: 500; font-size: 10px; letter-spacing: .08em;
+  text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--hairline);
+  position: sticky; top: -10px; background: var(--slate); }
+.pp-log td { color: var(--text); padding: 6px 8px; border-bottom: 1px solid #131C2E; }
 [data-testid="stDataFrame"], [data-testid="stTable"], .stApp table {
   font-family: var(--mono) !important; font-variant-numeric: tabular-nums !important; }
 
@@ -300,17 +351,42 @@ st.markdown("""
 # HTML COMPONENT HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+from html import escape as _esc
+
+# Card accent per status — gold stays the Tiverton primary; cyan is system/status only
+_STATUS_ACCENT = {
+    "neutral": "#334155",
+    "cyan":    "#06B6D4",
+    "emerald": "#10B981",
+    "amber":   "#F59E0B",
+    "crimson": "#EF4444",
+}
+
+
+def _metric_card_html(title, value, subtitle="", delta=None, status="neutral", value_px=32) -> str:
+    accent = _STATUS_ACCENT.get(status, _STATUS_ACCENT["neutral"])
+    pills = f'<span class="pp-pill">{_esc(str(subtitle))}</span>' if subtitle else ""
+    if delta is not None:
+        d = str(delta)
+        tone = "#10B981" if d.startswith("+") else "#EF4444" if d.startswith(("-", "−")) else "#A8B5C7"
+        pills += f'<span class="pp-pill" style="color:{tone}">{_esc(d)}</span>'
+    return (
+        f'<div class="pp-card" style="--accent:{accent}">'
+        f'<div class="pp-card-title">{_esc(str(title))}</div>'
+        f'<div class="pp-card-value" style="font-size:{value_px}px">{_esc(str(value))}</div>'
+        f'<div class="pp-card-foot">{pills}</div>'
+        f'</div>'
+    )
+
+
+def render_metric_card(title, value, subtitle, delta=None, status="neutral") -> None:
+    """Executive metric card (replaces st.metric). status: neutral | cyan | emerald | amber | crimson."""
+    st.markdown(_metric_card_html(title, value, subtitle, delta, status), unsafe_allow_html=True)
+
+
 def _tile(label: str, value: str, sub: str = "", color: str = "#f59e0b") -> str:
-    sub_html = f'<div style="color:#A8B5C7;font-size:.72rem;font-family:var(--sans);margin-top:6px">{sub}</div>' if sub else ""
-    return f"""
-    <div style="background:#1E293B;border:1px solid #334155;
-                border-radius:10px;padding:20px 20px;text-align:center;">
-      <div style="color:#A8B5C7;font-size:.65rem;text-transform:uppercase;
-                  letter-spacing:.14em;font-family:'Inter',sans-serif;margin-bottom:10px">{label}</div>
-      <div style="color:{color};font-size:1.9rem;font-weight:500;
-                  font-family:'JetBrains Mono',monospace;line-height:1">{value}</div>
-      {sub_html}
-    </div>"""
+    status = "amber" if color.lower() == "#f59e0b" else "neutral"
+    return _metric_card_html(label, value, sub, status=status, value_px=26)
 
 
 def _status_row(label: str, ok: bool) -> str:
@@ -356,6 +432,102 @@ def _badge(text: str, bg: str, fg: str = "#fff") -> str:
 
 def _divider() -> str:
     return '<hr style="border:none;border-top:1px solid #334155;margin:24px 0">'
+
+
+def _ledger_events(ledger: dict) -> list[dict]:
+    """All tagged events (matched + unmatched + opponent), sorted by match_seconds."""
+    tags = [m.get("tag", {}) for m in ledger.get("matched", [])]
+    tags += ledger.get("unmatched_tags", []) + ledger.get("opponent_events", [])
+    return sorted(tags, key=lambda t: t.get("match_seconds", 0))
+
+
+# ── Fixture, eval gate and deliverable helpers (shared by header, Tab 3, Tab 4) ──
+
+def _load_fixture() -> dict:
+    try:
+        return json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _fixture_run_id(fx: dict) -> str | None:
+    if not (fx.get("date") and fx.get("opponent")):
+        return None
+    from run_matchday import resolve_run_id
+    return resolve_run_id(None, fx["date"], fx["opponent"])
+
+
+def _uk_date(iso: str) -> str:
+    from datetime import date as _date
+    try:
+        d = _date.fromisoformat(iso)
+    except (TypeError, ValueError):
+        return iso or "date not set"
+    return f"{d:%A}, {d.day} {d:%B %Y}"
+
+
+def _evals():
+    tools_dir = str(ROOT / "tools")
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    import evals
+    return evals
+
+
+def _eval_status(run_id: str | None) -> tuple[str, str]:
+    try:
+        ev = _evals()
+        hist = ev.history()
+        blocking = ev.gate(run_id) if run_id else []
+    except Exception:
+        return "Eval Gate: ledger unreadable", "crimson"
+    regressions = sum(1 for s in hist.values()
+                      if not s["resolved"] and str(s.get("detail", "")).startswith("REGRESSION"))
+    if blocking:
+        return f"Eval Gate: Blocked ({len(blocking)} ERROR)", "crimson"
+    return f"Eval Gate: Ready ({regressions} Regressions)", "amber" if regressions else "cyan"
+
+
+def _context_status(fx: dict) -> tuple[str, str]:
+    if not CONTEXT_PATH.exists():
+        return "Match Context: awaiting post-match report", "neutral"
+    try:
+        ctx_opp = json.loads(CONTEXT_PATH.read_text(encoding="utf-8")).get("opponent", "")
+    except (OSError, json.JSONDecodeError):
+        return "Match Context: unreadable", "crimson"
+    from run_matchday import _slug
+    if fx.get("opponent") and _slug(ctx_opp) != _slug(fx["opponent"]):
+        return f"Match Context: STALE ({ctx_opp})", "crimson"
+    return f"Match Context: {ctx_opp or 'loaded'}", "cyan"
+
+
+def _compile_html_dossier(md: str) -> tuple[bool, str]:
+    """Eval-gated HTML packaging for the fixture's run_id — mirrors run_matchday Step 4."""
+    run_id = _fixture_run_id(_load_fixture())
+    blocking = _evals().gate(run_id) if run_id else []
+    if blocking:
+        reasons = "; ".join(f"{b['check']} [{b['key']}]" for b in blocking)
+        return False, f"Blocked: {len(blocking)} unresolved eval ERROR(s) for {run_id} — {reasons}"
+    from reports.packager import build_html
+    out = build_html(md, PLOTS_DIR, HTML_REPORT_PATH)
+    return True, f"HTML dossier written → {out.relative_to(ROOT)}"
+
+
+def _export_dof_card(ledger: dict, ctx: dict | None) -> str:
+    from reports.dof_card import build_dof_card
+    out = build_dof_card(ledger, ctx or {}, PLOTS_DIR, DOF_CARD_PATH)
+    return f"DoF card written → {out.relative_to(ROOT)}"
+
+
+def _disk_or_session_ledger() -> dict | None:
+    if st.session_state.get("ledger"):
+        return st.session_state["ledger"]
+    if LEDGER_PATH.exists():
+        try:
+            return json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+    return None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -548,17 +720,38 @@ with st.sidebar:
 # GLOBAL HEADER
 # ══════════════════════════════════════════════════════════════════════════════
 
-st.markdown("""
-<div style="margin-bottom:28px">
-  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:10px">
-    <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2.8rem;
-                 color:#f59e0b;letter-spacing:-.02em;line-height:1">COMMAND CENTRE</span>
-    <span style="font-family:'Inter',sans-serif;font-size:.75rem;color:#A8B5C7;
-                 letter-spacing:.1em;text-transform:uppercase">UEFA 4 Moments Framework</span>
-  </div>
-  <div style="width:100%;height:1px;background:linear-gradient(90deg,#f59e0b 120px,rgba(245,158,11,.15) 400px,transparent 700px)"></div>
-</div>
-""", unsafe_allow_html=True)
+_PILL_COLOR = {**_STATUS_ACCENT, "neutral": "#8494A9"}
+
+
+def _status_pill(label: str, status: str) -> str:
+    return f'<span class="pp-status" style="--st:{_PILL_COLOR.get(status, _PILL_COLOR["neutral"])}">{_esc(label)}</span>'
+
+
+_fx        = _load_fixture()
+_fx_run_id = _fixture_run_id(_fx)
+if _fx.get("opponent"):
+    _fx_venue = "Home" if _fx.get("home_game") else "Away"
+    _fixture_html = (
+        f'<div class="pp-fixture-kicker">Next fixture · UEFA 4 Moments</div>'
+        f'<div class="pp-fixture-opp">vs {_esc(_fx["opponent"])}</div>'
+        f'<div class="pp-fixture-meta">{_esc(_fx.get("competition", "Competition not set"))} · {_fx_venue}'
+        f' · {_esc(_uk_date(_fx.get("date", "")))}'
+        f' · <span class="pp-mono">run_id {_esc(_fx_run_id or "—")}</span></div>'
+    )
+else:
+    _fixture_html = (
+        '<div class="pp-fixture-kicker">Next fixture</div>'
+        '<div class="pp-fixture-opp">No fixture set</div>'
+        '<div class="pp-fixture-meta">Add opponent, competition, date and home_game to data/fixture.json</div>'
+    )
+
+st.markdown(
+    f'<div class="pp-command-bar"><div>{_fixture_html}</div>'
+    f'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    f'{_status_pill(*_eval_status(_fx_run_id))}{_status_pill(*_context_status(_fx))}'
+    f'</div></div>',
+    unsafe_allow_html=True,
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -625,6 +818,94 @@ with tab1:
     ]
     for col, (icon, title, body, ibg, iborder, bl) in zip(wf_cols, _STEPS):
         col.markdown(_workflow_step(icon, title, body, ibg, iborder, bl), unsafe_allow_html=True)
+
+    # ── Match Telemetry — momentum cards + pitch event log (read-only ledger view) ──
+    st.markdown(_section_label("Match Telemetry", "#06B6D4"), unsafe_allow_html=True)
+    _tel_ledger = _disk_or_session_ledger()
+    if not _tel_ledger:
+        st.markdown(
+            '<div class="pp-panel" style="color:#A8B5C7;font-size:.8rem">No match ledger yet. '
+            'Run the pipeline in the Agent Cockpit tab or <code>python run_matchday.py</code>.</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        from collections import Counter as _TelCounter
+        _ev  = _ledger_events(_tel_ledger)
+        _tiv = [e for e in _ev if e.get("team") != "opponent"]
+        _opp = [e for e in _ev if e.get("team") == "opponent"]
+
+        def _n(evs, event_type=None, period=None):
+            return sum(1 for e in evs
+                       if (event_type is None or e.get("event_type") == event_type)
+                       and (period is None or e.get("period") == period))
+
+        _tel_ctx = st.session_state.get("ctx") or {}
+        _score   = _tel_ctx.get("score") or {}
+
+        tel_left, tel_right = st.columns([1, 1], gap="large")
+        with tel_left:
+            st.markdown('<div class="pp-subhead">Match momentum · Tiverton / Opp</div>', unsafe_allow_html=True)
+            _m1, _m2 = st.columns(2, gap="small")
+            with _m1:
+                render_metric_card(
+                    "Score",
+                    f"{_score.get('tiverton', '–')}–{_score.get('opponent', '–')}" if _score else "–",
+                    _tel_ctx.get("opponent") or "awaiting report",
+                    status="amber" if _score else "neutral",
+                )
+            with _m2:
+                render_metric_card(
+                    "Tagged events", f"{len(_tiv)} / {len(_opp)}",
+                    f"1H {_n(_tiv, period='1H')}–{_n(_opp, period='1H')} · 2H {_n(_tiv, period='2H')}–{_n(_opp, period='2H')}",
+                    status="cyan",
+                )
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+            _m3, _m4 = st.columns(2, gap="small")
+            with _m3:
+                render_metric_card("Shots", f"{_n(_tiv, 'SHOT')} / {_n(_opp, 'SHOT')}", "In Possession", status="amber")
+            with _m4:
+                render_metric_card("Box entries", f"{_n(_tiv, 'BOX_ENTRY')} / {_n(_opp, 'BOX_ENTRY')}", "In Possession", status="amber")
+
+        with tel_right:
+            _recent = list(reversed(_ev[-20:]))
+            _rows = ""
+            for _e in _recent:
+                _is_opp = _e.get("team") == "opponent"
+                _rows += (
+                    f'<tr><td>{_esc(str(_e.get("clock_display", "—")))}</td>'
+                    f'<td>{_esc(str(_e.get("period", "—")))}</td>'
+                    f'<td style="color:{"#EF4444" if _is_opp else "#F59E0B"};font-weight:700">{"OPP" if _is_opp else "TIV"}</td>'
+                    f'<td>{_esc(str(_e.get("event_type", "—")))}</td>'
+                    f'<td>{_esc(str(_e.get("zone_id") or "—"))}</td></tr>'
+                )
+            st.markdown(
+                f'<div class="pp-subhead">Pitch event log · latest {len(_recent)} of {len(_ev)}</div>'
+                f'<div class="pp-panel"><table class="pp-log"><thead><tr>'
+                f'<th>Clock</th><th>Half</th><th>Team</th><th>Event</th><th>Zone</th>'
+                f'</tr></thead><tbody>{_rows}</tbody></table></div>',
+                unsafe_allow_html=True,
+            )
+
+        # Transitions — counts only; no xT model exists in PitchPulse yet
+        st.markdown('<div class="pp-subhead" style="margin-top:18px">Transitions · event counts (not xT)</div>',
+                    unsafe_allow_html=True)
+        _zones = _TelCounter(e.get("zone_id") for e in _ev if e.get("zone_id"))
+        _t1, _t2, _t3, _t4 = st.columns(4, gap="small")
+        with _t1:
+            render_metric_card("High regains", _n(_tiv, "HIGH_REGAIN"), "Tiverton · Counter-Pressing Phase", status="emerald")
+        with _t2:
+            _opp_regains = _n(_opp, "HIGH_REGAIN")
+            render_metric_card("Opp high regains", _opp_regains, "Rest Defense exposures",
+                               status="crimson" if _opp_regains else "neutral")
+        with _t3:
+            render_metric_card("Def turnovers", f"{_n(_tiv, 'DEF_TURNOVER')} / {_n(_opp, 'DEF_TURNOVER')}",
+                               "Tiverton / Opp", status="amber")
+        with _t4:
+            if _zones:
+                _top_zone, _top_n = _zones.most_common(1)[0]
+                render_metric_card("Busiest zone", _top_zone, f"{_top_n} events · count, not xT", status="cyan")
+            else:
+                render_metric_card("Busiest zone", "–", "no zone_id on events", status="neutral")
 
     st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
@@ -1857,16 +2138,17 @@ with tab3:
                         content = _build_dossier(ledger, feedback="", ctx=ctx)
                         match_id = _match_id_from_ledger(ledger)
                         path    = _write_dossier(content, match_id)
+                        # Previous calls passed kwargs neither function accepts and the
+                        # TypeError was swallowed — HTML and DoF card were never produced.
                         try:
-                            from reports.packager import build_html
-                            build_html(content, ledger=ledger, plots_dir=PLOTS_DIR, out_dir=PROC_DIR)
-                        except Exception:
-                            pass
+                            _html_ok, _html_msg = _compile_html_dossier(content)
+                        except Exception as _html_exc:
+                            _html_ok, _html_msg = False, f"HTML packaging failed: {_html_exc}"
+                        st.session_state["pipeline_log"] += f"\n[PACK] {_html_msg}"
                         try:
-                            from reports.dof_card import build_dof_card
-                            build_dof_card(ledger=ledger)
-                        except Exception:
-                            pass
+                            st.session_state["pipeline_log"] += f"\n[DOF] {_export_dof_card(ledger, ctx)}"
+                        except Exception as _dof_exc:
+                            st.session_state["pipeline_log"] += f"\n[DOF] Card render failed: {_dof_exc}"
                         st.session_state["dossier_content"] = content
                         st.session_state["dossier_path"]    = path
                         st.session_state["approval_status"] = "approved"
@@ -1923,6 +2205,62 @@ with tab3:
 
 with tab4:
     st.markdown(_section_label("Deliverables Hub"), unsafe_allow_html=True)
+
+    # ── Action Centre ─────────────────────────────────────────────────────────
+    _act_ledger = _disk_or_session_ledger()
+    _act_md = st.session_state.get("dossier_content")
+    if not _act_md:
+        _md_files = sorted(REPORTS_DIR.glob("dossier_*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+        _act_md = _md_files[0].read_text(encoding="utf-8") if _md_files else None
+
+    st.markdown('<div class="pp-subhead">Action centre</div>', unsafe_allow_html=True)
+    _a1, _a2, _a3 = st.columns(3, gap="medium")
+    with _a1:
+        if st.button("⚙  Compile HTML Dossier", key="btn_act_html", use_container_width=True,
+                     disabled=not _act_md, help="Eval-gated for the fixture run_id"):
+            try:
+                _ok, _msg = _compile_html_dossier(_act_md)
+                (st.success if _ok else st.error)(_msg)
+            except Exception as _exc:
+                st.error(f"HTML packaging failed: {_exc}")
+    with _a2:
+        if st.button("🛡  Review Gate Log", key="btn_act_gate", use_container_width=True):
+            st.session_state["show_gate_log"] = not st.session_state.get("show_gate_log", False)
+    with _a3:
+        if st.button("📲  Export DoF Card (WhatsApp)", key="btn_act_dof", use_container_width=True,
+                     disabled=_act_ledger is None):
+            try:
+                st.success(_export_dof_card(_act_ledger, st.session_state.get("ctx")))
+            except Exception as _exc:
+                st.error(f"DoF card render failed: {_exc}")
+
+    if st.session_state.get("show_gate_log"):
+        try:
+            _gl_ev   = _evals()
+            _gl_open = sorted((s for s in _gl_ev.history().values() if not s["resolved"] and "tool" in s),
+                              key=lambda s: -s["count"])
+        except Exception as _exc:
+            _gl_open = None
+            st.error(f"Eval ledger unreadable: {_exc}")
+        if _gl_open is not None:
+            _gl_run = _fixture_run_id(_load_fixture()) or "—"
+            _gl_rows = "".join(
+                f'<tr><td>{_esc(s["fp"])}</td>'
+                f'<td style="color:{"#EF4444" if s["severity"] == "ERROR" else "#F59E0B"}">{_esc(s["severity"])}</td>'
+                f'<td>{_esc(s["check"])}</td><td>{_esc(str(s.get("key", "")))}</td>'
+                f'<td>{s["count"]}</td><td>{_esc(str(s.get("run_id", "")))}</td></tr>'
+                for s in _gl_open
+            ) or '<tr><td colspan="6" style="color:#A8B5C7">No open findings. Gate is clear.</td></tr>'
+            st.markdown(
+                f'<div class="pp-subhead" style="margin-top:14px">Eval gate log · fixture run_id {_esc(_gl_run)}</div>'
+                f'<div class="pp-panel"><table class="pp-log"><thead><tr>'
+                f'<th>FP</th><th>Severity</th><th>Check</th><th>Key</th><th>Count</th><th>Last run</th>'
+                f'</tr></thead><tbody>{_gl_rows}</tbody></table></div>'
+                f'<div class="pp-subhead" style="margin-top:8px">Close a finding: python tools/evals.py --resolve FP "note"</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
     col_dof, col_doss = st.columns([1, 2], gap="large")
 
@@ -2036,23 +2374,39 @@ with tab4:
 
         _k1, _k2, _k3 = st.columns(3, gap="medium")
         with _k1:
-            st.metric(
+            render_metric_card(
                 "ATT First-Contact Win %",
                 f"{_sp_kpi.get('att_fc_win_pct', 0):.0f}%",
-                help="% of attacking corners where Tivvy won first contact",
+                f"{_sp_kpi.get('att_corners', 0)} attacking corners",
+                status="amber",
             )
         with _k2:
-            st.metric(
+            render_metric_card(
                 "Shots from ATT Corners",
                 _sp_kpi.get("att_shots_generated", 0),
-                help="Corners that led to a Tivvy shot within 12 seconds",
+                f"{_sp_kpi.get('att_shots_on_target', 0)} on target · 12 s window",
+                status="amber",
             )
         with _k3:
-            st.metric(
+            render_metric_card(
                 "DEF Clearance Rate",
                 f"{_sp_kpi.get('def_clearance_pct', 0):.0f}%",
-                help="% of opposition corners where Tivvy won first contact",
+                f"{_sp_kpi.get('def_corners', 0)} opp corners · {_sp_kpi.get('def_shots_conceded', 0)} shots conceded",
+                status="amber",
             )
+
+        # Target delivery markers — where attacking corners were delivered
+        from collections import Counter as _SpCounter
+        _att_zones = _SpCounter(c.get("delivery_zone") for c in _sp_corners if c.get("_type") == "ATT")
+        if _att_zones:
+            _att_total = sum(_att_zones.values())
+            st.markdown('<div class="pp-subhead" style="margin-top:14px">Attacking corner delivery targets</div>',
+                        unsafe_allow_html=True)
+            _zone_cols = st.columns(min(len(_att_zones), 6), gap="small")
+            for _zc, (_zone, _zn) in zip(_zone_cols, _att_zones.most_common(6)):
+                with _zc:
+                    render_metric_card(_zone, _zn, f"{_zn / _att_total:.0%} of ATT corners", status="amber")
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
         if st.button("📐 Regenerate Set-Piece Matrix", key="btn_sp_matrix"):
             with st.spinner("Rendering Set-Piece Target Matrix…"):

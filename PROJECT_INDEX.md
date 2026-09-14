@@ -11,7 +11,7 @@ PitchPulse/
 ├── PROJECT_INDEX.md           # This file — master map of the stack
 ├── requirements.txt           # Python dependencies (pandas, mplsoccer, opencv-python, streamlit)
 ├── app.py                     # ✅ COMPLETE — Streamlit desktop dashboard; 5 tabs; OLED dark; local-only; Tab 2 Clip Workspace; Tab 4 Archive & Clear
-├── .streamlit/config.toml     # Streamlit theme: OLED #09090b bg, Tivvy Amber #f59e0b primary
+├── .streamlit/config.toml     # Streamlit theme: Obsidian #090D16 bg, True Slate #0F172A panels, Tivvy Gold #F59E0B primary (app header reads data/fixture.json)
 ├── run_matchday.py            # ✅ COMPLETE — Master pipeline runner (reconcile → visuals → agents)
 ├── tagger/
 │   └── index.html             # ✅ COMPLETE (v3.0) — Broadcast-grade OLED tactical pad; dual-team split buttons (Tivvy/Opp per card); live score widget; haptic feedback; collapsible event log; UNDO toast; ↔ SUB modal; two-tap NEW MATCH reset (clears events, scores, phase, clock); taps blocked until a phase is set; PRE events filtered from Export/Copy
@@ -554,6 +554,9 @@ ELI5: Numbers that don't wobble when they change let the DoF compare 62% and 18%
 | Gold/Amber `--gold` | `#F59E0B` | Tiverton (Tivvy) primary |
 | Cardinal Red `--cardinal` | `#EF4444` | Opponent / errors |
 | Emerald `--emerald` | `#10B981` | Completed actions / success |
+| Obsidian `--obsidian` | `#090D16` | `app.py` page ground (panels/sidebar stay True Slate) |
+| Cyan `--cyan` | `#06B6D4` | System status only — active-tab indicator, status rail pills, Match Telemetry label. Never Tiverton data |
+| Hairline `--hairline` | `#1E293B` | `app.py` card / container micro-borders (8px radius) |
 
 - Team encoding is fixed: Gold = Tivvy, Cardinal = Opponent. Never swap for decoration.
 - **Slate Border** `#334155` — all 1px hairline borders/dividers (replaces `rgba(255,255,255,.04–.14)`).
