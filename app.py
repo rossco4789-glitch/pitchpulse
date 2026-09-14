@@ -547,6 +547,7 @@ _SS: dict = {
     "last_clip_path": None,
     "checklist": {},
     "ht_briefing": None,
+    "scout_result": None,
 }
 for _k, _v in _SS.items():
     if _k not in st.session_state:
@@ -1076,6 +1077,75 @@ with tab1:
                     <div style="background:#1E293B;border:1px solid #334155;
                                 border-radius:10px;padding:12px 14px">{rows}</div>
                     """, unsafe_allow_html=True)
+
+    # ── Opposition Briefing — preview upload → public evidence → brief.md → mobile HTML ──
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    st.markdown(_divider(), unsafe_allow_html=True)
+    st.markdown(_section_label("Opposition Briefing", "#06B6D4"), unsafe_allow_html=True)
+    sb_left, sb_right = st.columns([1, 1], gap="large")
+
+    with sb_left:
+        scout_file = st.file_uploader(
+            "Upload Opponent Match Preview (.docx, .txt, .md)",
+            type=["docx", "txt", "md"], key="scout_preview_upload",
+        )
+        scout_site = st.text_input(
+            "Opponent club website (optional: adds player profiles and post-match quotes)",
+            key="scout_club_site", placeholder="https://www.dorchestertownfc.co.uk",
+        )
+        scout_overwrite = st.checkbox("Overwrite a hand-edited brief.md", key="scout_overwrite")
+        if st.button("Generate Tactical Briefing", type="primary", key="btn_scout_brief",
+                     disabled=scout_file is None):
+            with st.status("Building opposition briefing…", expanded=True) as sb_status:
+                try:
+                    spec = importlib.util.spec_from_file_location("scout_brief", ROOT / "tools" / "scout_brief.py")
+                    sb_mod = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(sb_mod)
+                    res, _stdout = _capture(
+                        sb_mod.run, scout_file.name, scout_file.getvalue(),
+                        club_site=scout_site.strip() or None, overwrite=scout_overwrite,
+                        progress=sb_status.write,
+                    )
+                    st.session_state["scout_result"] = res
+                    sb_status.update(label=f"Briefing ready: {res['opponent']}", state="complete", expanded=False)
+                except Exception as exc:  # never surface a raw traceback to the analyst
+                    st.session_state["scout_result"] = None
+                    sb_status.update(label=f"Briefing failed: {exc}", state="error", expanded=True)
+
+    with sb_right:
+        sres = st.session_state.get("scout_result")
+        if not sres:
+            st.markdown(
+                '<div class="pp-panel" style="color:#A8B5C7;font-size:.8rem">No briefing yet. '
+                'Upload the club match preview and press Generate Tactical Briefing.</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            _b1, _b2, _b3 = st.columns(3, gap="small")
+            _b1.markdown(_metric_card_html("Opponent", sres["opponent"], _uk_date(sres["fixture"]["date"]),
+                                           status="amber", value_px=20), unsafe_allow_html=True)
+            _b2.markdown(_metric_card_html("Division", "Verified" if sres["division"] else "Unverified",
+                                           sres["division"] or "notes only",
+                                           status="cyan" if sres["division"] else "crimson", value_px=20),
+                         unsafe_allow_html=True)
+            _b3.markdown(_metric_card_html("Standing", f"{sres['position']} / {sres['teams']}" if sres["position"] else "–",
+                                           f"{sres['points']} pts" if sres["points"] is not None else "table unavailable",
+                                           status="emerald" if sres["position"] else "neutral", value_px=20),
+                         unsafe_allow_html=True)
+            for w in sres["warnings"][:5]:
+                st.warning(w)
+            html_path = Path(sres["html_path"])
+            if html_path.exists():
+                st.download_button(
+                    "Download Mobile Briefing (HTML)", data=html_path.read_bytes(),
+                    file_name=f"{sres['slug']}_scouting.html", mime="text/html", key="dl_scout_html",
+                )
+
+    _sres = st.session_state.get("scout_result")
+    if _sres and Path(_sres["html_path"]).exists():
+        with st.expander("Briefing preview", expanded=True):
+            import streamlit.components.v1 as _components
+            _components.html(Path(_sres["html_path"]).read_text(encoding="utf-8"), height=720, scrolling=True)
 
     # ── Matchday Checklist ────────────────────────────────────────────────────
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)

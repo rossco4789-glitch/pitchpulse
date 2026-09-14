@@ -36,6 +36,7 @@ data/scouting/sources/**/*.docx
 data/scouting/sources/**/*.doc
 data/scouting/sources/**/*.pdf
 data/processed/*_scouting.html
+data/scouting/sources/**/brief_auto.md
 
 # Sample data & ledger (committed for demo; swap for real data)
 # data/samples/2026-09-05_st_blazey/  ← keep tracked (moved out of data/raw so

@@ -20,6 +20,7 @@ PitchPulse/
 │   ├── scout_harvester.py     # ✅ COMPLETE — Offline Opposition Intelligence Harvester; Alpha/Beta/Gamma task graph → data/scouting/{slug}_dossier.json
 │   ├── evals.py               # ✅ COMPLETE — Self-improving eval ledger (stdlib); record/gate/replay/digest → data/evals/
 │   ├── scout_fetcher.py       # ✅ COMPLETE — Public match-evidence fetcher (stdlib urllib/html.parser); league table, team sheets, events, club articles → data/scouting/evidence/
+│   ├── scout_brief.py         # ✅ COMPLETE — Tab 1 Opposition Briefing: preview upload → fixture detect → scout_fetcher → 4-moments brief.md → packager HTML
 │   └── tests/
 │       └── test_scout_harvester.py # ✅ COMPLETE — Dossier schema integrity + CLI smoke suite (pytest, offline)
 ├── reconcile/
@@ -453,6 +454,17 @@ python -m pytest tools/tests/test_scout_fetcher.py -v
 **Contract:** identified User-Agent, `robots.txt` respected (host skipped if unreachable), 1 request/second, 15 s timeout. HTTP/network/timeout/parse failures never raise: each becomes a warning and the page falls back to `data/scouting/cache/`, else the section stays empty. Formation, in-match positions, corner takers and aerial duel counts are not published by these sources and are recorded under `not_published` — the tool never infers them. Cache and evidence JSON are gitignored (third-party text); briefs paraphrase and cite.
 
 ELI5: It reads the public team sheets and interviews so the brief says what actually happened, not what we guessed.
+
+### `tools/scout_brief.py`
+Tab 1 **Opposition Briefing** backend (no Streamlit import). Upload a club preview (.docx/.txt/.md) → detect `<Opponent> v Tiverton Town`, date, kick-off, venue from the first 12 lines → save `data/scouting/sources/<slug>/preview.<ext>` → `scout_fetcher.build_evidence` (+ profiles for preview players found on team sheets) → `brief.md` in the packager Markdown subset (4 moments + dead balls, one lever per section, preview sentences labelled unverified, banned vocabulary dropped) → `data/processed/<slug>_scouting.html`.
+
+```bash
+python -m pytest tools/tests/test_scout_brief.py -v
+```
+
+**Contract:** network or parse failure degrades to a notes-only brief with a warning; only an unreadable upload or a missing "X v Tiverton" line raises `ValueError`. A hand-edited `brief.md` (no auto marker) is kept unless overwrite is ticked; the draft goes to `brief_auto.md` (gitignored) and the HTML compiles from the hand-edited brief.
+
+ELI5: One upload turns the club's match preview into a checked, phone-ready opposition brief without opening a terminal.
 
 ### `tools/evals.py`
 Self-improving evaluation loop. Stdlib only (`hashlib`, `json`, `pathlib`, `sys`, `time`), fully offline.
