@@ -14,7 +14,7 @@ PitchPulse/
 ├── .streamlit/config.toml     # Streamlit theme: OLED #09090b bg, Tivvy Amber #f59e0b primary
 ├── run_matchday.py            # ✅ COMPLETE — Master pipeline runner (reconcile → visuals → agents)
 ├── tagger/
-│   └── index.html             # ✅ COMPLETE (v3.0) — Broadcast-grade OLED tactical pad; dual-team split buttons (Tivvy/Opp per card); live score widget; haptic feedback; collapsible event log; UNDO toast; ↔ SUB modal
+│   └── index.html             # ✅ COMPLETE (v3.0) — Broadcast-grade OLED tactical pad; dual-team split buttons (Tivvy/Opp per card); live score widget; haptic feedback; collapsible event log; UNDO toast; ↔ SUB modal; two-tap NEW MATCH reset (clears events, scores, phase, clock); taps blocked until a phase is set; PRE events filtered from Export/Copy
 ├── tools/
 │   ├── tagger_sanity.py       # ✅ COMPLETE — Post-session ledger validator CLI; 7 checks; ANSI colour report; exit 0/1; --test self-test suite (11 tests)
 │   ├── scout_harvester.py     # ✅ COMPLETE — Offline Opposition Intelligence Harvester; Alpha/Beta/Gamma task graph → data/scouting/{slug}_dossier.json

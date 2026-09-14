@@ -234,6 +234,13 @@ def build_x_feed(ctx: dict) -> list:
 # ---------------------------------------------------------------------------
 
 def main():
+    # UTF-8 output so ✓ / – survive redirection on Windows cp1252 consoles
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        except AttributeError:
+            pass
+
     ap = argparse.ArgumentParser(description="Parse Tiverton Town match report .docx")
     ap.add_argument("docx_path", type=Path)
     ap.add_argument("--out-dir", type=Path, default=Path("data/raw"))

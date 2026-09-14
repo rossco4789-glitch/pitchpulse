@@ -530,6 +530,13 @@ def print_audit(ledger: dict) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def main() -> None:
+    # UTF-8 output so rules/arrows survive redirection on Windows cp1252 consoles
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        except AttributeError:
+            pass
+
     print()
     _rule("═")
     print("  TIVVY SYNC — Post-Match Reconciliation Engine")

@@ -158,6 +158,12 @@
         <span id="clock-mm">00</span><span class="text-white/35">:</span><span id="clock-ss">00</span>
       </div>
       <span id="phase-label" class="phase-pill">—</span>
+      <!-- New Match / Reset — two-tap confirm; first tap arms for 3 s -->
+      <button id="btn-reset" onclick="resetMatch()"
+        class="text-[9px] font-black tracking-[.12em] px-2 rounded-lg leading-tight"
+        style="min-height:44px; min-width:44px; border:1px solid rgba(248,113,113,.45);
+               color:#f87171; background:rgba(220,38,38,.12);"
+        aria-label="New match: tap twice to wipe all events and scores">NEW<br>MATCH</button>
     </div>
   </header>
 
@@ -913,6 +919,7 @@
     // Action trigger — opens pitch overlay for ALL events
     // ══════════════════════════════════════════════════════════════════════
     function triggerAction(action, team) {
+      if (!phaseIsSet()) return;
       pendingAction  = action;
       pendingSubType = null;
       pendingTeam    = team;
@@ -1260,9 +1267,14 @@
     // ══════════════════════════════════════════════════════════════════════
     // Export / Copy
     // ══════════════════════════════════════════════════════════════════════
+    // PRE (phase-unset) events never leave the phone — reconcile/sync.py ingests competitive events only
+    function exportableEvents() {
+      return events.filter(e => e.period !== 'PRE');
+    }
+
     function exportJSON() {
-      const label = activePhase === '—' ? 'PRE' : activePhase;
-      const blob  = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' });
+      const label = activePhase === '—' ? 'ALL' : activePhase;
+      const blob  = new Blob([JSON.stringify(exportableEvents(), null, 2)], { type: 'application/json' });
       const url   = URL.createObjectURL(blob);
       const a     = document.createElement('a');
       a.href = url; a.download = `tivvy_events_${label}.json`;
@@ -1273,7 +1285,7 @@
     function copyJSON() {
       const btn    = document.getElementById('btn-copy');
       const svgCopy = `<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>`;
-      navigator.clipboard.writeText(JSON.stringify(events, null, 2))
+      navigator.clipboard.writeText(JSON.stringify(exportableEvents(), null, 2))
         .then(() => {
           btn.textContent = '✓ COPIED';
           setTimeout(() => { btn.innerHTML = `${svgCopy} COPY`; }, 1600);
@@ -1309,6 +1321,7 @@
     }
 
     function triggerSub(team) {
+      if (!phaseIsSet()) return;
       pendingSubTeam = team;
       const label = document.getElementById('sub-team-label');
       if (team === 'opponent') {
@@ -1383,6 +1396,81 @@
     }
 
     // ══════════════════════════════════════════════════════════════════════
+    // Phase guard — no competitive event without 1H / 2H (or HT / FT) set
+    // ══════════════════════════════════════════════════════════════════════
+    function phaseIsSet() {
+      if (activePhase !== '—') return true;
+      showPhaseToast();
+      return false;
+    }
+
+    function showPhaseToast() {
+      const toast = document.getElementById('phase-toast');
+      if (!toast) return;
+      toast.style.opacity   = '1';
+      toast.style.transform = 'translate(-50%,-50%) scale(1)';
+      if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
+      clearTimeout(toast._tid);
+      toast._tid = setTimeout(() => {
+        toast.style.opacity   = '0';
+        toast.style.transform = 'translate(-50%,-50%) scale(.96)';
+      }, 1800);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // New Match / Reset — first tap arms (3 s), second tap wipes
+    // ══════════════════════════════════════════════════════════════════════
+    let resetArmedUntil = 0;
+
+    function disarmReset() {
+      resetArmedUntil = 0;
+      const btn = document.getElementById('btn-reset');
+      clearTimeout(btn._tid);
+      btn.innerHTML        = 'NEW<br>MATCH';
+      btn.style.background = 'rgba(220,38,38,.12)';
+      btn.style.color      = '#f87171';
+    }
+
+    function resetMatch() {
+      const btn = document.getElementById('btn-reset');
+      if (Date.now() > resetArmedUntil) {
+        resetArmedUntil      = Date.now() + 3000;
+        btn.innerHTML        = `WIPE<br>${events.length}?`;
+        btn.style.background = '#dc2626';
+        btn.style.color      = '#fff';
+        clearTimeout(btn._tid);
+        btn._tid = setTimeout(disarmReset, 3000);
+        if (navigator.vibrate) navigator.vibrate([30, 40, 30]);
+        return;
+      }
+      disarmReset();
+
+      [STORAGE_KEY, 'tivvy_score_home', 'tivvy_score_away'].forEach(k => localStorage.removeItem(k));
+      events    = [];
+      scoreHome = 0;
+      scoreAway = 0;
+      document.getElementById('score-home').textContent = scoreHome;
+      document.getElementById('score-away').textContent = scoreAway;
+
+      // Phase + clock back to pre-match
+      if (tickInterval) clearInterval(tickInterval);
+      tickInterval   = null;
+      clockRunning   = false;
+      paused         = false;
+      elapsedAtPause = 0;
+      phaseStartWall = null;
+      activePhase    = '—';
+      attackingRight = true;
+      updateDirButton();
+
+      updateBadge();
+      updateUndo();
+      updateEventLog();
+      updateClockDisplay();
+      if (navigator.vibrate) navigator.vibrate(120);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
     // Init
     // ══════════════════════════════════════════════════════════════════════
     buildRoster();
@@ -1409,6 +1497,16 @@
            opacity:0; transition:opacity .18s ease, transform .18s ease;
            pointer-events:none; white-space:nowrap;">
     ↩ EVENT REMOVED
+  </div>
+
+  <!-- ══ Phase guard toast — high contrast; shown when a tap arrives with no phase set ══ -->
+  <div id="phase-toast" role="alert"
+    style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(.96);
+           background:#dc2626; border:2px solid #fff; color:#fff; font-size:13px; font-weight:900;
+           letter-spacing:.04em; padding:14px 22px; border-radius:12px; z-index:100;
+           opacity:0; transition:opacity .15s ease, transform .15s ease; pointer-events:none;
+           text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.6); max-width:88vw;">
+    ⚠ Set Phase (1H/2H) to log competitive events
   </div>
 
 </body>
