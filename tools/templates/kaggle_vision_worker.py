@@ -72,6 +72,7 @@ SETTLED_MAX_DEPTH_M = 40.0
 SETTLED_RUN      = 8        # consecutive sampled frames = 4 s at 2 FPS
 WINDOW_S         = 300      # attack direction and coverage are judged per 5-minute window
 SILHOUETTE_MIN   = 0.5
+KIT_LAB_WEIGHTS  = np.array([0.2, 1.5, 1.0])  # L*, a*, b*: kit clustering keyed to hue, not lighting
 
 # Mirrored from tools/cloud_vision_runner.py
 SCHEMA_VERSION = 2
@@ -204,17 +205,32 @@ def gpu_compatibility_error(name: str, capability: tuple[int, int], arch_list: l
             f"Pin a T4 with \"machine_shape\": \"NvidiaTeslaT4\" in kernel-metadata.json.")
 
 
-def hex_to_lab(hex_colour: str) -> np.ndarray:
+def kit_feature(bgr_pixels) -> np.ndarray:
+    """Median CIE-Lab of BGR pixels weighted by KIT_LAB_WEIGHTS, the space teams are clustered in.
+
+    Plain Lab let lightness dominate: dark navy and shadowed red on 720p Veo footage clustered at silhouette
+    0.494 (89 players). Down-weighting L* and up-weighting the red/green a* axis gave 0.671 on the same sample.
+    """
+    px = np.asarray(bgr_pixels, np.uint8).reshape(-1, 1, 3)
+    return np.median(cv2.cvtColor(px, cv2.COLOR_BGR2LAB).reshape(-1, 3).astype(float), axis=0) * KIT_LAB_WEIGHTS
+
+
+def hex_to_kit(hex_colour: str) -> np.ndarray:
     r, g, b = (int(hex_colour[i:i + 2], 16) for i in (1, 3, 5))
-    return cv2.cvtColor(np.uint8([[[b, g, r]]]), cv2.COLOR_BGR2LAB)[0, 0].astype(float)
+    return kit_feature([[b, g, r]])
 
 
 def torso_colour(frame, x1, y1, x2, y2) -> list[float] | None:
+    """kit_feature of the torso (15-50 % of box height, 25-75 % of width).
+
+    A narrower chest crop and a turf mask were tried on the 89-player Veo sample: turf share was 0 % and the
+    smaller crop lowered silhouette to 0.43 (players are 33-71 px tall at 720p), so the wider window stays.
+    """
     h, w = y2 - y1, x2 - x1
     crop = frame[int(y1 + 0.15 * h):int(y1 + 0.5 * h), int(x1 + 0.25 * w):int(x2 - 0.25 * w)]
     if crop.size == 0:
         return None
-    return cv2.cvtColor(crop, cv2.COLOR_BGR2LAB).reshape(-1, 3).mean(axis=0).tolist()
+    return kit_feature(crop.reshape(-1, 3)).tolist()
 
 
 # ── Team split and metrics (pure numpy; testable without a GPU) ──────────────
@@ -299,7 +315,7 @@ def compute_metrics(rows: list[dict], footage: str, opponent_kit: str | None) ->
     info["silhouette"] = round(score, 3)
     if min(np.bincount(labels, minlength=2)) == 0 or score < SILHOUETTE_MIN:
         return null_oop(f"team_split_ambiguous (silhouette {score:.2f})")
-    opp = int(np.argmin(((centres - hex_to_lab(opponent_kit)) ** 2).sum(1)))
+    opp = int(np.argmin(((centres - hex_to_kit(opponent_kit)) ** 2).sum(1)))
 
     frames: dict[float, tuple[list, list]] = {}
     for r, lab in zip(players, labels):

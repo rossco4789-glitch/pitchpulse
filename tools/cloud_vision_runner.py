@@ -19,7 +19,7 @@ One-off setup:
 Flow:
     dispatch  auth → models dataset check → payload (ffmpeg 2 FPS / 720p when > 1.5 GB) → SHA-256
               → private footage dataset (5 attempts, exponential backoff)
-              → poll `datasets files` until payload_<sha12> is listed at its byte size (10 min cap)
+              → poll `datasets files` until payload_<sha12>_<dispatch id> is listed at its byte size (10 min cap)
               → push kernels/templates worker → vision_job.json state DISPATCHED
     collect   kernel status → download output → worker FAILED report | output hash | payload hash
               | 4-moments schema → data/scouting/sources/<slug>/vision_metrics.json
@@ -272,12 +272,16 @@ def dispatch(args, creds: dict) -> dict:
     try:
         payload, downsampled = prepare_payload(video, data_dir)
         digest = sha256_file(payload)
-        # hash in the name: a stale file from the previous dataset version can never satisfy readiness
-        payload = payload.rename(payload.with_name(f"payload_{digest[:12]}{payload.suffix}"))
+        # content hash plus a per-dispatch id in the name: re-dispatching the same video (15 Sep 2026, new
+        # --opponent-kit) matched the previous version's payload_<sha12> at the same size, so the kernel was
+        # pushed 6 s later and mounted the old manifest. A fresh name is listed only once this version is processed.
+        dispatch_id = os.urandom(4).hex()
+        payload = payload.rename(payload.with_name(f"payload_{digest[:12]}_{dispatch_id}{payload.suffix}"))
         size = payload.stat().st_size
         (data_dir / "manifest.json").write_text(json.dumps({
             "opponent": slug, "footage": args.footage, "payload": payload.name, "payload_sha256": digest,
-            "downsampled": downsampled, "opponent_kit": args.opponent_kit, "created_at": _now(),
+            "downsampled": downsampled, "opponent_kit": args.opponent_kit, "dispatch_id": dispatch_id,
+            "created_at": _now(),
         }, indent=2), encoding="utf-8")
         (data_dir / "dataset-metadata.json").write_text(json.dumps({
             "title": f"pitchpulse-footage-{ks}", "id": dataset_ref, "licenses": [{"name": "other"}],
@@ -304,7 +308,9 @@ def dispatch(args, creds: dict) -> dict:
 
     job = write_job(slug, state="DISPATCHED", kernel_ref=kernel_ref, dataset_ref=dataset_ref,
                     models_ref=models_ref, footage=args.footage, payload=payload.name, payload_sha256=digest,
-                    downsampled=downsampled, dispatched_at=_now(), error=None)
+                    downsampled=downsampled, opponent_kit=args.opponent_kit, dispatch_id=dispatch_id,
+                    dispatched_at=_now(), error=None,
+                    remote_status=None, output_sha256=None, collected_at=None)  # never inherit the last collection
     print(f"  [DISPATCH] {kernel_ref} pushed; state DISPATCHED → {job_path(slug)}")
     return job
 

@@ -14,6 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import cv2
 import numpy as np
 import pytest
 
@@ -282,6 +283,44 @@ def test_payload_never_listed_times_out_with_exit_3_and_no_kernel(env, monkeypat
     assert not (env / "staging" / SLUG).exists()
 
 
+def test_redispatch_of_same_video_never_accepts_the_previous_versions_payload(env, monkeypatch):
+    video = env / "match.mp4"
+    video.write_bytes(b"fake video bytes")
+    first = {}
+    monkeypatch.setattr(cvr, "kaggle", _dispatch_fake(first, exists=False))
+    assert cvr.main(["--video", str(video), "--opponent", SLUG, "--dispatch-only"]) == 0
+
+    seen, clock = {}, [0.0]
+    stale = _dispatch_fake(seen, exists=True, payload_appears=False)
+
+    def fake(args, timeout=600):  # Kaggle still serving the previous version: same content hash, same size
+        out = stale(args, timeout)
+        if args[:2] == ["datasets", "files"] and args[2] == FOOTAGE_REF and "manifest" in seen:
+            return cp(out=out.stdout + f"{first['manifest']['payload']} {first['payload_size']} 2026-09-15\n")
+        return out
+
+    monkeypatch.setattr(cvr.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(cvr.time, "sleep", lambda s: clock.__setitem__(0, clock[0] + s))
+    monkeypatch.setattr(cvr, "kaggle", fake)
+    assert cvr.main(["--video", str(video), "--opponent", SLUG, "--dispatch-only", "--opponent-kit", "#CC2222"]) == 3
+    assert seen["manifest"]["payload_sha256"] == first["manifest"]["payload_sha256"]
+    assert seen["manifest"]["payload"] != first["manifest"]["payload"]
+    assert ["kernels", "push"] not in seen["calls"]
+
+
+def test_fresh_dispatch_clears_previous_collection_fields(env, monkeypatch):
+    video = env / "match.mp4"
+    video.write_bytes(b"fake video bytes")
+    cvr.write_job(SLUG, state="COMPLETE", remote_status="complete", output_sha256="ab" * 32,
+                  collected_at="2026-09-15T10:50:21+00:00", error=None)
+    seen = {}
+    monkeypatch.setattr(cvr, "kaggle", _dispatch_fake(seen, exists=True))
+    assert cvr.main(["--video", str(video), "--opponent", SLUG, "--dispatch-only", "--opponent-kit", "#CC2222"]) == 0
+    job = cvr.read_job(SLUG)
+    assert (job["state"], job["opponent_kit"], job["dispatch_id"]) == ("DISPATCHED", "#CC2222", seen["manifest"]["dispatch_id"])
+    assert (job["remote_status"], job["output_sha256"], job["collected_at"]) == (None, None, None)
+
+
 def test_dispatch_only_uploads_pushes_and_records_job(env, monkeypatch):
     video = env / "match.mp4"
     video.write_bytes(b"fake video bytes")
@@ -292,7 +331,8 @@ def test_dispatch_only_uploads_pushes_and_records_job(env, monkeypatch):
     job = json.loads((env / "sources" / SLUG / "vision_job.json").read_text(encoding="utf-8"))
     digest = hashlib.sha256(b"fake video bytes").hexdigest()
     assert (job["state"], job["kernel_ref"], job["payload_sha256"]) == ("DISPATCHED", "tivvy/pitchpulse-vision-dorchester-town", digest)
-    assert job["payload"] == seen["manifest"]["payload"] == f"payload_{digest[:12]}.mp4"
+    assert job["payload"] == seen["manifest"]["payload"]
+    assert re.fullmatch(rf"payload_{digest[:12]}_[0-9a-f]{{8}}\.mp4", job["payload"])
     assert seen["manifest"]["payload_sha256"] == digest and seen["manifest"]["opponent_kit"] == "#000000"
     assert seen["dataset"]["id"] == "tivvy/pitchpulse-footage-dorchester-town"
     k = seen["kernel"]
@@ -567,6 +607,23 @@ def test_clamp_border_landmarks_zeroes_edge_and_off_screen_keypoints():
     assert np.array_equal(worker.clamp_border_landmarks(xy[:1], np.ones(1), (1920, 1080)), np.ones(1))
 
 
+def test_kit_feature_down_weights_lightness_and_up_weights_red_green():
+    def plain_lab(hx):
+        return cv2.cvtColor(np.uint8([[[int(hx[5:7], 16), int(hx[3:5], 16), int(hx[1:3], 16)]]]), cv2.COLOR_BGR2LAB)[0, 0].astype(float)
+
+    for a, b in (("#202020", "#E0E0E0"), ("#661111", "#CC2222"), ("#1A1A24", "#CC2222")):
+        assert np.allclose(worker.hex_to_kit(b) - worker.hex_to_kit(a), (plain_lab(b) - plain_lab(a)) * [0.2, 1.5, 1.0])
+
+
+def test_torso_colour_is_the_median_kit_feature_of_the_torso_window():
+    grass, red, white, navy = (40, 140, 40), (34, 34, 204), (255, 255, 255), (36, 26, 26)  # BGR; red is #CC2222
+    frame = np.full((200, 100, 3), grass, np.uint8)
+    frame[30:100, 25:75] = red      # torso window: rows 15-50 %, columns 25-75 %
+    frame[30:52, 25:75] = white     # 31 % specular highlight: the median ignores it
+    frame[100:140, 25:75] = navy    # shorts, below the window
+    assert np.allclose(worker.torso_colour(frame, 0, 0, 100, 200), worker.hex_to_kit("#CC2222"))
+
+
 def test_pixel_tolerances_scale_with_frame_height():
     assert worker.scaled_tolerances(1080) == (4, 80)   # validated tuning unchanged
     assert worker.scaled_tolerances(720) == (3, 53)    # runner's > 1.5 GB downsampled payload
@@ -648,7 +705,7 @@ def test_timestamp_sampling_never_repeats_slow_source_frames():
 
 def _rows(windows=(0, 300), noise_seed=0):
     rng = np.random.default_rng(noise_seed)
-    red, blue = worker.hex_to_lab("#FF0000"), worker.hex_to_lab("#0000FF")
+    red, blue = worker.hex_to_kit("#FF0000"), worker.hex_to_kit("#0000FF")
     rows = []
     for base in windows:
         for k in range(40):
@@ -691,7 +748,7 @@ def test_metrics_stay_null_with_reason(rows, footage, kit, reason):
 
 def test_ambiguous_kits_null_the_team_metrics():
     rows = _rows()
-    grey = worker.hex_to_lab("#808080").tolist()
+    grey = worker.hex_to_kit("#808080").tolist()
     for r in rows:
         r["kit"] = grey
     reason = worker.compute_metrics(rows, "full_wide", "#FF0000")[0]["out_of_possession"]["block_height_m"]["reason"]
