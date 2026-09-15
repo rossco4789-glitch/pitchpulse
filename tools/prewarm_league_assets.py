@@ -8,11 +8,13 @@ Uncached lookups are spaced by --delay seconds (default 2.0; each club makes 3-5
 etiquette, and cv/club_assets honours HTTP 429 Retry-After. A club that still hits the limit shows OFFLINE; rerun.
 
 Usage:
-    python tools/prewarm_league_assets.py              # fill the gaps
-    python tools/prewarm_league_assets.py --force      # refresh every club
+    python tools/prewarm_league_assets.py                              # fill the gaps
+    python tools/prewarm_league_assets.py --force                      # refresh clubs not marked verified
+    python tools/prewarm_league_assets.py --force --override-verified  # refresh everything, manual records included
 
 Status:
     CACHED     meta.json was already valid; no network call
+    PROTECTED  --force skipped a "verified": true record (pass --override-verified to refetch it)
     RESOLVED   club page found; crest and kit colours saved
     NOT_FOUND  Wikipedia has no matching club page; saved so it is not looked up again
     OFFLINE    the lookup failed on the network; nothing saved, retried on the next run
@@ -43,18 +45,21 @@ def opponents() -> list[str]:
 
 
 def prewarm(clubs: list[str], sources: Path = SOURCES, force: bool = False, delay: float = DEFAULT_DELAY_S,
-            sleep=time.sleep) -> list[dict]:
+            sleep=time.sleep, override_verified: bool = False) -> list[dict]:
     rows, lookups = [], 0
     for club in clubs:
-        meta = None if force else cached_assets(club, sources)
-        if meta:
+        meta = cached_assets(club, sources)
+        if meta and not force:
             status = "CACHED"
+        elif meta and meta.get("verified") and not override_verified:
+            status = "PROTECTED"
         else:
             if lookups and delay > 0:
                 sleep(delay)
             lookups += 1
             outcome = {}
-            meta = resolve_club_assets(club, sources=sources, refresh=force, report=outcome)
+            meta = resolve_club_assets(club, sources=sources, refresh=force, report=outcome,
+                                       override_verified=override_verified)
             status = "OFFLINE" if not outcome["saved"] else "RESOLVED" if meta["verified"] else "NOT_FOUND"
         rows.append({"club": club, "status": status, "kit_source": meta.get("kit_source", "default"),
                      "home": meta["home_kit"], "away": meta["away_kit"], "crest": bool(meta.get("badge_path")),
@@ -69,7 +74,8 @@ def format_table(rows: list[dict]) -> str:
               f"{'yes' if r['crest'] else 'no':<6} {r['page']}" for r in rows]
     counts = Counter(r["status"] for r in rows)
     lines.append("-" * len(header))
-    lines.append("  ".join(f"{s}: {counts[s]}" for s in ("CACHED", "RESOLVED", "NOT_FOUND", "OFFLINE")) + f"  (of {len(rows)})")
+    lines.append("  ".join(f"{s}: {counts[s]}" for s in ("CACHED", "PROTECTED", "RESOLVED", "NOT_FOUND", "OFFLINE"))
+                 + f"  (of {len(rows)})")
     return "\n".join(lines)
 
 
@@ -80,7 +86,8 @@ def main(argv=None) -> int:
         except AttributeError:
             pass
     ap = argparse.ArgumentParser(description="Cache crest and kit colours for all league opponents.")
-    ap.add_argument("--force", action="store_true", help="Refresh clubs that already have meta.json")
+    ap.add_argument("--force", action="store_true", help="Refresh clubs that already have meta.json (verified records are kept)")
+    ap.add_argument("--override-verified", action="store_true", help="With --force, also refetch records marked verified")
     ap.add_argument("--delay", type=float, default=DEFAULT_DELAY_S, help="Seconds between uncached lookups (default 2.0)")
     ap.add_argument("--sources", type=Path, default=SOURCES, help="Scouting sources folder (default data/scouting/sources)")
     args = ap.parse_args(argv)
@@ -89,7 +96,7 @@ def main(argv=None) -> int:
 
     clubs = opponents()
     print(f"Pre-warming {len(clubs)} Southern League Division One South opponents ({OWN_CLUB} excluded)…", flush=True)
-    print(format_table(prewarm(clubs, args.sources, args.force, args.delay)))
+    print(format_table(prewarm(clubs, args.sources, args.force, args.delay, override_verified=args.override_verified)))
     return 0
 
 

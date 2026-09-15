@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import shutil
 import time
+from datetime import datetime
 from html import escape
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
+from cv import briefing_sheet as bs
 from cv import club_assets as ca
 from cv import coach_brief as cb
 from cv import highlight_dossier as hd
@@ -154,13 +157,20 @@ def _setup_slug() -> str:
 
 def render() -> None:
     _html(_CSS)
+    _html(bs.PRINT_CSS)
     with st.container(key="vcc"):
         highlight = st.session_state.get("vcc_mode", MODE_FULL) == MODE_HIGHLIGHT
         scouted = hd.logged_opponents(vc.SOURCES) if highlight else vc.scouted_opponents()
         subtitle = ("Their threats, weak spots and set pieces, logged from highlight reels." if highlight
                     else "How they defend, where the space is, and where we hold when we lose it.")
-        _html('<div class="vcc-head"><div><div class="vcc-eyebrow">Opposition analysis</div>'
-              f'<h2>Match Intelligence Report</h2><p>{escape(subtitle)}</p></div></div>')
+        head, action = st.columns([5, 2], vertical_alignment="bottom")
+        with head:
+            _html('<div class="vcc-head"><div><div class="vcc-eyebrow">Opposition analysis</div>'
+                  f'<h2>Match Intelligence Report</h2><p>{escape(subtitle)}</p></div></div>')
+        with action:
+            st.button("Export Briefing (Print / PDF)", key="vcc_print", icon=":material/print:", width="stretch",
+                      disabled=not scouted, on_click=_request_print,
+                      help="Opens the print dialog with a one-page A4 sheet. Choose Save as PDF for a file.")
         logging_moments = highlight and bool(_setup_slug())    # keep the drawer open while the analyst logs a reel
         with st.expander("Match Setup", expanded=not scouted or logging_moments, icon=":material/tune:"):
             _match_setup()
@@ -169,6 +179,36 @@ def render() -> None:
             _dossier_report(scouted)
         else:
             _report(scouted)
+        nonce = st.session_state.pop("vcc_print_nonce", None)
+        if nonce:
+            _print_now(nonce)
+
+
+def _request_print() -> None:
+    st.session_state["vcc_print_nonce"] = time.time()
+
+
+def _print_now(nonce: float) -> None:
+    """Mark the page for the print stylesheet, open the browser print dialog, then restore the page."""
+    components.html(f"""<script>
+// print request {nonce}
+const w = window.parent, d = w.document;
+d.documentElement.classList.add('vcc-printing');
+const page = d.createElement('style');
+page.textContent = '@page {{ size: A4 landscape; margin: 8mm; }}';
+d.head.appendChild(page);
+w.addEventListener('afterprint', () => {{ d.documentElement.classList.remove('vcc-printing'); page.remove(); }}, {{ once: true }});
+setTimeout(() => w.print(), 350);
+</script>""", height=0)
+
+
+def _crest_uri(slug: str) -> str | None:
+    club = ca.cached_assets(vc.display_name(slug), sources=vc.SOURCES)
+    return bs.crest_data_uri(club["badge_path"]) if club and club.get("badge_path") else None
+
+
+def _prepared() -> str:
+    return datetime.now().strftime("%d %b %Y, %H:%M")
 
 
 # ── Match Setup drawer ───────────────────────────────────────────────────────
@@ -399,6 +439,8 @@ def _report(scouted: list[str]) -> None:
 
     brief = cb.build_brief(summary)
     _html(_brief_card(brief))
+    geo = vc.shape_geometry(summary["oop"]) if brief["available"] else None
+    _html(bs.full_sheet(brief, geo, _crest_uri(summary["slug"]), _prepared()))      # hidden until printed
     with st.container(border=True):
         _html(_label("Their defensive shape")
               + cb.pitch_svg(vc.shape_geometry(summary["oop"]) if brief["available"] else None)
@@ -501,6 +543,7 @@ def _dossier_report(logged: list[str]) -> None:
     slug = st.session_state["vcc_dossier_opp"]
     dossier = hd.build_dossier(vc.display_name(slug), hd.load_events(hd.events_path(vc.SOURCES, slug)))
     _html(_dossier_card(dossier))
+    _html(bs.dossier_sheet(dossier, _crest_uri(slug), _prepared()))                   # hidden until printed
 
 
 def _dossier_card(d: dict) -> str:

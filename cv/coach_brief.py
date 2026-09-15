@@ -189,44 +189,59 @@ def _n(v: float) -> str:
     return f"{v:.2f}"
 
 
-def pitch_svg(geo: dict | None) -> str:
+PITCH_THEMES = {
+    # "dark" matches the dashboard; "print" is the low-ink match-day sheet with its own element ids
+    "dark":  {"id": "vcc", "surround": "#1B4A21", "grass": ("#2F7F36", "#23652B"), "mow": 0.065, "turf": True,
+              "line": "#F4F7F1", "net": "#FFFFFF", "flank_text": "#F2CC60", "flank_sub": "#FFFFFF", "halo": "#0D1117",
+              "def_label": "#79C0FF", "press_label": "#FF7B72", "caption": "#C9D1D9"},
+    "print": {"id": "vccp", "surround": "#FFFFFF", "grass": ("#EEF6EC", "#E2EEDF"), "mow": 0.35, "turf": False,
+              "line": "#2E6B33", "net": "#2E6B33", "flank_text": "#7A5A00", "flank_sub": "#1E3A1E", "halo": "#FFFFFF",
+              "def_label": "#1F5FBF", "press_label": "#B3261E", "caption": "#3D4A3D"},
+}
+
+
+def pitch_svg(geo: dict | None, theme: str = "dark") -> str:
     """Single-line SVG (Markdown-safe) of a mown pitch; the opponent defends the left goal.
 
     `geo` is cv/vision_center.shape_geometry output: defensive line, press line, compact corridor and centroid.
+    theme "print" draws the same pitch in low-ink colours for the match-day sheet.
     """
+    t = PITCH_THEMES[theme]
+    p = t["id"]
     L, W, arc = PITCH_L, PITCH_W, 7.31   # arc: sqrt(9.15² − 5.5²), where the penalty arc meets the box edge
     s = ['<svg class="vcc-pitch" viewBox="-6 -8 117 86" xmlns="http://www.w3.org/2000/svg" role="img" '
          'aria-label="Opposition defensive shape" font-family="Bahnschrift,Arial Narrow,Arial,sans-serif">',
          '<defs>',
-         '<linearGradient id="vcc-grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2F7F36"/>'
-         '<stop offset="1" stop-color="#23652B"/></linearGradient>',
-         '<pattern id="vcc-mow" width="21" height="68" patternUnits="userSpaceOnUse">'
-         '<rect width="10.5" height="68" fill="#FFFFFF" fill-opacity="0.065"/></pattern>',
-         '<filter id="vcc-turf"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="4"/>'
+         f'<linearGradient id="{p}-grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{t["grass"][0]}"/>'
+         f'<stop offset="1" stop-color="{t["grass"][1]}"/></linearGradient>',
+         f'<pattern id="{p}-mow" width="21" height="68" patternUnits="userSpaceOnUse">'
+         f'<rect width="10.5" height="68" fill="#FFFFFF" fill-opacity="{t["mow"]}"/></pattern>',
+         f'<filter id="{p}-turf"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="4"/>'
          '<feColorMatrix type="saturate" values="0"/></filter>',
-         '<pattern id="vcc-mesh" width="2" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+         f'<pattern id="{p}-mesh" width="2" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
          '<line x1="0" y1="0" x2="0" y2="2" stroke="#79C0FF" stroke-opacity="0.55" stroke-width="0.22"/></pattern>',
-         '<pattern id="vcc-net" width="0.7" height="0.7" patternUnits="userSpaceOnUse">'
-         '<path d="M0 0H0.7M0 0V0.7" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="0.09"/></pattern>',
+         f'<pattern id="{p}-net" width="0.7" height="0.7" patternUnits="userSpaceOnUse">'
+         f'<path d="M0 0H0.7M0 0V0.7" stroke="{t["net"]}" stroke-opacity="0.55" stroke-width="0.09"/></pattern>',
          '</defs>',
-         '<rect x="-6" y="-8" width="117" height="86" rx="2" fill="#1B4A21"/>',
-         f'<rect x="0" y="0" width="{L:g}" height="{W:g}" fill="url(#vcc-grass)"/>',
-         f'<rect x="0" y="0" width="{L:g}" height="{W:g}" fill="url(#vcc-mow)"/>',
-         '<rect x="-6" y="-8" width="117" height="86" filter="url(#vcc-turf)" opacity="0.07"/>',
-         '<g fill="none" stroke="#F4F7F1" stroke-width="0.3" stroke-linecap="round" stroke-linejoin="round">',
-         f'<rect x="0" y="0" width="{L:g}" height="{W:g}"/>',
-         f'<line x1="52.5" y1="0" x2="52.5" y2="{W:g}"/>',
-         '<circle cx="52.5" cy="34" r="9.15"/>',
-         '<rect x="0" y="13.84" width="16.5" height="40.32"/><rect x="88.5" y="13.84" width="16.5" height="40.32"/>',
-         '<rect x="0" y="24.84" width="5.5" height="18.32"/><rect x="99.5" y="24.84" width="5.5" height="18.32"/>',
-         f'<path d="M16.5 {_n(34 - arc)} A9.15 9.15 0 0 1 16.5 {_n(34 + arc)}"/>',
-         f'<path d="M88.5 {_n(34 - arc)} A9.15 9.15 0 0 0 88.5 {_n(34 + arc)}"/>',
-         '<path d="M0 1A1 1 0 0 0 1 0M104 0A1 1 0 0 0 105 1M105 67A1 1 0 0 0 104 68M1 68A1 1 0 0 0 0 67"/>',
-         '</g>',
-         '<g fill="#F4F7F1"><circle cx="11" cy="34" r="0.35"/><circle cx="94" cy="34" r="0.35"/>'
-         '<circle cx="52.5" cy="34" r="0.4"/></g>']
+         f'<rect x="-6" y="-8" width="117" height="86" rx="2" fill="{t["surround"]}"/>',
+         f'<rect x="0" y="0" width="{L:g}" height="{W:g}" fill="url(#{p}-grass)"/>',
+         f'<rect x="0" y="0" width="{L:g}" height="{W:g}" fill="url(#{p}-mow)"/>']
+    if t["turf"]:
+        s.append(f'<rect x="-6" y="-8" width="117" height="86" filter="url(#{p}-turf)" opacity="0.07"/>')
+    s += [f'<g fill="none" stroke="{t["line"]}" stroke-width="0.3" stroke-linecap="round" stroke-linejoin="round">',
+          f'<rect x="0" y="0" width="{L:g}" height="{W:g}"/>',
+          f'<line x1="52.5" y1="0" x2="52.5" y2="{W:g}"/>',
+          '<circle cx="52.5" cy="34" r="9.15"/>',
+          '<rect x="0" y="13.84" width="16.5" height="40.32"/><rect x="88.5" y="13.84" width="16.5" height="40.32"/>',
+          '<rect x="0" y="24.84" width="5.5" height="18.32"/><rect x="99.5" y="24.84" width="5.5" height="18.32"/>',
+          f'<path d="M16.5 {_n(34 - arc)} A9.15 9.15 0 0 1 16.5 {_n(34 + arc)}"/>',
+          f'<path d="M88.5 {_n(34 - arc)} A9.15 9.15 0 0 0 88.5 {_n(34 + arc)}"/>',
+          '<path d="M0 1A1 1 0 0 0 1 0M104 0A1 1 0 0 0 105 1M105 67A1 1 0 0 0 104 68M1 68A1 1 0 0 0 0 67"/>',
+          '</g>',
+          f'<g fill="{t["line"]}"><circle cx="11" cy="34" r="0.35"/><circle cx="94" cy="34" r="0.35"/>'
+          '<circle cx="52.5" cy="34" r="0.4"/></g>']
     for x in (-2.0, L):
-        s.append(f'<rect x="{x:g}" y="30.34" width="2" height="7.32" fill="url(#vcc-net)" stroke="#F4F7F1" stroke-width="0.3"/>')
+        s.append(f'<rect x="{x:g}" y="30.34" width="2" height="7.32" fill="url(#{p}-net)" stroke="{t["line"]}" stroke-width="0.3"/>')
 
     if geo:
         (back, y0), (front, _), (_, y1), _ = geo["zone"]
@@ -237,28 +252,28 @@ def pitch_svg(geo: dict | None) -> str:
                 s.append(f'<rect class="flank" x="0" y="{_n(top)}" width="{_n(reach)}" height="{_n(height)}" fill="#3FB950" '
                          'fill-opacity="0.22" stroke="#E3B341" stroke-width="0.3" stroke-dasharray="1 0.7"/>')
                 s.append(f'<text x="{_n(reach / 2)}" y="{_n(cy - 0.4)}" text-anchor="middle" font-size="2.3" font-weight="700" '
-                         'fill="#F2CC60" letter-spacing="0.15" paint-order="stroke" stroke="#0D1117" stroke-width="0.5">SPACE ON FLANKS</text>')
+                         f'fill="{t["flank_text"]}" letter-spacing="0.15" paint-order="stroke" stroke="{t["halo"]}" '
+                         'stroke-width="0.5">SPACE ON FLANKS</text>')
                 s.append(f'<text x="{_n(reach / 2)}" y="{_n(cy + 2.6)}" text-anchor="middle" font-size="1.9" font-weight="700" '
-                         'fill="#FFFFFF" paint-order="stroke" stroke="#0D1117" stroke-width="0.45">Switch Play Early</text>')
+                         f'fill="{t["flank_sub"]}" paint-order="stroke" stroke="{t["halo"]}" stroke-width="0.45">Switch Play Early</text>')
         s.append(f'<rect class="corridor" x="{_n(back)}" y="{_n(y0)}" width="{_n(front - back)}" height="{_n(y1 - y0)}" '
                  'fill="#388BFD" fill-opacity="0.22" stroke="#58A6FF" stroke-width="0.3"/>')
-        s.append(f'<rect x="{_n(back)}" y="{_n(y0)}" width="{_n(front - back)}" height="{_n(y1 - y0)}" fill="url(#vcc-mesh)"/>')
+        s.append(f'<rect x="{_n(back)}" y="{_n(y0)}" width="{_n(front - back)}" height="{_n(y1 - y0)}" fill="url(#{p}-mesh)"/>')
         s.append(f'<line class="def-line" x1="{_n(geo["block"])}" y1="0" x2="{_n(geo["block"])}" y2="{W:g}" '
                  'stroke="#388BFD" stroke-width="0.75"/>')
         s.append(f'<line class="press-line" x1="{_n(geo["loe"])}" y1="0" x2="{_n(geo["loe"])}" y2="{W:g}" '
                  'stroke="#F85149" stroke-width="0.6" stroke-dasharray="1.6 1.1"/>')
-        s.append(f'<text x="{_n(max(0.4, geo["block"]))}" y="71.9" font-size="2" font-weight="700" fill="#79C0FF" '
+        s.append(f'<text x="{_n(max(0.4, geo["block"]))}" y="71.9" font-size="2" font-weight="700" fill="{t["def_label"]}" '
                  f'letter-spacing="0.2">DEFENSIVE LINE · {yards(geo["block"])} YDS</text>')
-        s.append(f'<text x="{_n(max(0.4, geo["loe"]))}" y="-2.3" font-size="2" font-weight="700" fill="#FF7B72" '
+        s.append(f'<text x="{_n(max(0.4, geo["loe"]))}" y="-2.3" font-size="2" font-weight="700" fill="{t["press_label"]}" '
                  f'letter-spacing="0.2">PRESS TRIGGER · {yards(geo["loe"])} YDS</text>')
 
-    s.append('<text x="-3.7" y="34" transform="rotate(-90 -3.7 34)" text-anchor="middle" font-size="1.7" fill="#C9D1D9" '
+    s.append(f'<text x="-3.7" y="34" transform="rotate(-90 -3.7 34)" text-anchor="middle" font-size="1.7" fill="{t["caption"]}" '
              'letter-spacing="0.3">THEIR GOAL</text>')
-    s.append(f'<text x="{L:g}" y="71.9" text-anchor="end" font-size="1.8" font-weight="700" fill="#C9D1D9" '
+    s.append(f'<text x="{L:g}" y="71.9" text-anchor="end" font-size="1.8" font-weight="700" fill="{t["caption"]}" '
              'letter-spacing="0.2">WE ATTACK ←</text>')
     s.append("</svg>")
     return "".join(s)
-
 
 def library_row(summary: dict) -> dict:
     brief = build_brief(summary)

@@ -135,17 +135,20 @@ def test_prewarm_reports_each_edge_case_and_never_crashes(tmp_path, monkeypatch)
     assert pauses == [0.75]                                       # only the two retried lookups are spaced
 
 
-def test_prewarm_force_refreshes_and_keeps_the_cache_when_offline(tmp_path, monkeypatch):
+def test_prewarm_force_protects_verified_records_unless_overridden(tmp_path, monkeypatch):
     _league_wikipedia(monkeypatch)
-    pw.prewarm(["Dorchester Town"], sources=tmp_path, delay=0)
-    assert pw.prewarm(["Dorchester Town"], sources=tmp_path, force=True, delay=0)[0]["status"] == "RESOLVED"
+    clubs = ["Dorchester Town", "Bideford"]
+    pw.prewarm(clubs, sources=tmp_path, delay=0)                              # Dorchester verified, Bideford not found
+    forced = {r["club"]: r["status"] for r in pw.prewarm(clubs, sources=tmp_path, force=True, delay=0)}
+    assert forced == {"Dorchester Town": "PROTECTED", "Bideford": "NOT_FOUND"}
+    assert pw.prewarm(["Dorchester Town"], sources=tmp_path, force=True, override_verified=True, delay=0)[0]["status"] == "RESOLVED"
 
     def down(url):
         raise TimeoutError("timed out")
 
     monkeypatch.setattr(ca, "_http_json", down)
-    row = pw.prewarm(["Dorchester Town"], sources=tmp_path, force=True, delay=0)[0]
-    assert row["status"] == "OFFLINE"
+    assert pw.prewarm(["Dorchester Town"], sources=tmp_path, force=True, delay=0)[0]["status"] == "PROTECTED"
+    assert pw.prewarm(["Dorchester Town"], sources=tmp_path, force=True, override_verified=True, delay=0)[0]["status"] == "OFFLINE"
     assert pw.prewarm(["Dorchester Town"], sources=tmp_path, delay=0)[0]["status"] == "CACHED"   # old meta.json survives
 
 
@@ -155,7 +158,8 @@ def test_prewarm_cli_covers_all_21_opponents(tmp_path, monkeypatch, capsys):
     assert pw.main(["--sources", str(tmp_path), "--delay", "0"]) == 0
     out = capsys.readouterr().out
     assert "Pre-warming 21" in out and "Tiverton Town" in out and out.count("NOT_FOUND ") == 21
-    assert "CACHED: 0  RESOLVED: 0  NOT_FOUND: 21  OFFLINE: 0  (of 21)" in out
+    assert "CACHED: 0  PROTECTED: 0  RESOLVED: 0  NOT_FOUND: 21  OFFLINE: 0  (of 21)" in out
+    assert pw.main(["--sources", str(tmp_path), "--delay", "0", "--force", "--override-verified"]) == 0
     assert not re.search(r"^Tiverton Town\s", out, re.M)          # named only in the excluded note
     with pytest.raises(SystemExit) as exc:
         pw.main(["--delay", "-1"])

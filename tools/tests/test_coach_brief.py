@@ -133,7 +133,8 @@ def _tab_script():
 
 
 def _all_text(node) -> list[str]:
-    out = [str(node.proto)] if getattr(node, "proto", None) is not None else []
+    # proto text escapes quotes inside HTML bodies; unescape so 'class="..."' checks can match (and fail) for real
+    out = [str(node.proto).replace('\\"', '"')] if getattr(node, "proto", None) is not None else []
     for child in getattr(node, "children", {}).values():
         out += _all_text(child)
     return out
@@ -194,6 +195,12 @@ def test_tab_renders_a_coach_briefing_with_no_engineering_terms(tab_env):
                      "In Possession", "Breaking Them Down", "Transition &amp; Rest Defence", "SPACE ON FLANKS",
                      "Data Confidence: Low"):
         assert expected in text, expected
+
+    assert 'class="vcc-sheet"' in text and "sh-metrics" in text and "vccp-grass" in text   # print sheet, hidden on screen
+    at.button(key="vcc_print").click().run()
+    assert not at.exception
+    printed = "\n".join(_all_text(at.main))
+    assert "vcc-printing" in printed and "A4 landscape" in printed and banned_terms(printed) == []
 
 
 # ── Highlight & Tendency Dossier ─────────────────────────────────────────────
@@ -326,6 +333,7 @@ def test_highlight_mode_hides_the_pitch_and_logs_moments(tab_env):
     for expected in ("HIGHLIGHT REEL", "Attacks down their left wing", "Attacking Patterns", "Defensive Flaws",
                      "Dead-Ball Intelligence", "Log a key moment", "Logged moments · 17", "Data Confidence: Medium"):
         assert expected in text, expected
+    assert 'class="vcc-sheet"' in text and "sh-quick" in text and "vccp-grass" not in text    # dossier sheet has no pitch
 
     at.selectbox(key="vcc_hl_kind").set_value("free_kick").run()
     at.text_input(key="vcc_hl_free_kick_player").set_value("7").run()

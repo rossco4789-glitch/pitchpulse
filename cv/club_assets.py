@@ -194,20 +194,25 @@ def cached_assets(opponent_name: str, sources: str | Path | None = None) -> dict
 
 
 def resolve_club_assets(opponent_name: str, sources: str | Path | None = None, refresh: bool = False,
-                        report: dict | None = None) -> dict:
+                        report: dict | None = None, override_verified: bool = False) -> dict:
     """Crest and kit colours for an opponent; cached per club in meta.json. Never raises.
 
-    Pass `report={}` to learn whether this call wrote meta.json (report["saved"]); network failures leave it False.
+    A cached record with "verified": true is never refetched or overwritten, even with refresh=True, unless
+    override_verified=True (manual kit records such as Hartpury University would otherwise be lost).
+    Pass `report={}` to learn whether meta.json was written (report["saved"]; network failures leave it False)
+    and whether a refresh was skipped to protect a verified record (report["protected"]).
     """
     report = {} if report is None else report
-    report["saved"] = False
+    report.update(saved=False, protected=False)
     name = (opponent_name or "").strip()
     slug = slugify(name)
     if not slug:
         return fallback(name, slug)
     folder = Path(sources or SOURCES) / slug
     meta_path = folder / META_FILE
-    if not refresh and (cached := _read_meta(meta_path)):
+    cached = _read_meta(meta_path)
+    if cached and (not refresh or (cached.get("verified") and not override_verified)):
+        report["protected"] = bool(refresh)
         return cached
 
     try:

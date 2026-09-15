@@ -222,7 +222,7 @@ def test_persistent_rate_limit_falls_back_without_caching_and_404_does_not_wait(
     monkeypatch.setattr(ca, "_sleep", waits.append)
     report = {}
     meta = ca.resolve_club_assets(CLUB, sources=tmp_path, report=report)
-    assert meta["verified"] is False and report == {"saved": False}
+    assert meta["verified"] is False and report == {"saved": False, "protected": False}
     assert not (tmp_path / "dorchester_town" / "meta.json").exists()
     assert waits == [ca.MAX_RETRY_WAIT_S] * ca.RETRIES      # Retry-After 60 s capped at 10 s, then give up
 
@@ -233,6 +233,33 @@ def test_persistent_rate_limit_falls_back_without_caching_and_404_does_not_wait(
 
     monkeypatch.setattr(ca, "urlopen", missing)
     assert ca.resolve_club_assets(CLUB, sources=tmp_path)["verified"] is False and waits == []
+
+
+def test_forced_refresh_preserves_verified_records(tmp_path, monkeypatch):
+    folder = tmp_path / "hartpury_university"
+    folder.mkdir()
+    manual = {"name": "Hartpury University F.C.", "slug": "hartpury_university", "badge_path": None,
+              "home_kit": "#CC2222", "away_kit": "#111111", "verified": True, "kit_source": "club records"}
+    (folder / "meta.json").write_text(json.dumps(manual), encoding="utf-8")
+    before = (folder / "meta.json").read_bytes()
+
+    _no_network(monkeypatch)                                               # a protected refresh must not even ask
+    report = {}
+    assert ca.resolve_club_assets("Hartpury University", sources=tmp_path, refresh=True, report=report) == manual
+    assert report == {"saved": False, "protected": True} and (folder / "meta.json").read_bytes() == before
+
+    monkeypatch.setattr(ca, "_http_json", lambda url: SEARCH)            # search only knows Dorchester
+    report = {}
+    meta = ca.resolve_club_assets("Hartpury University", sources=tmp_path, refresh=True, override_verified=True, report=report)
+    assert meta["verified"] is False and report == {"saved": True, "protected": False}   # explicit override refetches
+
+    unverified = tmp_path / "bideford"
+    unverified.mkdir()
+    (unverified / "meta.json").write_text(json.dumps(ca.fallback("Bideford", "bideford")), encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(ca, "_http_json", lambda url: calls.append(url) or {"pages": []})
+    ca.resolve_club_assets("Bideford", sources=tmp_path, refresh=True)
+    assert calls                                                           # unverified records still refresh
 
 
 def test_rugby_clubs_are_not_football_clubs():
