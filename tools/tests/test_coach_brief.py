@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from cv import coach_brief as cb  # noqa: E402
+from cv import highlight_dossier as hd  # noqa: E402
 from cv import vision_center as vc  # noqa: E402
 
 BANNED = ("homography", "bounding box", "yolo", "pipeline", "acceptance rate", "silhouette", "iqr", "median",
@@ -183,3 +184,141 @@ def test_tab_renders_a_coach_briefing_with_no_engineering_terms(tab_env):
                      "In Possession", "Breaking Them Down", "Transition &amp; Rest Defence", "SPACE ON FLANKS",
                      "Data Confidence: Low"):
         assert expected in text, expected
+
+
+# ── Highlight & Tendency Dossier ─────────────────────────────────────────────
+
+def _moments():
+    def attack(kind, channel, action, arrival, trigger="Not a counter"):
+        return hd.new_event(kind, {"channel": channel, "action": action, "arrival": arrival, "counter_trigger": trigger})
+
+    return [
+        attack("goal_scored", "Left wing", "Cross", "Far post", "Regain in midfield"),
+        attack("goal_scored", "Left wing", "Cross", "Far post"),
+        attack("chance_created", "Left wing", "Cross", "Near post", "Regain in midfield"),
+        attack("goal_scored", "Right wing", "Cut-back", "Penalty spot", "Keeper quick release"),
+        attack("chance_created", "Central", "Shot from distance", "Outside the box"),
+        hd.new_event("goal_conceded", {"flaw": "Isolated 1v1", "side": "Their left", "player": "3"}),
+        hd.new_event("chance_conceded", {"flaw": "Isolated 1v1", "side": "Their left", "player": "3"}),
+        hd.new_event("chance_conceded", {"flaw": "Space behind full-back", "side": "Their right"}),
+        hd.new_event("goal_conceded", {"flaw": "Second ball after clearance", "side": "Central"}),
+        hd.new_event("corner_for", {"delivery": "Inswinger", "target": "Near post", "player": "5", "outcome": "Goal"}),
+        hd.new_event("corner_for", {"delivery": "Inswinger", "target": "Near post", "player": "5", "outcome": "Shot"}),
+        hd.new_event("corner_for", {"delivery": "Outswinger", "target": "Far post", "outcome": "Won by defence"}),
+        hd.new_event("corner_against", {"marking": "Zonal", "outcome": "Cleared"}),
+        hd.new_event("corner_against", {"marking": "Zonal", "outcome": "Second ball lost"}),
+        hd.new_event("corner_against", {"marking": "Man-to-man", "outcome": "Shot conceded"}),
+        hd.new_event("free_kick", {"player": "10", "foot": "Right foot", "outcome": "On target"}, minute=63),
+        hd.new_event("free_kick", {"player": "10", "foot": "Right foot", "outcome": "Goal"}),
+    ]
+
+
+def test_dossier_quick_read_and_confidence():
+    d = hd.build_dossier("Weymouth", _moments())
+    assert (d["footage"], d["moments"], d["confidence"]["level"]) == ("Highlight Reel", 17, "Medium")
+    assert d["quick_read"] == {"threat": "Attacks down their left wing (3 of 5 goals and chances)",
+                               "vulnerability": "Defenders isolated 1v1 (2 of 5 conceded moments)"}
+    assert [s["title"] for s in d["sections"]] == ["Attacking Patterns", "Defensive Flaws", "Dead-Ball Intelligence"]
+
+
+def test_dossier_sections_count_moments_and_end_on_an_instruction():
+    attacking, defending, dead_ball = ({i["label"]: i for i in s["items"]} for s in hd.build_dossier("Weymouth", _moments())["sections"])
+    assert attacking["Creation channel"] == {
+        "label": "Creation channel", "read": "3 of 5 goals and chances came down their left wing, most often from crosses (3).",
+        "lever": "Our right-back and right midfielder double up on their left wing; force play inside."}
+    assert attacking["Box arrival runs"]["read"] == "2 of 4 finishes in the box arrived at the far post."
+    assert attacking["Counter-attack triggers"]["read"] == "3 of 5 came on the counter, most often after a regain in midfield (2)."
+
+    assert defending["Isolated 1v1 matchups"]["read"] == "Isolated 1v1 in 2 of 4 goals and chances conceded, No. 3 most often (2)."
+    assert defending["Isolated 1v1 matchups"]["lever"] == "Get our right winger 1v1 against No. 3 early."
+    assert defending["Space behind full-backs"]["lever"] == "Our left winger spins in behind as soon as their right-back steps up."
+    assert defending["Second balls on box clearances"]["read"] == "Lost the second ball after a clearance 2 times: 1 in open play, 1 from corners."
+
+    assert dead_ball["Attacking corners"]["read"] == "Inswingers on 2 of 3, aimed at the near post (2); No. 5 attacks it (2). 1 goal, 1 shot."
+    assert dead_ball["Attacking corners"]["lever"].endswith("Our best header marks No. 5.")
+    assert dead_ball["Defending corners"]["read"] == "Zonal marking on 2 of 3 corners; 0 goals and 1 shot conceded."
+    assert dead_ball["Direct free kicks"]["read"] == "No. 10 took 2 of 2, right foot; 2 on target, 1 scored."
+    for section in (attacking, defending, dead_ball):
+        assert all(item["lever"] for item in section.values())
+
+
+def test_single_moment_reads_in_the_singular():
+    moment = hd.new_event("goal_scored", {"channel": "Left wing", "action": "Cross", "arrival": "Near post", "counter_trigger": "Not a counter"})
+    attacking = {i["label"]: i["read"] for i in hd.build_dossier("Weymouth", [moment])["sections"][0]["items"]}
+    assert hd.build_dossier("Weymouth", [moment])["quick_read"]["threat"] == "Attacks down their left wing (1 of 1 goal or chance)"
+    assert attacking["Creation channel"].startswith("1 of 1 goal or chance came down their left wing")
+    assert attacking["Counter-attack triggers"] == "The one goal or chance logged didn't come on the counter."
+    conceded = hd.new_event("chance_conceded", {"flaw": "Beaten in the air", "side": "Central"})
+    defending = {i["label"]: i["read"] for i in hd.build_dossier("Weymouth", [conceded])["sections"][1]["items"]}
+    assert defending["Isolated 1v1 matchups"] == "No isolated 1v1 defending in 1 goal or chance conceded."
+    assert defending["Space behind full-backs"] == "No goal or chance conceded came in behind the full-backs."
+
+
+def test_empty_dossier_prompts_logging():
+    d = hd.build_dossier("Weymouth", [])
+    assert d["confidence"]["text"] == "Data Confidence: Low · 0 moments logged; treat as leads, not patterns"
+    assert d["quick_read"]["threat"] == "Log goals and chances to find their main threat"
+    items = [i for s in d["sections"] for i in s["items"]]
+    assert len(items) == 9 and all("logged yet" in i["read"] and not i["lever"] for i in items)
+
+
+def test_moment_validation_and_storage(tmp_path):
+    with pytest.raises(ValueError, match="unknown moment type"):
+        hd.new_event("throw_in", {})
+    with pytest.raises(ValueError, match="Delivery: 'Banana'"):
+        hd.new_event("corner_for", {"delivery": "Banana", "target": "Near post", "outcome": "Goal"})
+    with pytest.raises(ValueError, match="minute"):
+        hd.new_event("free_kick", {"foot": "Left foot", "outcome": "Goal"}, minute=200)
+    assert len(hd.new_event("free_kick", {"player": "A" * 40, "foot": "Left foot", "outcome": "Goal"})["fields"]["player"]) == hd.TEXT_MAX
+
+    path = hd.events_path(tmp_path, "weymouth")
+    first = hd.add_event(path, "corner_against", {"marking": "Hybrid", "outcome": "Cleared"}, source="v Yeovil")
+    hd.add_event(path, "free_kick", {"player": "10", "foot": "Left foot", "outcome": "Goal"}, minute=81)
+    assert [e["kind"] for e in hd.load_events(path)] == ["corner_against", "free_kick"]
+    assert hd.logged_opponents(tmp_path) == ["weymouth"]
+    assert hd.delete_event(path, first["id"]) and not hd.delete_event(path, "missing")
+    assert hd.describe_event(hd.load_events(path)[0]) == "Direct free kick · No. 10 · Left foot · Goal · 81'"
+    hd.delete_event(path, hd.load_events(path)[0]["id"])
+    assert hd.logged_opponents(tmp_path) == []   # an emptied log is not a dossier
+
+
+def test_dossier_text_is_free_of_engineering_terms():
+    moments = _moments()
+    text = " ".join([hd.dossier_text(hd.build_dossier("Weymouth", moments)), hd.dossier_text(hd.build_dossier("Weymouth", [])),
+                     *(hd.describe_event(e) for e in moments)])
+    variants = [hd.new_event("goal_scored", {"channel": c, "action": a, "arrival": "Outside the box", "counter_trigger": t})
+                for c in hd.CHANNELS for a in hd.ACTIONS for t in hd.TRIGGERS]
+    variants += [hd.new_event("chance_conceded", {"flaw": f, "side": s}) for f in hd.FLAWS for s in hd.SIDES]
+    variants += [hd.new_event("corner_for", {"delivery": d, "target": z, "outcome": "Shot"}) for d in hd.DELIVERIES for z in hd.CORNER_ZONE]
+    variants += [hd.new_event("corner_against", {"marking": m, "outcome": o}) for m in hd.MARKING for o in hd.CORNER_AGST]
+    for group in (variants[i:i + 7] for i in range(0, len(variants), 7)):
+        text += " " + hd.dossier_text(hd.build_dossier("Weymouth", group))
+    assert banned_terms(text) == []
+
+
+def test_highlight_mode_hides_the_pitch_and_logs_moments(tab_env):
+    from streamlit.testing.v1 import AppTest
+
+    path = hd.events_path(vc.SOURCES, "supporting_charities")
+    for e in _moments():
+        hd.add_event(path, e["kind"], e["fields"], minute=e["minute"], source="v Weymouth")
+
+    at = AppTest.from_function(_tab_script, default_timeout=60)
+    at.run()
+    at.text_input(key="vcc_opponent").set_value("Supporting Charities").run()
+    at.radio(key="vcc_mode").set_value("Highlight & Tendency Dossier").run()
+    assert not at.exception
+
+    text = "\n".join(_all_text(at.main))
+    assert banned_terms(text) == []
+    assert 'class="vcc-pitch"' not in text and "Kit contrast check" not in text   # no team shape, no video analysis
+    for expected in ("HIGHLIGHT REEL", "Attacks down their left wing", "Attacking Patterns", "Defensive Flaws",
+                     "Dead-Ball Intelligence", "Log a key moment", "Logged moments · 17", "Data Confidence: Medium"):
+        assert expected in text, expected
+
+    at.selectbox(key="vcc_hl_kind").set_value("free_kick").run()
+    at.text_input(key="vcc_hl_free_kick_player").set_value("7").run()
+    at.button(key="vcc_hl_add").click().run()
+    assert not at.exception
+    assert hd.load_events(path)[-1]["fields"] == {"player": "7", "foot": "Right foot", "outcome": "Goal"}
+    assert "Logged moments · 18" in "\n".join(_all_text(at.main))

@@ -16,7 +16,11 @@ from pathlib import Path
 import streamlit as st
 
 from cv import coach_brief as cb
+from cv import highlight_dossier as hd
 from cv import vision_center as vc
+
+MODE_FULL      = "Full Match Structural Analysis"
+MODE_HIGHLIGHT = "Highlight & Tendency Dossier"
 
 _CSS = """
 <style>
@@ -93,8 +97,20 @@ _CSS = """
 .vcc-lib td.opp { font:700 .95rem Bahnschrift,'Arial Narrow',Arial,sans-serif; text-transform:uppercase; letter-spacing:.04em; }
 .vcc-empty { text-align:center; padding:48px 20px; border:1px dashed #30363D; border-radius:14px; background:#161B22; }
 .vcc-empty b { display:block; font:700 1.3rem Bahnschrift,'Arial Narrow',Arial,sans-serif; color:#F0F6FC; letter-spacing:.04em; text-transform:uppercase; }
+.vcc-quick { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#30363D; }
+.vcc-quick .q { background:#161B22; padding:16px 20px; }
+.vcc-quick .threat { box-shadow:inset 4px 0 0 #F85149; } .vcc-quick .weak { box-shadow:inset 4px 0 0 #3FB950; }
+.vcc-quick .k { font:600 .68rem Bahnschrift,'Arial Narrow',Arial,sans-serif; letter-spacing:.16em; color:#8B949E; text-transform:uppercase; }
+.vcc-quick .v { font:700 1.2rem/1.3 Bahnschrift,'Arial Narrow',Arial,sans-serif; color:#F0F6FC; margin-top:6px; }
+.vcc-phases .item { margin:0 0 16px; }
+.vcc-phases .il { font:600 .68rem Bahnschrift,'Arial Narrow',Arial,sans-serif; letter-spacing:.14em; color:#8B949E; text-transform:uppercase; }
+.vcc-phases .ir { font:.88rem/1.5 'Segoe UI',Inter,system-ui,sans-serif; color:#E6EDF3; margin-top:3px; }
+.vcc-phases .ir.empty { color:#6E7681; }
+.vcc-phases .iv { font:600 .84rem/1.5 'Segoe UI',Inter,system-ui,sans-serif; color:#3FB950; margin-top:4px; }
+.vcc-moment { font:.85rem/1.4 'Segoe UI',Inter,system-ui,sans-serif; color:#E6EDF3; padding:7px 0; border-bottom:1px solid #21262D; }
+.vcc-moment span { color:#8B949E; }
 @media (max-width: 1000px) { .vcc-metrics, .vcc-phases { grid-template-columns:1fr 1fr; } .vcc-phases .p3 { grid-column:span 2; } }
-@media (max-width: 640px) { .vcc-metrics, .vcc-phases { grid-template-columns:1fr; } .vcc-phases .p3 { grid-column:auto; }
+@media (max-width: 640px) { .vcc-metrics, .vcc-phases, .vcc-quick { grid-template-columns:1fr; } .vcc-phases .p3 { grid-column:auto; }
   .vcc-brief-head .right { align-items:flex-start; } }
 </style>
 """
@@ -129,14 +145,20 @@ def _setup_slug() -> str:
 def render() -> None:
     _html(_CSS)
     with st.container(key="vcc"):
-        scouted = vc.scouted_opponents()
+        highlight = st.session_state.get("vcc_mode", MODE_FULL) == MODE_HIGHLIGHT
+        scouted = hd.logged_opponents(vc.SOURCES) if highlight else vc.scouted_opponents()
+        subtitle = ("Their threats, weak spots and set pieces, logged from highlight reels." if highlight
+                    else "How they defend, where the space is, and where we hold when we lose it.")
         _html('<div class="vcc-head"><div><div class="vcc-eyebrow">Opposition analysis</div>'
-              '<h2>Match Intelligence Report</h2>'
-              '<p>How they defend, where the space is, and where we hold when we lose it.</p></div></div>')
-        with st.expander("Match Setup", expanded=not scouted, icon=":material/tune:"):
+              f'<h2>Match Intelligence Report</h2><p>{escape(subtitle)}</p></div></div>')
+        logging_moments = highlight and bool(_setup_slug())    # keep the drawer open while the analyst logs a reel
+        with st.expander("Match Setup", expanded=not scouted or logging_moments, icon=":material/tune:"):
             _match_setup()
         _analysis_status()
-        _report(scouted)
+        if highlight:
+            _dossier_report(scouted)
+        else:
+            _report(scouted)
 
 
 # ── Match Setup drawer ───────────────────────────────────────────────────────
@@ -153,27 +175,30 @@ def _video_signature() -> tuple:
 
 
 def _match_setup() -> None:
+    st.radio("Report mode", [MODE_FULL, MODE_HIGHLIGHT], key="vcc_mode", horizontal=True)
+    highlight = st.session_state.get("vcc_mode") == MODE_HIGHLIGHT
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        st.text_input("Opponent name", key="vcc_opponent", placeholder="e.g. Dorchester Town")
+    with c2:
+        if highlight:
+            reel = st.text_input("Highlight reel", key="vcc_reel", placeholder="e.g. v Weymouth, 12 Aug")
+        else:
+            kit = st.color_picker("Their shirt colour", value="#CC2222", key="vcc_kit")
+    slug = _setup_slug()
+
+    if highlight:
+        _html(_note("Highlight clips can't show team shape. Log each goal, chance, corner and direct free kick; "
+                    "the dossier updates as you go."))
+        _moment_entry(slug, reel)
+        return
     left, right = st.columns([1.1, 1], gap="large")
     with left:
         _html(_label("Match video"))
         video = _video_picker()
     with right:
-        _html(_label("Opponent"))
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            st.text_input("Opponent name", key="vcc_opponent", placeholder="e.g. Dorchester Town")
-        with c2:
-            kit = st.color_picker("Their shirt colour", value="#CC2222", key="vcc_kit")
-        footage = st.radio("Video type", ["full_wide", "highlight"], key="vcc_footage", horizontal=True,
-                           format_func=lambda f: {"full_wide": "Full match", "highlight": "Highlights only"}[f])
-        if footage == "highlight":
-            _html(_note("Highlights can't show a defensive shape. Use the full match for a complete report."))
-    slug = _setup_slug()
-    k1, k2 = st.columns([1.1, 1], gap="large")
-    with k1:
         _kit_check(slug, video, kit.upper())
-    with k2:
-        _start_analysis(slug, video, kit.upper(), footage)
+    _start_analysis(slug, video, kit.upper(), "full_wide")
 
 
 def _video_picker() -> str | None:
@@ -360,3 +385,87 @@ def _library(order: list[str]) -> None:
               + '<div style="overflow-x:auto"><table class="vcc-lib"><thead><tr><th>Opponent</th><th>Report date</th>'
                 '<th>Structure</th><th>Defensive line</th><th>Press trigger</th><th>Confidence</th></tr></thead>'
               + f"<tbody>{body}</tbody></table></div>")
+
+
+# ── Highlight & Tendency Dossier ─────────────────────────────────────────────
+
+MOMENTS_SHOWN = 15
+
+
+def _moment_entry(slug: str, reel: str) -> None:
+    _html(_label("Log a key moment"))
+    if not slug:
+        _html(_note("Name the opponent to start logging moments."))
+        return
+    path = hd.events_path(vc.SOURCES, slug)
+    t1, t2 = st.columns([2, 1])
+    with t1:
+        kind = st.selectbox("Moment", list(hd.KINDS), key="vcc_hl_kind", format_func=lambda k: hd.KINDS[k]["label"])
+    with t2:
+        minute = st.number_input("Minute", min_value=0, max_value=130, value=None, step=1, placeholder="e.g. 63", key="vcc_hl_minute")
+    group = hd.KINDS[kind]["group"]
+    values = {}
+    for col, (name, field) in zip(st.columns(len(hd.FIELDS[group])), hd.FIELDS[group].items()):
+        with col:
+            key = f"vcc_hl_{group}_{name}"
+            values[name] = (st.selectbox(field["label"], field["options"], key=key) if field["options"]
+                            else st.text_input(field["label"], key=key, placeholder=field["placeholder"]))
+    if st.button("Add Moment", type="primary", key="vcc_hl_add", width="stretch"):
+        hd.add_event(path, kind, values, minute=minute, source=reel)
+        st.toast(f"{hd.KINDS[kind]['label']} added")
+        st.rerun()
+
+    events = hd.load_events(path)
+    if not events:
+        return
+    _html(_label(f"Logged moments · {len(events)}"))
+    for event in reversed(events[-MOMENTS_SHOWN:]):
+        line, remove = st.columns([12, 1], vertical_alignment="center")
+        source = f' <span>· {escape(event["source"])}</span>' if event.get("source") else ""
+        line.markdown(f'<div class="vcc-moment">{escape(hd.describe_event(event))}{source}</div>', unsafe_allow_html=True)
+        if remove.button(":material/close:", key=f"vcc_hl_del_{event['id']}", help="Remove this moment"):
+            hd.delete_event(path, event["id"])
+            st.rerun()
+    if len(events) > MOMENTS_SHOWN:
+        _html(_note(f"Showing the latest {MOMENTS_SHOWN} of {len(events)} moments."))
+
+
+def _dossier_report(logged: list[str]) -> None:
+    if not logged:
+        _html('<div class="vcc-empty"><b>No highlight dossiers yet</b>'
+              + _note("Open Match Setup, choose Highlight & Tendency Dossier, name the opponent and log key moments.") + "</div>")
+        return
+    setup = _setup_slug()
+    if setup in logged and st.session_state.get("vcc_dossier_setup") != setup:
+        st.session_state["vcc_dossier_opp"] = setup      # follow the opponent being logged
+    st.session_state["vcc_dossier_setup"] = setup
+    if st.session_state.get("vcc_dossier_opp") not in logged:
+        st.session_state["vcc_dossier_opp"] = logged[0]
+    if len(logged) > 1:
+        st.selectbox("Opponent dossier", logged, key="vcc_dossier_opp", format_func=vc.display_name)
+    slug = st.session_state["vcc_dossier_opp"]
+    dossier = hd.build_dossier(vc.display_name(slug), hd.load_events(hd.events_path(vc.SOURCES, slug)))
+    _html(_dossier_card(dossier))
+
+
+def _dossier_card(d: dict) -> str:
+    conf, quick = d["confidence"], d["quick_read"]
+    head = ('<div class="vcc-brief-head"><div><div class="vcc-eyebrow">Opposition scouting dossier</div>'
+            f'<div class="opp">{escape(d["opponent"])}</div><div class="shape">{escape(d["note"])}</div></div>'
+            f'<div class="right"><span class="vcc-struct">{escape(d["footage"].upper())}</span>'
+            f'{_pill(conf["text"], conf["tone"])}</div></div>')
+    quick_read = ('<div class="vcc-quick">'
+                  f'<div class="q threat"><div class="k">Primary threat</div><div class="v">{escape(quick["threat"])}</div></div>'
+                  f'<div class="q weak"><div class="k">Primary vulnerability</div><div class="v">{escape(quick["vulnerability"])}</div></div>'
+                  "</div>")
+    sections = []
+    for i, section in enumerate(d["sections"], start=1):
+        items = []
+        for item in section["items"]:
+            empty = "" if item["lever"] else " empty"
+            lever = f'<div class="iv">→ {escape(item["lever"])}</div>' if item["lever"] else ""
+            items.append(f'<div class="item"><div class="il">{escape(item["label"])}</div>'
+                         f'<div class="ir{empty}">{escape(item["read"])}</div>{lever}</div>')
+        sections.append(f'<div class="p p{i}"><div class="top"><div class="num">{i}</div>'
+                        f'<div class="t">{escape(section["title"])}</div></div>{"".join(items)}</div>')
+    return f'<div class="vcc-brief">{head}{quick_read}<div class="vcc-phases">{"".join(sections)}</div></div>'
