@@ -759,12 +759,13 @@ st.markdown(
 # TABS
 # ══════════════════════════════════════════════════════════════════════════════
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📥  Match Ingestion",
     "🎥  Veo Video Lab",
     "🧠  Agent Cockpit",
     "📦  Deliverables",
     "📈  Progress Review",
+    "🎯  Opposition Analysis",
 ])
 
 
@@ -2848,3 +2849,12 @@ with tab5:
                     key="dl_dof_card",
                     use_container_width=True,
                 )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 6 — Tactical Vision Command Center
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab6:
+    from cv.vision_center_ui import render as _render_vision_center
+    _render_vision_center()

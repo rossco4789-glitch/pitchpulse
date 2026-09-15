@@ -4,3 +4,5 @@ opencv-python        # cv/calibration.py, cv/picker.py — Tier 1 homography (CP
 streamlit            # app.py — desktop dashboard (local only, no cloud)
 python-docx          # data/parse_report.py — club .docx match reports
 kaggle               # tools/cloud_vision_runner.py — headless Kaggle GPU batch runs (CLAUDE.md §5 exception)
+plotly               # app.py — Veo Video Lab frame-selection chart (plotly.express)
+psutil               # cv/vision_center.py — tracks detached dispatch / collect / pre-flight processes

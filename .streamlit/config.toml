@@ -10,3 +10,4 @@ font                     = "sans serif"
 headless         = true
 enableCORS       = false
 enableXsrfProtection = true
+maxUploadSize    = 4096   # MB: Vision Command Center stages full-match Veo footage (~2.2 GB)
