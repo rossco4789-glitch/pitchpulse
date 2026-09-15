@@ -145,6 +145,15 @@ def tab_env(tmp_path, monkeypatch):
         monkeypatch.setattr(vc, name, tmp_path / sub)
     for fn in ("start_collect", "start_dispatch", "start_preflight"):
         monkeypatch.setattr(vc, fn, lambda *a, **k: None)   # never launch real work from a render test
+
+    from urllib.error import URLError
+    from cv import club_assets as ca
+
+    def offline(url):
+        raise URLError("render tests stay offline")
+
+    monkeypatch.setattr(ca, "_http_json", offline)           # club lookups fall back to the default kit
+    monkeypatch.setattr(ca, "_http_bytes", offline)
     (tmp_path / "staging").mkdir()
     writer = cv2.VideoWriter(str(tmp_path / "staging" / "tiverton_v_supporting_charities.mp4"), cv2.VideoWriter_fourcc(*"mp4v"), 10, (64, 48))
     for _ in range(20):

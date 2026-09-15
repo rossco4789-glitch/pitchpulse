@@ -42,6 +42,8 @@ data/scouting/sources/**/brief_auto.md
 data/scouting/cloud_staging/
 data/staging/
 data/scouting/sources/**/vision_job.json
+# Club crests fetched from Wikipedia are usually non-free logos: keep them local
+data/scouting/sources/**/badge.png
 # Test footage runs (not a real opponent)
 data/scouting/sources/test_veo/
 

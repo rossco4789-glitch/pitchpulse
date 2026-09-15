@@ -1,0 +1,9 @@
+{
+  "name": "Dorchester Town F.C.",
+  "slug": "dorchester_town",
+  "badge_path": "data/scouting/sources/dorchester_town/badge.png",
+  "home_kit": "#000000",
+  "away_kit": "#0000EE",
+  "verified": true,
+  "kit_source": "club records"
+}

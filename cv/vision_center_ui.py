@@ -15,6 +15,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from cv import club_assets as ca
 from cv import coach_brief as cb
 from cv import highlight_dossier as hd
 from cv import vision_center as vc
@@ -109,6 +110,9 @@ _CSS = """
 .vcc-phases .iv { font:600 .84rem/1.5 'Segoe UI',Inter,system-ui,sans-serif; color:#3FB950; margin-top:4px; }
 .vcc-moment { font:.85rem/1.4 'Segoe UI',Inter,system-ui,sans-serif; color:#E6EDF3; padding:7px 0; border-bottom:1px solid #21262D; }
 .vcc-moment span { color:#8B949E; }
+.vcc-club { font:700 1.1rem Bahnschrift,'Arial Narrow',Arial,sans-serif; color:#F0F6FC; letter-spacing:.03em; text-transform:uppercase; margin-bottom:4px; }
+.vcc-crest-empty { width:52px; height:52px; border-radius:12px; border:1px dashed #30363D; display:grid; place-items:center;
+  font:700 1.3rem Bahnschrift,Arial,sans-serif; color:#6E7681; }
 @media (max-width: 1000px) { .vcc-metrics, .vcc-phases { grid-template-columns:1fr 1fr; } .vcc-phases .p3 { grid-column:span 2; } }
 @media (max-width: 640px) { .vcc-metrics, .vcc-phases, .vcc-quick { grid-template-columns:1fr; } .vcc-phases .p3 { grid-column:auto; }
   .vcc-brief-head .right { align-items:flex-start; } }
@@ -174,17 +178,29 @@ def _video_signature() -> tuple:
     return tuple((p.name, p.stat().st_size, p.stat().st_mtime) for p in sorted(vc.STAGING_VIDEOS.glob("*.mp4")))
 
 
+@st.cache_data(show_spinner=False, ttl=900)
+def _club_assets(name: str, sources: str) -> dict:
+    return ca.resolve_club_assets(name, sources=sources)
+
+
 def _match_setup() -> None:
     st.radio("Report mode", [MODE_FULL, MODE_HIGHLIGHT], key="vcc_mode", horizontal=True)
     highlight = st.session_state.get("vcc_mode") == MODE_HIGHLIGHT
+    name = st.session_state.get("vcc_opponent", "").strip()
+    club = None
+    if name:
+        with st.spinner("Looking up the club…"):
+            club = _club_assets(name, str(vc.SOURCES))
     c1, c2 = st.columns([2, 1])
     with c1:
         st.text_input("Opponent name", key="vcc_opponent", placeholder="e.g. Dorchester Town")
+        if club:
+            _club_banner(club)
     with c2:
         if highlight:
             reel = st.text_input("Highlight reel", key="vcc_reel", placeholder="e.g. v Weymouth, 12 Aug")
         else:
-            kit = st.color_picker("Their shirt colour", value="#CC2222", key="vcc_kit")
+            kit = _kit_selector(club)
     slug = _setup_slug()
 
     if highlight:
@@ -199,6 +215,36 @@ def _match_setup() -> None:
     with right:
         _kit_check(slug, video, kit.upper())
     _start_analysis(slug, video, kit.upper(), "full_wide")
+
+
+def _club_banner(club: dict) -> None:
+    crest, text = st.columns([1, 6], vertical_alignment="center")
+    with crest:
+        if club["badge_path"]:
+            st.image(club["badge_path"], width=52)
+        else:
+            _html('<div class="vcc-crest-empty">?</div>')
+    with text:
+        if not club["verified"]:
+            status = _pill("Club not found online · set their kit colour", "amber")
+        elif club.get("kit_source") == "club records":
+            status = _pill("Club found · kit colours from club records", "green")
+        else:
+            status = _pill("Club found · kit colours guessed from the crest; check them against the video", "amber")
+        _html(f'<div class="vcc-club">{escape(club["name"])}</div>{status}')
+
+
+def _kit_selector(club: dict | None) -> str:
+    home = club["home_kit"] if club else ca.DEFAULT_HOME
+    away = club["away_kit"] if club else ca.DEFAULT_AWAY
+    choice = st.radio("Their kit", ["Home", "Away"], key="vcc_kit_choice", horizontal=True)
+    with st.popover("Custom kit colour", icon=":material/palette:"):
+        custom_on = st.checkbox("Use a custom colour (third kit or clash)", key="vcc_kit_custom_on")
+        custom = st.color_picker("Custom colour", value=ca.DEFAULT_HOME, key="vcc_kit_custom")
+    kit = (custom if custom_on else home if choice == "Home" else away).upper()
+    st.session_state["vision_opponent_kit"] = kit
+    _html('<div class="vcc-swatches">' + _swatch(kit, "Custom colour" if custom_on else f"{choice} shirt") + "</div>")
+    return kit
 
 
 def _video_picker() -> str | None:
