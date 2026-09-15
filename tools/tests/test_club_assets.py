@@ -213,7 +213,7 @@ def test_setup_shows_crest_and_home_away_kit_toggle(tmp_path, monkeypatch):
 
     at = AppTest.from_function(_tab_script, default_timeout=60)
     at.run()
-    at.text_input(key="vcc_opponent").set_value("Weymouth").run()
+    at.selectbox(key="vcc_opponent_pick").set_value("Weymouth").run()
     assert not at.exception
     assert at.session_state["vision_opponent_kit"] == "#003399"
     text = "\n".join(_all_text(at.main))

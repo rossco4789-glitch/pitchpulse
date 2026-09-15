@@ -18,6 +18,7 @@ import streamlit as st
 from cv import club_assets as ca
 from cv import coach_brief as cb
 from cv import highlight_dossier as hd
+from cv import league_roster as lr
 from cv import vision_center as vc
 
 MODE_FULL      = "Full Match Structural Analysis"
@@ -140,8 +141,13 @@ def _alert(text: str, tone: str = "") -> str:
     return f'<div class="vcc-alert {tone}">{escape(text)}</div>'
 
 
+def _opponent_name() -> str:
+    """League club from the quick-select, or the typed name when Other / Custom is chosen."""
+    return lr.opponent_name(st.session_state.get("vcc_opponent_pick"), st.session_state.get("vcc_opponent"))
+
+
 def _setup_slug() -> str:
-    return vc.slugify(st.session_state.get("vcc_opponent", ""))
+    return vc.slugify(_opponent_name())
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
@@ -186,14 +192,17 @@ def _club_assets(name: str, sources: str) -> dict:
 def _match_setup() -> None:
     st.radio("Report mode", [MODE_FULL, MODE_HIGHLIGHT], key="vcc_mode", horizontal=True)
     highlight = st.session_state.get("vcc_mode") == MODE_HIGHLIGHT
-    name = st.session_state.get("vcc_opponent", "").strip()
+    name = _opponent_name()
+    st.session_state["vision_opponent_name"] = name
     club = None
     if name:
         with st.spinner("Looking up the club…"):
             club = _club_assets(name, str(vc.SOURCES))
     c1, c2 = st.columns([2, 1])
     with c1:
-        st.text_input("Opponent name", key="vcc_opponent", placeholder="e.g. Dorchester Town")
+        pick = st.selectbox("Opponent · Southern League Division One South", lr.opponent_options(), key="vcc_opponent_pick")
+        if pick == lr.CUSTOM:
+            st.text_input("Opponent name", key="vcc_opponent", placeholder="e.g. a cup or friendly opponent")
         if club:
             _club_banner(club)
     with c2:

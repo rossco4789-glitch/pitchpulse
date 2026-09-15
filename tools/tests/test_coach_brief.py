@@ -184,6 +184,7 @@ def test_tab_renders_a_coach_briefing_with_no_engineering_terms(tab_env):
     at = AppTest.from_function(_tab_script, default_timeout=60)
     at.run()
     assert not at.exception
+    at.selectbox(key="vcc_opponent_pick").set_value("Other / Custom...").run()   # not a league club
     at.text_input(key="vcc_opponent").set_value("Supporting Charities").run()
     assert not at.exception
 
@@ -314,6 +315,7 @@ def test_highlight_mode_hides_the_pitch_and_logs_moments(tab_env):
 
     at = AppTest.from_function(_tab_script, default_timeout=60)
     at.run()
+    at.selectbox(key="vcc_opponent_pick").set_value("Other / Custom...").run()
     at.text_input(key="vcc_opponent").set_value("Supporting Charities").run()
     at.radio(key="vcc_mode").set_value("Highlight & Tendency Dossier").run()
     assert not at.exception
