@@ -2,8 +2,8 @@
   "name": "Bristol Manor Farm F.C.",
   "slug": "bristol_manor_farm",
   "badge_path": "data/scouting/sources/bristol_manor_farm/badge.png",
-  "home_kit": "#737071",
-  "away_kit": "#D1D1D2",
+  "home_kit": "#CC2222",
+  "away_kit": "#FFDD00",
   "verified": true,
-  "kit_source": "crest"
+  "kit_source": "club records"
 }

@@ -1,9 +1,9 @@
 {
-  "name": "Hartpury University",
+  "name": "Hartpury University F.C.",
   "slug": "hartpury_university",
   "badge_path": null,
   "home_kit": "#CC2222",
-  "away_kit": "#FFFFFF",
-  "verified": false,
-  "kit_source": "default"
+  "away_kit": "#111111",
+  "verified": true,
+  "kit_source": "club records"
 }
