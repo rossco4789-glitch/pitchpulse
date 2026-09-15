@@ -42,6 +42,8 @@ data/scouting/sources/**/brief_auto.md
 data/scouting/cloud_staging/
 data/staging/
 data/scouting/sources/**/vision_job.json
+# Test footage runs (not a real opponent)
+data/scouting/sources/test_veo/
 
 # Sample data & ledger (committed for demo; swap for real data)
 # data/samples/2026-09-05_st_blazey/  ← keep tracked (moved out of data/raw so

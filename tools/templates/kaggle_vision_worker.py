@@ -67,9 +67,10 @@ ISOLATED_CENTRE_PX = 80     # broadcast: valid #32 at 79 px from a box-cluster f
 CENTRE_CIRCLE    = (31, 32)
 END_ZONE_X_M     = 16.5     # penalty-area depth: landmarks within it of either goal line form a same-end cluster
 HULL_MARGIN_M    = 5.0
-SETTLED_MIN_PLAYERS = 8
+SETTLED_MIN_PLAYERS = 6    # follow-cam rarely frames 8 opponents (Veo 15 Sep: 12 settled frames); Block height uses the deepest 4
 SETTLED_MAX_DEPTH_M = 40.0
 SETTLED_RUN      = 8        # consecutive sampled frames = 4 s at 2 FPS
+SETTLED_MAX_GAP_S = 2.0     # a 1-2 frame homography drop (42.7 % acceptance on Veo) does not break a settled run
 WINDOW_S         = 300      # attack direction and coverage are judged per 5-minute window
 SILHOUETTE_MIN   = 0.5
 KIT_LAB_WEIGHTS  = np.array([0.2, 1.5, 1.0])  # L*, a*, b*: kit clustering keyed to hue, not lighting
@@ -276,10 +277,11 @@ def _entry(values, windows, reason=None) -> dict:
 
 
 def settled_frames(series: list[tuple[float, np.ndarray]]) -> list[tuple[float, np.ndarray]]:
-    """Frames where the (normalised) opponent sits in its own half, ≥ 8 outfielders, depth ≤ 40 m, for ≥ 4 s."""
+    """Frames where the (normalised) opponent sits in its own half, ≥ SETTLED_MIN_PLAYERS outfielders, depth ≤ 40 m,
+    for ≥ SETTLED_RUN sampled frames with no gap over SETTLED_MAX_GAP_S."""
     ok = [(t, p) for t, p in series
           if len(p) >= SETTLED_MIN_PLAYERS and p[:, 0].mean() < PITCH_L / 2 and np.ptp(p[:, 0]) <= SETTLED_MAX_DEPTH_M]
-    runs, cur, gap = [], [], 1.5 / SAMPLE_FPS
+    runs, cur, gap = [], [], SETTLED_MAX_GAP_S
     for t, p in ok:
         if cur and t - cur[-1][0] > gap:
             runs.append(cur)
@@ -551,7 +553,8 @@ def run(input_dir: Path = INPUT, output_dir: Path = OUTPUT) -> None:
                   "min_inlier_ratio": MIN_INLIER_RATIO,
                   "max_cond": MAX_COND, "min_samples": MIN_SAMPLES, "silhouette_min": SILHOUETTE_MIN,
                   "exclude_landmarks": list(exclude), "border_px": BORDER_PX,
-                  "isolated_centre_px": ISOLATED_CENTRE_PX, "tolerance_reference_height_px": REFERENCE_HEIGHT_PX},
+                  "isolated_centre_px": ISOLATED_CENTRE_PX, "tolerance_reference_height_px": REFERENCE_HEIGHT_PX,
+                  "settled_min_players": SETTLED_MIN_PLAYERS, "settled_max_gap_s": SETTLED_MAX_GAP_S},
     }, output_dir)
 
 

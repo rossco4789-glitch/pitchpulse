@@ -755,6 +755,19 @@ def test_ambiguous_kits_null_the_team_metrics():
     assert reason.startswith("team_split_ambiguous")
 
 
+def test_settled_frames_accept_six_outfielders_and_bridge_follow_cam_gaps():
+    import inspect
+    six =np.array([[10.0 + i * 2, 10.0 + i * 5] for i in range(6)])   # own half, 10 m deep
+    bridged = [0, 0.5, 1.0, 1.5, 3.0, 3.5, 4.0, 4.5]                   # 1.5 s homography drop mid-run
+    assert len(worker.settled_frames([(t, six) for t in bridged])) == 8
+    broken = [0, 0.5, 1.0, 1.5, 4.0, 4.5, 5.0, 5.5]                    # 2.5 s gap splits into two 4-frame runs
+    assert worker.settled_frames([(t, six) for t in broken]) == []
+    assert worker.settled_frames([(t, six[:5]) for t in bridged]) == []   # 5 outfielders do not anchor a block
+    source = inspect.getsource(worker.run)
+    assert '"settled_min_players": SETTLED_MIN_PLAYERS' in source and '"settled_max_gap_s": SETTLED_MAX_GAP_S' in source
+    assert (worker.SETTLED_MIN_PLAYERS, worker.SETTLED_MAX_GAP_S) == (6, 2.0)
+
+
 def test_worker_main_writes_failed_report_instead_of_raising(tmp_path, monkeypatch):
     monkeypatch.setattr(worker, "OUTPUT", tmp_path)
     monkeypatch.setattr(worker, "run", lambda: (_ for _ in ()).throw(RuntimeError("CUDA out of memory")))
