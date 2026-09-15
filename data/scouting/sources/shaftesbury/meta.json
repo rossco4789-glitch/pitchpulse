@@ -1,0 +1,9 @@
+{
+  "name": "Shaftesbury F.C.",
+  "slug": "shaftesbury",
+  "badge_path": "data/scouting/sources/shaftesbury/badge.png",
+  "home_kit": "#FF0000",
+  "away_kit": "#00FF00",
+  "verified": true,
+  "kit_source": "club records"
+}

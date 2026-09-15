@@ -1,0 +1,9 @@
+{
+  "name": "Bideford A.F.C.",
+  "slug": "bideford",
+  "badge_path": "data/scouting/sources/bideford/badge.png",
+  "home_kit": "#FF0000",
+  "away_kit": "#24BDFF",
+  "verified": true,
+  "kit_source": "club records"
+}

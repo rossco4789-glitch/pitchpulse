@@ -1,0 +1,9 @@
+{
+  "name": "Swindon Supermarine F.C.",
+  "slug": "swindon_supermarine",
+  "badge_path": "data/scouting/sources/swindon_supermarine/badge.png",
+  "home_kit": "#0000FF",
+  "away_kit": "#FF0000",
+  "verified": true,
+  "kit_source": "club records"
+}

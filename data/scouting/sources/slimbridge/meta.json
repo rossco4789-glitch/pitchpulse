@@ -1,0 +1,9 @@
+{
+  "name": "Slimbridge A.F.C.",
+  "slug": "slimbridge",
+  "badge_path": "data/scouting/sources/slimbridge/badge.png",
+  "home_kit": "#0000FF",
+  "away_kit": "#008000",
+  "verified": true,
+  "kit_source": "club records"
+}

@@ -17,7 +17,9 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tools"))
 
+import prewarm_league_assets as pw  # noqa: E402
 from cv import club_assets as ca  # noqa: E402
 from cv import league_roster as lr  # noqa: E402
 from cv import vision_center as vc  # noqa: E402
@@ -77,6 +79,87 @@ def _all_text(node) -> list[str]:
     for child in getattr(node, "children", {}).values():
         out += _all_text(child)
     return out
+
+
+# ── Batch pre-warm ───────────────────────────────────────────────────────────
+
+def _league_wikipedia(monkeypatch):
+    """Fake Wikipedia with one edge case per club: records, crest only, no page, offline, bad JSON, bad crest."""
+    from urllib.error import URLError
+    from urllib.parse import parse_qs, urlparse
+
+    def fake_json(url):
+        if "search/page" in url:
+            club = parse_qs(urlparse(url).query)["q"][0].removesuffix(" F.C.")
+            if club.startswith("Exmouth"):
+                raise URLError("connection reset")
+            if club.startswith("Hungerford"):
+                raise ValueError("Expecting value: line 1 column 1")   # truncated JSON
+            if club.startswith("Bideford"):
+                return {"pages": [{"key": "Bideford", "title": "Bideford", "description": "Town in Devon, England"}]}
+            key = f"{club.replace(' ', '_')}_F.C."
+            return {"pages": [{"key": key, "title": key.replace("_", " "), "description": "Association football club in England"}]}
+        key = url.rsplit("/", 1)[1]
+        if "summary" in url:
+            return {"title": key.replace("_", " ").replace("%27", "'"), "thumbnail": {"source": f"https://upload.example/{key}.png"}}
+        return {"source": WIKITEXT if key.startswith("Dorchester") else ""}
+
+    def fake_bytes(url):
+        return b"<html>moved</html>" if "Paulton" in url else _crest()
+
+    monkeypatch.setattr(ca, "_http_json", fake_json)
+    monkeypatch.setattr(ca, "_http_bytes", fake_bytes)
+
+
+def test_prewarm_reports_each_edge_case_and_never_crashes(tmp_path, monkeypatch):
+    _league_wikipedia(monkeypatch)
+    clubs = ["Dorchester Town", "Weymouth", "Bideford", "Exmouth Town", "Hungerford Town", "Paulton Rovers"]
+    pauses = []
+    rows = {r["club"]: r for r in pw.prewarm(clubs, sources=tmp_path, delay=0.75, sleep=pauses.append)}
+    assert {c: (r["status"], r["kit_source"], r["home"], r["away"], r["crest"]) for c, r in rows.items()} == {
+        "Dorchester Town": ("RESOLVED", "club records", "#000000", "#0000EE", True),
+        "Weymouth": ("RESOLVED", "crest", "#5A8CFA", "#FFFFFF", True),
+        "Bideford": ("NOT_FOUND", "default", "#CC2222", "#FFFFFF", False),
+        "Exmouth Town": ("OFFLINE", "default", "#CC2222", "#FFFFFF", False),
+        "Hungerford Town": ("OFFLINE", "default", "#CC2222", "#FFFFFF", False),
+        "Paulton Rovers": ("RESOLVED", "default", "#CC2222", "#FFFFFF", False),     # page found, crest was not an image
+    }
+    assert rows["Dorchester Town"]["page"] == "Dorchester Town F.C." and rows["Bideford"]["page"] == ""
+    assert pauses == [0.75] * 5                                   # a pause between each of the 6 lookups
+    assert sorted(p.parent.name for p in tmp_path.glob("*/meta.json")) == ["bideford", "dorchester_town", "paulton_rovers", "weymouth"]
+
+    pauses.clear()
+    second = {r["club"]: r["status"] for r in pw.prewarm(clubs, sources=tmp_path, delay=0.75, sleep=pauses.append)}
+    assert second == {"Dorchester Town": "CACHED", "Weymouth": "CACHED", "Bideford": "CACHED",
+                      "Exmouth Town": "OFFLINE", "Hungerford Town": "OFFLINE", "Paulton Rovers": "CACHED"}
+    assert pauses == [0.75]                                       # only the two retried lookups are spaced
+
+
+def test_prewarm_force_refreshes_and_keeps_the_cache_when_offline(tmp_path, monkeypatch):
+    _league_wikipedia(monkeypatch)
+    pw.prewarm(["Dorchester Town"], sources=tmp_path, delay=0)
+    assert pw.prewarm(["Dorchester Town"], sources=tmp_path, force=True, delay=0)[0]["status"] == "RESOLVED"
+
+    def down(url):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(ca, "_http_json", down)
+    row = pw.prewarm(["Dorchester Town"], sources=tmp_path, force=True, delay=0)[0]
+    assert row["status"] == "OFFLINE"
+    assert pw.prewarm(["Dorchester Town"], sources=tmp_path, delay=0)[0]["status"] == "CACHED"   # old meta.json survives
+
+
+def test_prewarm_cli_covers_all_21_opponents(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(ca, "_http_json", lambda url: {"pages": []})
+    assert pw.opponents() == [c for c in lr.SOUTHERN_LEAGUE_DIV_ONE_SOUTH if c != "Tiverton Town"]
+    assert pw.main(["--sources", str(tmp_path), "--delay", "0"]) == 0
+    out = capsys.readouterr().out
+    assert "Pre-warming 21" in out and "Tiverton Town" in out and out.count("NOT_FOUND ") == 21
+    assert "CACHED: 0  RESOLVED: 0  NOT_FOUND: 21  OFFLINE: 0  (of 21)" in out
+    assert not re.search(r"^Tiverton Town\s", out, re.M)          # named only in the excluded note
+    with pytest.raises(SystemExit) as exc:
+        pw.main(["--delay", "-1"])
+    assert exc.value.code == 2
 
 
 def test_picking_a_league_club_resolves_crest_and_kit_without_typing(tmp_path, monkeypatch):

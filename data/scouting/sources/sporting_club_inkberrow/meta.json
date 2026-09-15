@@ -1,0 +1,9 @@
+{
+  "name": "Sporting Club Inkberrow F.C.",
+  "slug": "sporting_club_inkberrow",
+  "badge_path": "data/scouting/sources/sporting_club_inkberrow/badge.png",
+  "home_kit": "#FFFFFF",
+  "away_kit": "#FFFF00",
+  "verified": true,
+  "kit_source": "club records"
+}

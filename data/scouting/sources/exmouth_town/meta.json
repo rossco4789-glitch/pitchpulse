@@ -1,0 +1,9 @@
+{
+  "name": "Exmouth Town F.C.",
+  "slug": "exmouth_town",
+  "badge_path": "data/scouting/sources/exmouth_town/badge.png",
+  "home_kit": "#0000FF",
+  "away_kit": "#FF0000",
+  "verified": true,
+  "kit_source": "club records"
+}

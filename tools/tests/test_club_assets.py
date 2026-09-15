@@ -174,6 +174,75 @@ def test_broken_cache_and_blank_names_never_raise(tmp_path, online):
     assert ca.resolve_club_assets("   ", sources=tmp_path) == ca.fallback("", "")
 
 
+class _Response:
+    def __init__(self, body: bytes):
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self, n=-1):
+        return self.body if n is None or n < 0 else self.body[:n]
+
+
+def _http_error(code: int, retry_after: str | None = None):
+    from urllib.error import HTTPError
+
+    return HTTPError("https://en.wikipedia.org/w/rest.php/v1/search/page", code, "error",
+                     {"Retry-After": retry_after} if retry_after is not None else {}, None)
+
+
+def test_rate_limited_request_waits_for_retry_after_then_succeeds(monkeypatch):
+    replies, waits, agents = [_http_error(429, "4"), _http_error(429, "soon"), _Response(b'{"pages": []}')], [], []
+
+    def fake_urlopen(request, timeout):
+        agents.append(request.get_header("User-agent"))
+        reply = replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    monkeypatch.setattr(ca, "urlopen", fake_urlopen)
+    monkeypatch.setattr(ca, "_sleep", waits.append)
+    assert ca._http_json("https://en.wikipedia.org/w/rest.php/v1/search/page?q=x") == {"pages": []}
+    assert waits == [4.0, 4.0]                              # Retry-After, then exponential backoff for a bad header
+    assert all("github.com/rossco4789-glitch/pitchpulse" in a for a in agents)   # Wikimedia asks for contact details
+
+
+def test_persistent_rate_limit_falls_back_without_caching_and_404_does_not_wait(tmp_path, monkeypatch):
+    waits = []
+
+    def always_429(request, timeout):
+        raise _http_error(429, "60")
+
+    monkeypatch.setattr(ca, "urlopen", always_429)
+    monkeypatch.setattr(ca, "_sleep", waits.append)
+    report = {}
+    meta = ca.resolve_club_assets(CLUB, sources=tmp_path, report=report)
+    assert meta["verified"] is False and report == {"saved": False}
+    assert not (tmp_path / "dorchester_town" / "meta.json").exists()
+    assert waits == [ca.MAX_RETRY_WAIT_S] * ca.RETRIES      # Retry-After 60 s capped at 10 s, then give up
+
+    waits.clear()
+
+    def missing(request, timeout):
+        raise _http_error(404)
+
+    monkeypatch.setattr(ca, "urlopen", missing)
+    assert ca.resolve_club_assets(CLUB, sources=tmp_path)["verified"] is False and waits == []
+
+
+def test_rugby_clubs_are_not_football_clubs():
+    rugby = {"key": "Hartpury_University_R.F.C.", "title": "Hartpury University R.F.C.", "description": "Rugby union football club"}
+    football = {"key": "Hartpury_University_F.C.", "title": "Hartpury University F.C.", "description": "Association football club in England"}
+    assert not ca._is_club_page(rugby, "Hartpury University")
+    assert not ca._is_club_page({**rugby, "description": ""}, "Hartpury University")          # R.F.C. title alone
+    assert ca._is_club_page(football, "Hartpury University")
+
+
 def test_slug_matches_the_scouting_folder_name():
     for name in ("Dorchester Town", "AFC Totton", "Hayes & Yeading United", "  Weymouth FC "):
         assert ca.slugify(name) == vc.slugify(name)

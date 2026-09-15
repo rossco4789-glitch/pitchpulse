@@ -1,0 +1,9 @@
+{
+  "name": "Worcester Raiders F.C.",
+  "slug": "worcester_raiders",
+  "badge_path": "data/scouting/sources/worcester_raiders/badge.png",
+  "home_kit": "#FF0000",
+  "away_kit": "#FFFFFF",
+  "verified": true,
+  "kit_source": "club records"
+}

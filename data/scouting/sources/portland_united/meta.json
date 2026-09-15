@@ -1,0 +1,9 @@
+{
+  "name": "Portland United F.C.",
+  "slug": "portland_united",
+  "badge_path": "data/scouting/sources/portland_united/badge.png",
+  "home_kit": "#0000FF",
+  "away_kit": "#FFFFFF",
+  "verified": true,
+  "kit_source": "club records"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "Paulton Rovers F.C.",
+  "slug": "paulton_rovers",
+  "badge_path": "data/scouting/sources/paulton_rovers/badge.png",
+  "home_kit": "#990033",
+  "away_kit": "#F1EF00",
+  "verified": true,
+  "kit_source": "club records"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "Barnstaple Town F.C.",
+  "slug": "barnstaple_town",
+  "badge_path": "data/scouting/sources/barnstaple_town/badge.png",
+  "home_kit": "#FF0000",
+  "away_kit": "#00BFFF",
+  "verified": true,
+  "kit_source": "club records"
+}

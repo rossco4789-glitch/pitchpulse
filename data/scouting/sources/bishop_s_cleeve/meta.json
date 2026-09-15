@@ -1,0 +1,9 @@
+{
+  "name": "Bishop's Cleeve F.C.",
+  "slug": "bishop_s_cleeve",
+  "badge_path": "data/scouting/sources/bishop_s_cleeve/badge.png",
+  "home_kit": "#008000",
+  "away_kit": "#0000FF",
+  "verified": true,
+  "kit_source": "club records"
+}

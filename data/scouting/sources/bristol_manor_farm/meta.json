@@ -1,0 +1,9 @@
+{
+  "name": "Bristol Manor Farm F.C.",
+  "slug": "bristol_manor_farm",
+  "badge_path": "data/scouting/sources/bristol_manor_farm/badge.png",
+  "home_kit": "#737071",
+  "away_kit": "#D1D1D2",
+  "verified": true,
+  "kit_source": "crest"
+}

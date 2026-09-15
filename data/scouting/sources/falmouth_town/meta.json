@@ -1,0 +1,9 @@
+{
+  "name": "Falmouth Town A.F.C.",
+  "slug": "falmouth_town",
+  "badge_path": "data/scouting/sources/falmouth_town/badge.png",
+  "home_kit": "#F4B438",
+  "away_kit": "#92243D",
+  "verified": true,
+  "kit_source": "club records"
+}

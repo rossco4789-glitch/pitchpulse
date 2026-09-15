@@ -1,0 +1,9 @@
+{
+  "name": "Westbury United F.C.",
+  "slug": "westbury_united",
+  "badge_path": "data/scouting/sources/westbury_united/badge.png",
+  "home_kit": "#023020",
+  "away_kit": "#E3DB6E",
+  "verified": true,
+  "kit_source": "club records"
+}

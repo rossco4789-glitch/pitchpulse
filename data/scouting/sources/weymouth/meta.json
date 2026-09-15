@@ -1,0 +1,9 @@
+{
+  "name": "Weymouth F.C.",
+  "slug": "weymouth",
+  "badge_path": "data/scouting/sources/weymouth/badge.png",
+  "home_kit": "#00B7FF",
+  "away_kit": "#FFFFFF",
+  "verified": true,
+  "kit_source": "club records"
+}

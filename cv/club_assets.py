@@ -16,10 +16,11 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from collections import defaultdict
 from io import BytesIO
 from pathlib import Path
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
@@ -36,9 +37,11 @@ DEFAULT_AWAY = "#FFFFFF"
 SEARCH_URL   = "https://en.wikipedia.org/w/rest.php/v1/search/page?"
 SUMMARY_URL  = "https://en.wikipedia.org/api/rest_v1/page/summary/"
 PAGE_URL     = "https://en.wikipedia.org/w/rest.php/v1/page/"          # wikitext, for the infobox kit colours
-USER_AGENT   = "PitchPulse/1.0 (Tiverton Town FC opposition scouting; local desktop tool)"
+USER_AGENT   = "PitchPulse/1.0 (https://github.com/rossco4789-glitch/pitchpulse; Tiverton Town FC opposition scouting)"
 TIMEOUT_S    = 4
 MAX_IMAGE_B  = 2_000_000
+RETRIES          = 2      # extra attempts after HTTP 429 (the search API throttled a 21-club batch on 15 Sep 2026)
+MAX_RETRY_WAIT_S = 10.0
 
 COLOUR_BIN      = 32     # 8 levels per channel
 NEAR_WHITE      = 235
@@ -57,14 +60,35 @@ def slugify(name: str) -> str:
 
 # ── HTTP (replaced in tests) ─────────────────────────────────────────────────
 
+_sleep = time.sleep
+
+
+def _retry_wait(retry_after: str | None, attempt: int) -> float:
+    try:
+        wait = float(retry_after)
+    except (TypeError, ValueError):
+        wait = 2.0 * 2 ** attempt
+    return min(MAX_RETRY_WAIT_S, max(0.0, wait))
+
+
+def _fetch(url: str, accept: str, limit: int = -1) -> bytes:
+    """GET that identifies PitchPulse and honours HTTP 429 Retry-After (capped) before giving up."""
+    for attempt in range(RETRIES + 1):
+        try:
+            with urlopen(Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept}), timeout=TIMEOUT_S) as r:
+                return r.read(limit)
+        except HTTPError as exc:
+            if exc.code != 429 or attempt == RETRIES:
+                raise
+            _sleep(_retry_wait(exc.headers.get("Retry-After") if exc.headers else None, attempt))
+
+
 def _http_json(url: str) -> dict:
-    with urlopen(Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"}), timeout=TIMEOUT_S) as r:
-        return json.loads(r.read().decode("utf-8"))
+    return json.loads(_fetch(url, "application/json").decode("utf-8"))
 
 
 def _http_bytes(url: str) -> bytes:
-    with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=TIMEOUT_S) as r:
-        data = r.read(MAX_IMAGE_B + 1)
+    data = _fetch(url, "image/*", MAX_IMAGE_B + 1)
     if len(data) > MAX_IMAGE_B:
         raise ValueError("crest image larger than 2 MB")
     return data
@@ -74,6 +98,8 @@ def _http_bytes(url: str) -> bytes:
 
 def _is_club_page(page: dict, name: str) -> bool:
     title, description = (page.get("title") or ""), (page.get("description") or "").lower()
+    if "rugby" in description or title.endswith("R.F.C."):   # "rugby union football club" (Hartpury University R.F.C.)
+        return False
     club = "football club" in description or title.endswith(("F.C.", "A.F.C.", " FC"))
     words = [w for w in re.findall(r"[a-z0-9]+", name.lower()) if len(w) >= 3 and w not in ("afc", "football", "club")]
     named = all(w in title.lower() for w in words) if words else False
@@ -161,8 +187,20 @@ def _write_meta(path: Path, meta: dict) -> None:
     os.replace(tmp, path)
 
 
-def resolve_club_assets(opponent_name: str, sources: str | Path | None = None, refresh: bool = False) -> dict:
-    """Crest and kit colours for an opponent; cached per club in meta.json. Never raises."""
+def cached_assets(opponent_name: str, sources: str | Path | None = None) -> dict | None:
+    """The saved meta.json for this club if it exists and is valid; never touches the network."""
+    slug = slugify(opponent_name)
+    return _read_meta(Path(sources or SOURCES) / slug / META_FILE) if slug else None
+
+
+def resolve_club_assets(opponent_name: str, sources: str | Path | None = None, refresh: bool = False,
+                        report: dict | None = None) -> dict:
+    """Crest and kit colours for an opponent; cached per club in meta.json. Never raises.
+
+    Pass `report={}` to learn whether this call wrote meta.json (report["saved"]); network failures leave it False.
+    """
+    report = {} if report is None else report
+    report["saved"] = False
     name = (opponent_name or "").strip()
     slug = slugify(name)
     if not slug:
@@ -179,6 +217,7 @@ def resolve_club_assets(opponent_name: str, sources: str | Path | None = None, r
     if page is None:
         meta = fallback(name, slug)
         _write_meta(meta_path, meta)          # Wikipedia has no such club: don't ask again
+        report["saved"] = True
         return meta
 
     home, away = page.get("kits") or (None, None)
@@ -203,4 +242,5 @@ def resolve_club_assets(opponent_name: str, sources: str | Path | None = None, r
                 crest_home, crest_away = kit_colours(crest)
                 meta.update(home_kit=crest_home, away_kit=away or crest_away, kit_source="crest")
     _write_meta(meta_path, meta)
+    report["saved"] = True
     return meta

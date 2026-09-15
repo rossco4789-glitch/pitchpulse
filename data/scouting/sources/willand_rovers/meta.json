@@ -1,0 +1,9 @@
+{
+  "name": "Willand Rovers F.C.",
+  "slug": "willand_rovers",
+  "badge_path": "data/scouting/sources/willand_rovers/badge.png",
+  "home_kit": "#FFFFFF",
+  "away_kit": "#FFFF00",
+  "verified": true,
+  "kit_source": "club records"
+}
