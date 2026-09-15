@@ -218,12 +218,12 @@ def edge_distance(x: float, y: float, wh) -> float:
 
 
 CENTRE_CIRCLE = (31, 32)
-ISOLATED_CENTRE_PX = 80.0   # broadcast 0bfacc: valid #32 at 79 px (LOO 0.52 m); Veo: 182/184 hallucinations > 80 px
+def isolated_centre_rejects(W, xy, conf, world, image_h: float) -> set[int]:
+    """Change 2b: centre-circle landmarks inconsistent with a same-end box/goal-line cluster fit (world → pixel).
 
-
-def isolated_centre_rejects(W, xy, conf, world) -> set[int]:
-    """Change 2b: centre-circle landmarks inconsistent with a same-end box/goal-line cluster fit (world → pixel)."""
+    Tolerance is the worker's ISOLATED_CENTRE_PX scaled to the frame height (80 px at 1080p, 53 px at 720p)."""
     ok = conf >= W.KP_CONF
+    tolerance = W.scaled_tolerances(image_h)[1]
     out = set()
     for end in (world[:, 0] <= 16.5, world[:, 0] >= 88.5):
         idx = np.where(ok & end)[0]
@@ -235,7 +235,7 @@ def isolated_centre_rejects(W, xy, conf, world) -> set[int]:
         for n in CENTRE_CIRCLE:
             if ok[n - 1]:
                 ex = W.project(G, world[n - 1:n].astype(np.float32))[0]
-                if np.linalg.norm(ex - xy[n - 1]) > ISOLATED_CENTRE_PX:
+                if np.linalg.norm(ex - xy[n - 1]) > tolerance:
                     out.add(n)
     return out
 
@@ -292,7 +292,8 @@ def main(argv=None) -> int:
     ap.add_argument("--overlay-dir", type=Path, default=None, help="Save annotated frames where inspected landmarks disagree")
     ap.add_argument("--overlays", type=int, default=6, help="Maximum overlays, at least 10 s apart (default 6)")
     ap.add_argument("--border-px", type=float, default=0.0,
-                    help="Change 2a: drop keypoints within this many pixels of (or outside) the image edge (default 0 = off)")
+                    help="Change 2a: drop keypoints within this many pixels of (or outside) the image edge, given at 1080p "
+                         "and scaled to frame height, min 1 (default 0 = off)")
     ap.add_argument("--filter-isolated-centre", action="store_true",
                     help="Change 2b: drop centre-circle landmarks (31, 32) inconsistent with a same-end box cluster fit")
     args = ap.parse_args(argv)
@@ -324,11 +325,11 @@ def main(argv=None) -> int:
         raw_conf = r.keypoints.conf[best].cpu().numpy()
         xy, conf = r.keypoints.xy[best].cpu().numpy(), W.mask_landmarks(raw_conf, exclude)
         wh = (frame.shape[1], frame.shape[0])
-        clamped = {i + 1 for i in range(len(xy))
-                   if args.border_px > 0 and edge_distance(xy[i][0], xy[i][1], wh) < args.border_px}
+        border = max(1, int(round(args.border_px * wh[1] / W.REFERENCE_HEIGHT_PX))) if args.border_px > 0 else 0
+        clamped = {i + 1 for i in range(len(xy)) if border and edge_distance(xy[i][0], xy[i][1], wh) < border}
         if clamped:
             conf[[n - 1 for n in clamped]] = 0.0
-        isolated = isolated_centre_rejects(W, xy, conf, world) if args.filter_isolated_centre else set()
+        isolated = isolated_centre_rejects(W, xy, conf, world, wh[1]) if args.filter_isolated_centre else set()
         if isolated:
             conf[[n - 1 for n in isolated]] = 0.0
             isolated_count += len(isolated)
