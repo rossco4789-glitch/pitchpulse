@@ -560,6 +560,50 @@ def test_excluded_landmarks_are_omitted_from_the_homography_fit():
     assert np.abs(worker.project(H, image[:8]) - BOX_WORLD).max() < 0.05
 
 
+def test_clamp_border_landmarks_zeroes_edge_and_off_screen_keypoints():
+    xy = np.array([[960, 540], [960, 1080], [960, 1077], [960, 1075], [-3, 500], [1919, 10]], float)
+    out = worker.clamp_border_landmarks(xy, np.ones(6), (1920, 1080))
+    assert out.tolist() == [1, 0, 0, 1, 0, 0]  # y=1080 is the Veo #17 clamp; 1075 is 4 px inside
+    assert np.array_equal(worker.clamp_border_landmarks(xy[:1], np.ones(1), (1920, 1080)), np.ones(1))
+
+
+# roboflow SoccerPitchConfiguration landmarks (data/staging/models/pitch_config.json)
+PITCH_WORLD = np.array([[0, 0], [0, 13.84], [0, 24.84], [0, 43.16], [0, 54.16], [0, 68.0], [5.5, 24.84], [5.5, 43.16],
+                        [11.0, 34.0], [16.5, 13.84], [16.5, 24.84], [16.5, 43.16], [16.5, 54.16], [52.5, 0],
+                        [52.5, 24.85], [52.5, 43.15], [52.5, 68.0], [88.5, 13.84], [88.5, 24.84], [88.5, 43.16],
+                        [88.5, 54.16], [94.0, 34.0], [99.5, 24.84], [99.5, 43.16], [105.0, 0], [105.0, 13.84],
+                        [105.0, 24.84], [105.0, 43.16], [105.0, 54.16], [105.0, 68.0], [43.35, 34.0], [61.65, 34.0]], float)
+RIGHT_BOX = (18, 21, 22, 23, 24, 26, 27, 28, 29)
+
+
+def _penalty_area_view(*extra):
+    conf = np.zeros(32)
+    conf[[n - 1 for n in RIGHT_BOX + extra]] = 1.0
+    return _image_points(PITCH_WORLD), conf
+
+
+def test_isolated_centre_landmark_far_from_penalty_area_fit_is_rejected():
+    image, conf = _penalty_area_view(31, 32)
+    image[31] += [200.0, 0.0]   # #32 detected on plain grass, like Veo 12:00-14:00
+    image[30] += [50.0, 0.0]    # #31 within tolerance: kept
+    out = worker.reject_isolated_centre(image, PITCH_WORLD, conf)
+    assert out[31] == 0.0 and out[30] == 1.0
+    assert np.array_equal(np.delete(out, 31), np.delete(conf, 31))
+    assert conf[31] == 1.0  # caller's array is not mutated
+
+
+def test_isolated_centre_landmark_consistent_with_penalty_area_fit_is_kept():
+    image, conf = _penalty_area_view(32)
+    assert np.array_equal(worker.reject_isolated_centre(image, PITCH_WORLD, conf), conf)
+
+
+def test_isolated_centre_check_needs_a_same_end_cluster():
+    image, conf = _penalty_area_view(32)
+    conf[[n - 1 for n in RIGHT_BOX[3:]]] = 0.0  # 3 box landmarks: no reliable cluster fit
+    image[31] += [200.0, 0.0]
+    assert np.array_equal(worker.reject_isolated_centre(image, PITCH_WORLD, conf), conf)
+
+
 def test_every_rejection_reason_is_a_schema_drop_rule():
     import inspect
     reasons = set(re.findall(r'return None, "(\w+)"', inspect.getsource(worker.fit_homography)))

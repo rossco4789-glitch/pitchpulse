@@ -61,6 +61,10 @@ MAX_RMSE_M       = 0.5
 RANSAC_THRESHOLD_M = 1.0    # wider than MAX_RMSE_M so keypoint noise and systematic fit error land in separate buckets
 MIN_INLIER_RATIO = 0.8
 MAX_COND         = 1e7
+BORDER_PX        = 4.0      # keypoints on or outside the frame edge are off-screen guesses (Veo #17 at y=1080, 64/64)
+ISOLATED_CENTRE_PX = 80.0   # broadcast: valid #32 at 79 px from a box-cluster fit; Veo: 182/184 grass #31/#32 > 80 px
+CENTRE_CIRCLE    = (31, 32)
+END_ZONE_X_M     = 16.5     # penalty-area depth: landmarks within it of either goal line form a same-end cluster
 HULL_MARGIN_M    = 5.0
 SETTLED_MIN_PLAYERS = 8
 SETTLED_MAX_DEPTH_M = 40.0
@@ -133,6 +137,46 @@ def mask_landmarks(conf, exclude) -> np.ndarray:
     out = np.array(conf, dtype=float, copy=True)
     if exclude:
         out[[n - 1 for n in exclude]] = 0.0
+    return out
+
+
+def clamp_border_landmarks(image_xy, conf, image_wh) -> np.ndarray:
+    """Zero the confidence of keypoints within BORDER_PX of, or outside, the image edge.
+
+    The Veo follow-cam diagnostic (15 Sep 2026) found landmark 17 pinned to the bottom edge in 64/64 detections:
+    the model clamps an off-screen point to the frame rather than dropping it.
+    """
+    xy = np.asarray(image_xy, float)
+    w, h = image_wh
+    edge = np.minimum.reduce([xy[:, 0], xy[:, 1], w - 1 - xy[:, 0], h - 1 - xy[:, 1]])
+    out = np.array(conf, dtype=float, copy=True)
+    out[edge < BORDER_PX] = 0.0
+    return out
+
+
+def reject_isolated_centre(image_xy, world_xy, conf) -> np.ndarray:
+    """Zero centre-circle landmarks more than ISOLATED_CENTRE_PX from where a same-end penalty-area fit places them.
+
+    On Veo footage facing a penalty area the model reports #32 on plain grass at ~0.95 confidence; confidence
+    thresholds cannot catch it, but a world → pixel fit from ≥ 4 box/goal-line landmarks at that end can.
+    Veo 12:00-14:00: 44 → 79 of 241 frames accepted, leave-one-out median 0.47 m; broadcast 0bfacc_0 unchanged.
+    """
+    xy, world = np.asarray(image_xy, np.float32), np.asarray(world_xy, np.float32)
+    ok = np.asarray(conf) >= KP_CONF
+    out = np.array(conf, dtype=float, copy=True)
+    for end in (world[:, 0] <= END_ZONE_X_M, world[:, 0] >= PITCH_L - END_ZONE_X_M):
+        idx = np.where(ok & end)[0]
+        if len(idx) < 4 or cv2.contourArea(cv2.convexHull(world[idx])) < 50:
+            continue
+        try:
+            G, mask = cv2.findHomography(world[idx], xy[idx], cv2.RANSAC, 10.0)
+        except cv2.error:
+            continue
+        if G is None or mask is None or mask.sum() < 4 or not np.all(np.isfinite(G)) or np.linalg.cond(G) > MAX_COND:
+            continue
+        for n in CENTRE_CIRCLE:
+            if ok[n - 1] and np.linalg.norm(project(G, world[n - 1:n])[0] - xy[n - 1]) > ISOLATED_CENTRE_PX:
+                out[n - 1] = 0.0
     return out
 
 
@@ -357,6 +401,7 @@ def frame_players(frame, pitch_result, player_result, world_xy, names, exclude=(
         return "no_pitch_detection", []
     best = int(pitch_result.boxes.conf.argmax()) if pitch_result.boxes is not None and len(pitch_result.boxes) else 0
     xy, conf = kp.xy[best].cpu().numpy(), mask_landmarks(kp.conf[best].cpu().numpy(), exclude)
+    conf = reject_isolated_centre(xy, world_xy, clamp_border_landmarks(xy, conf, (frame.shape[1], frame.shape[0])))
     H, reason = fit_homography(xy, world_xy, conf)
     if reason:
         return reason, []
@@ -479,7 +524,8 @@ def run(input_dir: Path = INPUT, output_dir: Path = OUTPUT) -> None:
                   "min_hull_m2": MIN_HULL_M2, "max_rmse_m": MAX_RMSE_M, "ransac_threshold_m": RANSAC_THRESHOLD_M,
                   "min_inlier_ratio": MIN_INLIER_RATIO,
                   "max_cond": MAX_COND, "min_samples": MIN_SAMPLES, "silhouette_min": SILHOUETTE_MIN,
-                  "exclude_landmarks": list(exclude)},
+                  "exclude_landmarks": list(exclude), "border_px": BORDER_PX,
+                  "isolated_centre_px": ISOLATED_CENTRE_PX},
     }, output_dir)
 
 
