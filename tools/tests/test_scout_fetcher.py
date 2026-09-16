@@ -308,6 +308,40 @@ def test_build_evidence_flags_table_mismatch():
     assert any("does not match table" in w for w in fetcher.warnings)
 
 
+WP_REPORT_HTML = (
+    '<h1 class="header-global-title">News</h1>'
+    '<div class="post-header"><h1 class="post-title">Match Report: Andover New Street (H)</h1>'
+    '<div class="post-meta"><span class="cat">Club News</span><span class="timestamp">5 September, 2026</span></div>'
+    '<div class="post-summary"><p class="lead">Read all about today’s FA Cup win!</p></div></div>'
+    '<div class="post-body prose"><p>Dotse got past his man on the right before sending a fizzing cross in.</p>'
+    "<p>A foul led to a free kick on the right, with Olly Pendlebury curling it in.</p><p>Next up is Moneyfields.</p></div>"
+    '<div class="post-footer"><h2>Share</h2></div>'
+)
+
+
+def test_wordpress_club_report_parses_title_date_and_body():
+    art = sf.parse_article(WP_REPORT_HTML)
+    assert (art["title"], art["date"]) == ("Match Report: Andover New Street (H)", "5 September, 2026")
+    assert art["paragraphs"][0] == "Read all about today’s FA Cup win!" and "Share" not in art["paragraphs"]
+    assert sf.tactical_sentences(art["paragraphs"][1:]) == [
+        "Dotse got past his man on the right before sending a fizzing cross in.",
+        "A foul led to a free kick on the right, with Olly Pendlebury curling it in."]
+    assert sf._parse_date("5 September, 2026") == sf.datetime(2026, 9, 5)
+
+
+def test_club_news_archive_pages_and_match_report_links():
+    site = "https://club.test"
+    first = ('<a href="https://club.test/match-report-plymouth-parkway-h/">r</a>'
+             '<a href="https://club.test/match-preview-plymouth-parkway-h/">p</a><a href="https://club.test/news/page/2/">2</a>')
+    second = '<a href="https://club.test/match-report-andover-new-street-h/">r</a>'
+    old = WP_REPORT_HTML.replace("5 September, 2026", "21 July, 2025")
+    pages = {**_pages(), f"{site}/news": first, f"{site}/news/page/2/": second,
+             f"{site}/match-report-plymouth-parkway-h/": WP_REPORT_HTML, f"{site}/match-report-andover-new-street-h/": old}
+    ev = sf.build_evidence("Dorchester Town", "dorchester-town", site + "/news/", [], 3, _StubFetcher(pages))
+    assert [s["url"] for s in ev["statements"]] == [f"{site}/match-report-plymouth-parkway-h/"]    # last season's report dropped
+    assert ev["statements"][0]["title"] == "Match Report: Andover New Street (H)"
+
+
 def test_build_evidence_survives_total_outage():
     fetcher = _StubFetcher({})
     ev = sf.build_evidence("Dorchester Town", "dorchester-town", "https://club.test", ["Will Spetch"], 3, fetcher)

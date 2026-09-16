@@ -62,8 +62,12 @@ NOT_PUBLISHED = ["formation", "in-match player positions", "corner and free-kick
 TACTICAL = re.compile(
     r"(?i)set[- ]?plays?|set[- ]?pieces?|\bcorners?\b|free[- ]?kicks?|\bheaders?\b|aerial|in the air|"
     r"counter|second[- ]phase|second balls?|back post|near post|far post|\bpress\w*|\bshape\b|formation|"
-    r"dictate|tempo|marshal\w*|offside|edge of the box|clean sheet|defend\w*|territory"
+    r"dictate|tempo|marshal\w*|offside|edge of the box|clean sheet|defend\w*|territory|"
+    r"\bcross(?:es|ed)?\b|cut[- ]?backs?|pulled? (?:it |the ball )?back|scrambl\w*|goalmouth|"
+    r"on the (?:right|left)\b|down the (?:right|left)\b|\bwinner\b|equali[sz]\w*"
 )
+REPORT_LINK = re.compile(r'href="((?:https?://[^"/]+)?/(?:news/reaction|match-report)-[^"#?]+)"')
+NEWS_PAGES  = 4
 SCORE = re.compile(r"^(?:\((\d+)\))?\s*(\d+)\s*-\s*(\d+)\s*(?:\((\d+)\))?$")
 EVENT = re.compile(r"^(\d{1,3}(?:\+\d+)?)'\s*(.+)$")
 CAPTAIN = re.compile(r"\s*\((?:C|Captain)\)\s*$")
@@ -413,7 +417,8 @@ def involvement(match: dict, name: str) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 class _ArticleParser(HTMLParser):
-    """h1.post-heading, .post-date-text and paragraphs inside .main-post-content."""
+    """Title, date and body paragraphs. Webflow club sites: h1.post-heading, .post-date-text, .main-post-content.
+    WordPress club sites (e.g. Sholing): h1.post-title, .timestamp, .post-summary lead then .post-body."""
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
@@ -438,11 +443,11 @@ class _ArticleParser(HTMLParser):
             self._depth += 1
             if tag in ("p", "li", "h2", "h3", "h4"):
                 self._flush()
-        elif "main-post-content" in cls:
+        elif {"main-post-content", "post-summary", "post-body"} & set(cls):
             self._mode, self._depth = "body", 1
-        elif "post-heading" in cls:
+        elif {"post-heading", "post-title"} & set(cls) and not self.title:
             self._mode = "title"
-        elif "post-date-text" in cls:
+        elif {"post-date-text", "timestamp"} & set(cls) and not self.date:
             self._mode = "date"
 
     def handle_endtag(self, tag):
@@ -499,7 +504,7 @@ def tactical_sentences(paragraphs: list[str]) -> list[str]:
 
 
 def _parse_date(text: str) -> datetime | None:
-    for fmt in ("%B %d, %Y", "%b %d, %Y"):
+    for fmt in ("%B %d, %Y", "%b %d, %Y", "%d %B, %Y", "%d %B %Y"):
         try:
             return datetime.strptime(text, fmt)
         except (TypeError, ValueError):
@@ -594,9 +599,13 @@ def build_evidence(opponent: str, fwp_slug: str, club_site: str | None,
                 profile.update(url=url, tactical_sentences=tactical_sentences([profile["bio"]]))
             ev["players"][name]["profile"] = profile
 
-        index = fetcher.get(f"{site}/news") or ""
-        links = list(dict.fromkeys(
-            urljoin(site + "/", h) for h in re.findall(r'href="((?:https?://[^"]+)?/news/reaction-[^"#?]+)"', index)))
+        news = site if site.endswith("/news") else f"{site}/news"
+        index = fetcher.get(news) or ""
+        for n in range(2, NEWS_PAGES + 1):                 # older archive pages, only when the site links them
+            if not re.search(rf'href="[^"]*/news/page/{n}/?"', index):
+                break
+            index += fetcher.get(f"{news}/page/{n}/") or ""
+        links = list(dict.fromkeys(urljoin(site + "/", h) for h in REPORT_LINK.findall(index)))
         season_start = _season_start(league["season"] if league else None)
         for url in links:
             page = fetcher.get(url)
