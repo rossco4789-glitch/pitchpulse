@@ -756,8 +756,7 @@ if _fx.get("opponent"):
         f'<div class="pp-fixture-kicker">Next fixture · UEFA 4 Moments</div>'
         f'<div class="pp-fixture-opp">vs {_esc(_fx["opponent"])}</div>'
         f'<div class="pp-fixture-meta">{_esc(_fx.get("competition", "Competition not set"))} · {_fx_venue}'
-        f' · {_esc(_uk_date(_fx.get("date", "")))}'
-        f' · <span class="pp-mono">run_id {_esc(_fx_run_id or "—")}</span></div>'
+        f' · {_esc(_uk_date(_fx.get("date", "")))}</div>'
     )
 else:
     _fixture_html = (
