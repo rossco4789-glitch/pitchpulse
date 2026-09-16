@@ -8,6 +8,7 @@ the tactical pitch and the scouting library. Wording comes from cv/coach_brief.p
 
 from __future__ import annotations
 
+import importlib.util
 import shutil
 import time
 from datetime import datetime
@@ -229,7 +230,39 @@ def _club_assets(name: str, sources: str) -> dict:
     return ca.resolve_club_assets(name, sources=sources)
 
 
+def _fixture_agent():
+    spec = importlib.util.spec_from_file_location("fixture_agent", vc.ROOT / "tools" / "fixture_agent.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def _next_fixture() -> dict | None:
+    try:
+        return _fixture_agent().get_next_fixture()
+    except Exception:  # the quick-load button is a convenience; never break Match Setup
+        return None
+
+
+def _load_next_fixture(fx: dict) -> None:
+    """Fill the opponent pickers from the fixture (league club if it matches, else Other / Custom)."""
+    league = {vc.slugify(club): club for club in lr.SOUTHERN_LEAGUE_DIV_ONE_SOUTH}
+    club = league.get(vc.slugify(fx["opponent"]))
+    st.session_state["vcc_opponent_pick"] = club or lr.CUSTOM
+    st.session_state["vcc_opponent"] = "" if club else fx["opponent"]
+    st.session_state["vision_fixture"] = {**fx, "preview": _fixture_agent().scaffold_preview_stub(fx)}
+
+
 def _match_setup() -> None:
+    nfx = _next_fixture()
+    if nfx:
+        st.button(f"Next Fixture: {nfx['opponent']} ({nfx['home_away']})", key="vcc_next_fixture",
+                  icon=":material/event:", on_click=_load_next_fixture, args=(nfx,))
+    loaded = st.session_state.get("vision_fixture")
+    if loaded:
+        _html(_note(f"{loaded['home_away']} · {loaded['competition']} · {loaded['date_str']}, {loaded['kickoff']} · "
+                    f"{loaded['venue']}. Preview draft: {loaded['preview']}"))
     st.radio("Report mode", [MODE_FULL, MODE_HIGHLIGHT], key="vcc_mode", horizontal=True)
     highlight = st.session_state.get("vcc_mode") == MODE_HIGHLIGHT
     name = _opponent_name()

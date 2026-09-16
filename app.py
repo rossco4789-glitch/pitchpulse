@@ -450,6 +450,26 @@ def _load_fixture() -> dict:
         return {}
 
 
+def _fixture_agent():
+    spec = importlib.util.spec_from_file_location("fixture_agent", ROOT / "tools" / "fixture_agent.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def _next_fixture() -> dict | None:
+    try:
+        return _fixture_agent().get_next_fixture()
+    except Exception:  # the quick-load button is a convenience; never break Tab 1
+        return None
+
+
+def _load_next_fixture(fx: dict) -> None:
+    st.session_state["scout_fixture"] = fx
+    st.session_state["scout_stub_path"] = _fixture_agent().scaffold_preview_stub(fx)
+
+
 def _fixture_run_id(fx: dict) -> str | None:
     if not (fx.get("date") and fx.get("opponent")):
         return None
@@ -1086,6 +1106,14 @@ with tab1:
     sb_left, sb_right = st.columns([1, 1], gap="large")
 
     with sb_left:
+        _nfx = _next_fixture()
+        if _nfx:
+            st.button(f"Next Fixture: {_nfx['opponent']} ({_nfx['home_away']})", key="btn_next_fixture",
+                      icon=":material/event:", on_click=_load_next_fixture, args=(_nfx,))
+        scout_fx = st.session_state.get("scout_fixture")
+        if scout_fx:
+            st.caption(f"{scout_fx['competition']} · {scout_fx['date_str']}, {scout_fx['kickoff']} · "
+                       f"{scout_fx['venue']} · preview draft: {st.session_state['scout_stub_path']}")
         scout_file = st.file_uploader(
             "Upload Opponent Match Preview (.docx, .txt, .md)",
             type=["docx", "txt", "md"], key="scout_preview_upload",
@@ -1096,14 +1124,19 @@ with tab1:
         )
         scout_overwrite = st.checkbox("Overwrite a hand-edited brief.md", key="scout_overwrite")
         if st.button("Generate Tactical Briefing", type="primary", key="btn_scout_brief",
-                     disabled=scout_file is None):
+                     disabled=scout_file is None and not scout_fx):
             with st.status("Building opposition briefing…", expanded=True) as sb_status:
                 try:
                     spec = importlib.util.spec_from_file_location("scout_brief", ROOT / "tools" / "scout_brief.py")
                     sb_mod = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(sb_mod)
+                    if scout_file is not None:
+                        _pv_name, _pv_data, _pv_opp = scout_file.name, scout_file.getvalue(), None
+                    else:  # the next-fixture preview draft; its header line carries date, kick-off and venue
+                        _stub = Path(st.session_state["scout_stub_path"])
+                        _pv_name, _pv_data, _pv_opp = _stub.name, _stub.read_bytes(), scout_fx["opponent"]
                     res, _stdout = _capture(
-                        sb_mod.run, scout_file.name, scout_file.getvalue(),
+                        sb_mod.run, _pv_name, _pv_data, opponent=_pv_opp,
                         club_site=scout_site.strip() or None, overwrite=scout_overwrite,
                         progress=sb_status.write,
                     )
