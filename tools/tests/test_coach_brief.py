@@ -324,7 +324,7 @@ def test_highlight_mode_hides_the_pitch_and_logs_moments(tab_env):
     at.run()
     at.selectbox(key="vcc_opponent_pick").set_value("Other / Custom...").run()
     at.text_input(key="vcc_opponent").set_value("Supporting Charities").run()
-    at.radio(key="vcc_mode").set_value("Highlight & Tendency Dossier").run()
+    at.radio(key="vcc_mode").set_value("Opposition Scouting").run()
     assert not at.exception
 
     text = "\n".join(_all_text(at.main))
@@ -341,3 +341,36 @@ def test_highlight_mode_hides_the_pitch_and_logs_moments(tab_env):
     assert not at.exception
     assert hd.load_events(path)[-1]["fields"] == {"player": "7", "foot": "Right foot", "outcome": "Goal"}
     assert "Logged moments · 18" in "\n".join(_all_text(at.main))
+
+
+def test_next_fixture_opens_opposition_scouting_with_the_top_highlight(tab_env, monkeypatch):
+    from types import SimpleNamespace
+    from streamlit.testing.v1 import AppTest
+    from cv import vision_center_ui as ui
+
+    fixture = {"opponent": "Sholing", "home_away": "Home", "venue": "The Slee Blackwell Solicitors Stadium",
+               "date": "2026-09-19", "date_str": "Sat 19 Sep 2026", "kickoff": "15:00", "competition": "FA Cup",
+               "slug": "sholing"}
+    monkeypatch.setattr(ui, "_next_fixture", lambda: fixture)
+    monkeypatch.setattr(ui, "_fixture_agent", lambda: SimpleNamespace(scaffold_preview_stub=lambda fx: "previews/sholing.md"))
+    links = vc.SOURCES / "sholing" / "video_links.json"
+    links.parent.mkdir(parents=True)
+    links.write_text(json.dumps({"opponent": "Sholing", "videos": [
+        {"title": "Highlights - Sholing 2-4 Chertsey Town", "url": "https://www.youtube.com/watch?v=VqinZ1Dw3eo",
+         "channel": "Sholing Football Club", "duration_s": 594, "score": 17, "fixture": "Sat 22 Aug v Chertsey Town"}]}),
+        encoding="utf-8")
+
+    at = AppTest.from_function(_tab_script, default_timeout=60)
+    at.run()
+    assert at.radio(key="vcc_mode").value == "Post-Match Performance"
+    at.button(key="vcc_next_fixture").click().run()
+    assert not at.exception
+    assert at.radio(key="vcc_mode").value == "Opposition Scouting"
+    assert at.text_input(key="vcc_opponent").value == "Sholing"
+
+    text = "\n".join(_all_text(at.main))
+    assert banned_terms(text) == []
+    assert "Kit contrast check" not in text and "Log a key moment" in text
+    assert "https://www.youtube.com/embed/VqinZ1Dw3eo" in text                # st.video renders the YouTube player
+    assert text.index("VqinZ1Dw3eo") < text.index("Log a key moment")      # the reel sits above the logger
+    assert "Sat 22 Aug v Chertsey Town. 1 video found." in text

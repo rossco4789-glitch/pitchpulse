@@ -25,8 +25,10 @@ from cv import highlight_dossier as hd
 from cv import league_roster as lr
 from cv import vision_center as vc
 
-MODE_FULL      = "Full Match Structural Analysis"
-MODE_HIGHLIGHT = "Highlight & Tendency Dossier"
+MODE_FULL      = "Post-Match Performance"
+MODE_HIGHLIGHT = "Opposition Scouting"
+MODE_CAPTIONS  = ["Our full match video: pitch calibration, defensive line depth and settled shape.",
+                  "Their highlight reels: tag key moments, tendency ratios and a print-ready briefing."]
 
 _CSS = """
 <style>
@@ -252,6 +254,7 @@ def _load_next_fixture(fx: dict) -> None:
     st.session_state["vcc_opponent_pick"] = club or lr.CUSTOM
     st.session_state["vcc_opponent"] = "" if club else fx["opponent"]
     st.session_state["vision_fixture"] = {**fx, "preview": _fixture_agent().scaffold_preview_stub(fx)}
+    st.session_state["vcc_mode"] = MODE_HIGHLIGHT           # an upcoming opponent is scouted from highlights
 
 
 def _match_setup() -> None:
@@ -263,7 +266,7 @@ def _match_setup() -> None:
     if loaded:
         _html(_note(f"{loaded['home_away']} · {loaded['competition']} · {loaded['date_str']}, {loaded['kickoff']} · "
                     f"{loaded['venue']}. Preview draft: {loaded['preview']}"))
-    st.radio("Report mode", [MODE_FULL, MODE_HIGHLIGHT], key="vcc_mode", horizontal=True)
+    st.radio("Analysis track", [MODE_FULL, MODE_HIGHLIGHT], key="vcc_mode", horizontal=True, captions=MODE_CAPTIONS)
     highlight = st.session_state.get("vcc_mode") == MODE_HIGHLIGHT
     name = _opponent_name()
     st.session_state["vision_opponent_name"] = name
@@ -288,6 +291,7 @@ def _match_setup() -> None:
     if highlight:
         _html(_note("Highlight clips can't show team shape. Log each goal, chance, corner and direct free kick; "
                     "the dossier updates as you go."))
+        _highlight_video(name)
         _moment_entry(slug, reel)
         return
     left, right = st.columns([1.1, 1], gap="large")
@@ -522,6 +526,38 @@ def _library(order: list[str]) -> None:
 MOMENTS_SHOWN = 15
 
 
+def _highlight_finder():
+    spec = importlib.util.spec_from_file_location("highlight_finder", vc.ROOT / "tools" / "highlight_finder.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _highlight_video(name: str) -> None:
+    """Top-ranked public highlight package for the opponent, shown above the moment logger."""
+    if not name:
+        return
+    hf = _highlight_finder()
+    links = hf.cached_highlights(name, vc.SOURCES)
+    search = st.button("Search again" if links else "Find highlight videos", key="vcc_hl_search",
+                       icon=":material/travel_explore:")
+    if search:
+        with st.spinner(f"Searching for {name} highlights…"):
+            links = hf.find_highlights(name, vc.SOURCES, refresh=True)
+        for warning in links.get("warnings", []):
+            _html(_alert(warning))
+    if not links:
+        return
+    if not links["videos"]:
+        _html(_note(f"No public highlight videos found for {name}."))
+        return
+    top = links["videos"][0]
+    _html(_label("Highlight reel"))
+    st.video(top["url"])
+    match = f" · {top['fixture']}" if top.get("fixture") else ""
+    _html(_note(f"{top['title']} · {top['channel']}{match}. {len(links['videos'])} video{'s' if len(links['videos']) != 1 else ''} found."))
+
+
 def _moment_entry(slug: str, reel: str) -> None:
     _html(_label("Log a key moment"))
     if not slug:
@@ -563,7 +599,7 @@ def _moment_entry(slug: str, reel: str) -> None:
 def _dossier_report(logged: list[str]) -> None:
     if not logged:
         _html('<div class="vcc-empty"><b>No highlight dossiers yet</b>'
-              + _note("Open Match Setup, choose Highlight & Tendency Dossier, name the opponent and log key moments.") + "</div>")
+              + _note("Open Match Setup, choose Opposition Scouting, name the opponent and log key moments.") + "</div>")
         return
     setup = _setup_slug()
     if setup in logged and st.session_state.get("vcc_dossier_setup") != setup:
