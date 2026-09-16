@@ -50,7 +50,8 @@ def _assert_packager_safe(md: str):
 def test_detects_away_fixture_date_kickoff_venue():
     fx = sb.detect_fixture(PREVIEW, TODAY)
     assert fx == {"home": "Dorchester Town", "away": "Tiverton Town", "opponent": "Dorchester Town",
-                  "home_game": False, "date": "2026-09-15", "kickoff": "19:45", "venue": "The Avenue Stadium"}
+                  "home_game": False, "date": "2026-09-15", "kickoff": "19:45", "venue": "The Avenue Stadium",
+                  "competition": None}
 
 
 def test_detects_home_fixture_with_explicit_year():
@@ -149,6 +150,94 @@ def test_evidence_run_builds_verified_sections(tmp_path, monkeypatch):
                    "matches the table"):
         assert needle in md, needle
     assert (tmp_path / "data/scouting/evidence/dorchester_town.json").exists()
+
+
+# ── Synthesis fixes ───────────────────────────────────────────────────────────
+
+FIXTURE_STUB = ("Tiverton Town v Sholing — Sat 19 Sep 2026, 15:00, The Slee Blackwell Solicitors Stadium\n"
+                "Kick off 15:00\nAt The Slee Blackwell Solicitors Stadium\nCompetition: FA Cup 2Q\n")
+
+
+def _fx(**over):
+    return {**sb.detect_fixture(FIXTURE_STUB, TODAY), **over}
+
+
+def _sholing(sheets):
+    """Evidence with one team sheet per (competition, goals_against, captain, events) tuple, oldest first."""
+    squad = ["Jack Turner", "Harry Taylor", "Byron Mason", "Jake Mccarthy"] + [f"Squad Player{i}" for i in range(7)]
+    fixtures = []
+    for i, (competition, against, captain, events) in enumerate(sheets):
+        starters = [_player(n + 1, name, captain=name == captain) for n, name in enumerate(squad)]
+        match = {"lineup_published": True, "starters": starters, "bench": [],
+                 "events": [{"minute": m, "kind": k, "text": t} for m, k, t in events]}
+        fixtures.append({"date": f"Sat {i + 1} Aug", "venue": "home", "opponent": f"Rival {i}", "competition": competition,
+                         "played": True, "goals_for": 1, "goals_against": against, "result": "L", "match": match})
+    league = {"division": "Southern League - Premier South", "season": "2026-2027", "last_updated": "15 Sep", "teams": 22,
+              "row": {"position": 16, "played": 3, "won": 0, "drawn": 0, "lost": 3, "goals_for": 3, "goals_against": 7, "points": 0},
+              "standings": [], "check": {"league_label_in_fixtures": "Southern Prem South", "record_from_results": "W0 D0 L3",
+                                         "points_from_results": 0, "matches_table": True}}
+    return {"league": league, "fixtures": fixtures, "statements": [], "players": {}, "warnings": [], "sources": []}
+
+
+PEN = ("45+2", "other", "Jake Mccarthy scores (pen)")
+LEAGUE = "Southern Prem South"
+
+
+def test_fixture_title_strips_header_metadata_and_reads_the_competition():
+    fx = sb.detect_fixture(FIXTURE_STUB, TODAY)
+    assert (fx["home"], fx["away"], fx["opponent"], fx["competition"]) == ("Tiverton Town", "Sholing", "Sholing", "FA Cup 2Q")
+    assert (fx["date"], fx["kickoff"], fx["venue"]) == ("2026-09-19", "15:00", "The Slee Blackwell Solicitors Stadium")
+    md = sb.compose_brief(fx, FIXTURE_STUB, None, TODAY)
+    assert md.startswith("# Tiverton Town v Sholing — Pre-Match Briefing\n")
+    assert sb.detect_fixture("Bishop's Cleeve v Tiverton Town, 7.45pm\n", TODAY)["opponent"] == "Bishop's Cleeve"
+    assert sb.detect_fixture("Sholing v Tiverton Town\nEmirates FA Cup Second Qualifying Round\n", TODAY)["competition"] == "FA Cup"
+
+
+def test_cup_competition_takes_precedence_over_the_opponent_league():
+    ev = _sholing([(LEAGUE, 2, "Byron Mason", [])])
+    md = sb.compose_brief(_fx(), "", ev, TODAY)
+    assert "**Competition:** FA Cup 2Q" in md and "**Opponent league:** Southern League - Premier South, 2026-2027" in md
+    ev["fixtures"].append({"date": "Sat 19 Sep", "venue": "away", "opponent": "Tiverton Town", "competition": "FA Cup 2Q", "played": False})
+    assert "**Competition:** FA Cup 2Q" in sb.compose_brief(_fx(competition=None), "", ev, TODAY)       # from their fixture list
+    assert "**Competition:** Southern League - Premier South, 2026-2027" in sb.compose_brief(
+        _fx(competition=None), "", _sholing([(LEAGUE, 2, "Byron Mason", [])]), TODAY)
+
+
+def test_penalties_count_towards_goal_tallies_and_ties_share_top_billing():
+    ev = _sholing([(LEAGUE, 1, "Byron Mason", [("29", "goal", "Harry Taylor scores"), PEN]),
+                   (LEAGUE, 0, "Byron Mason", [("24", "goal", "Jake Mccarthy scores"), ("80", "goal", "Harry Taylor scores"),
+                                               ("88", "goal", "Opp Nine scores (pen)")])])
+    md = sb.compose_brief(_fx(), "", ev, TODAY)
+    assert "**Goal threat:** Harry Taylor 2, Jake Mccarthy 2" in md
+    assert "**Primary finishers:** Harry Taylor and Jake Mccarthy, 2 goals each." in md
+    assert "tracking Harry Taylor and Jake Mccarthy" in md
+    assert "conceded after it in 1" in md                                     # the opponent's late penalty is a goal against
+
+
+def test_defensive_denominator_uses_scored_games_split_by_competition():
+    ev = _sholing([(LEAGUE, 4, "Byron Mason", []), (LEAGUE, 3, "Byron Mason", []), ("FA Cup 1Q", 0, "Harry Taylor", [])])
+    ev["fixtures"].append({"date": "Sat 9 Sep", "venue": "away", "opponent": "Abandoned FC", "competition": LEAGUE,
+                           "played": True, "goals_for": None, "goals_against": None})
+    md = sb.compose_brief(_fx(), "", ev, TODAY)
+    assert ("**Defensive record:** 7 conceded in 2 league games (0 clean sheets, most in one game 4); "
+            "0 conceded in 1 cup game (1 clean sheet, most in one game 0).") in md
+
+
+def test_captaincy_reports_the_recent_armband_first():
+    ev = _sholing([(LEAGUE, 1, c, []) for c in ["Byron Mason"] * 5 + ["Harry Taylor"] * 2])
+    assert ("**Captain:** Harry Taylor has worn the armband in the last 2 team sheets. "
+            "Byron Mason wore it in 5 of 7.") in sb.compose_brief(_fx(), "", ev, TODAY)
+    ev = _sholing([(LEAGUE, 1, c, []) for c in ["Harry Taylor", "Byron Mason", "Byron Mason"]])
+    assert "**Captain:** Byron Mason wore the armband in 2 of 3 team sheets, including the last 2." in sb.compose_brief(_fx(), "", ev, TODAY)
+    ev = _sholing([(LEAGUE, 1, "Byron Mason", [])] * 2)
+    assert "**Captain:** Byron Mason wore the armband in 2 of 2 team sheets." in sb.compose_brief(_fx(), "", ev, TODAY)
+
+
+def test_absentee_lever_only_when_the_preview_names_absentees():
+    md = sb.compose_brief(_fx(), FIXTURE_STUB, None, TODAY)
+    assert "absentee listed above" not in md and "**Absentees:** none named in the preview." in md
+    notes = FIXTURE_STUB + "Their captain Harry Taylor is suspended after five bookings this season so far.\n"
+    assert "absentee listed above" in sb.compose_brief(_fx(), notes, None, TODAY)
 
 
 # ── Hand-edited brief protection ──────────────────────────────────────────────

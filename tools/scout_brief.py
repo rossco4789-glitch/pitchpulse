@@ -44,6 +44,10 @@ DATE_NUM = re.compile(r"\b(\d{1,2})/(\d{1,2})/(\d{2,4})\b")
 VERSUS = re.compile(r"(?i)^\s*(.+?)\s+(?:v|vs\.?|versus)\s+(.+?)\s*$")
 KICKOFF = re.compile(r"(?i)\b(\d{1,2})[.:](\d{2})\s*(am|pm)?")
 VENUE = re.compile(r"(?i)^(?:at|venue:?)\s+(.+)$")
+COMPETITION = re.compile(r"(?i)^competition:?\s+(.+)$")
+CUP_NAME = re.compile(r"(?i)\b(FA (?:Cup|Trophy|Vase)(?:\s+\w*\d\w*)?)")
+SIDE_META = re.compile(r"\s+[—–|]\s+.*$|,.*$|\s+\(.*$")          # "Sholing — Sat 19 Sep, 15:00, ground" → "Sholing"
+SCORER = re.compile(r"^(.+?) scores(?: \((?:pen|penalty)\))?$", re.I)
 MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
 
 ROUTES = {
@@ -121,7 +125,7 @@ def detect_fixture(text: str, today: date | None = None) -> dict:
                   if m and any("tiverton" in side.lower() for side in m.groups())), None)
     if not teams:
         raise ValueError(f"no '<Opponent> v {CLUB}' line in the first 12 lines of the preview")
-    home, away = teams.group(1).strip(), teams.group(2).strip()
+    home, away = (SIDE_META.sub("", side).strip() for side in teams.groups())
     home_game = "tiverton" in home.lower()
 
     found = None
@@ -146,8 +150,10 @@ def detect_fixture(text: str, today: date | None = None) -> dict:
                 break
 
     venue = next((m.group(1).strip() for m in map(VENUE.match, head) if m), None)
+    competition = next((m.group(1).strip() for m in map(COMPETITION.match, head) if m), None) or next(
+        (m.group(1).strip() for m in map(CUP_NAME.search, head) if m), None)
     return {"home": home, "away": away, "opponent": away if home_game else home, "home_game": home_game,
-            "date": found.isoformat() if found else None, "kickoff": kickoff, "venue": venue}
+            "date": found.isoformat() if found else None, "kickoff": kickoff, "venue": venue, "competition": competition}
 
 
 # ── Evidence ──────────────────────────────────────────────────────────────────
@@ -223,6 +229,17 @@ def _result_line(fx: dict) -> str:
     return f"{verb} {fx['goals_for']}-{fx['goals_against']} {where} {fx['opponent']} ({fx['competition']})"
 
 
+def _goals(match: dict) -> tuple[list[dict], list[dict]]:
+    """(team goals, goals against) from event text, so penalties count: 'Jake Mccarthy scores (pen)' is a goal."""
+    squad = {p["name"] for p in match.get("starters", []) + match.get("bench", [])}
+    ours, theirs = [], []
+    for e in match.get("events", []):
+        m = SCORER.match(e.get("text", ""))
+        if m:
+            (ours if m.group(1) in squad else theirs).append({"minute": e["minute"], "scorer": m.group(1)})
+    return ours, theirs
+
+
 def _late_goals(played: list[dict]) -> tuple[int, int, int]:
     scored = conceded = sheets = 0
     for fx in played:
@@ -230,11 +247,30 @@ def _late_goals(played: list[dict]) -> tuple[int, int, int]:
         if not m or not m.get("events"):
             continue
         sheets += 1
-        ours = {g["minute"] for g in m["team_goals"]}
-        goals = [e for e in m["events"] if e["kind"] == "goal"]
-        scored += any(_minute(g["minute"]) >= 85 for g in m["team_goals"])
-        conceded += any(_minute(e["minute"]) >= 85 and e["minute"] not in ours for e in goals)
+        ours, theirs = _goals(m)
+        scored += any(_minute(g["minute"]) >= 85 for g in ours)
+        conceded += any(_minute(g["minute"]) >= 85 for g in theirs)
     return scored, conceded, sheets
+
+
+def _names_and(names: list[str]) -> str:
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + f" and {names[-1]}"
+
+
+def _captaincy(sheets: list[dict]) -> str | None:
+    """Recent armband first: a change of captain is news even when the old captain has more games."""
+    worn = [next((p["name"] for p in f["match"]["starters"] if p["captain"]), None) for f in sheets]
+    worn = [w for w in worn if w]
+    if not worn:
+        return None
+    recent = worn[-1]
+    streak = next((i for i, w in enumerate(reversed(worn)) if w != recent), len(worn))
+    top, c = Counter(worn).most_common(1)[0]
+    if top == recent or Counter(worn)[recent] == c:
+        return (f"**Captain:** {recent} wore the armband in {Counter(worn)[recent]} of {len(worn)} team sheets"
+                + (f", including the last {streak}." if streak < len(worn) else "."))
+    return (f"**Captain:** {recent} has worn the armband in the last {streak} team sheet{'s' if streak > 1 else ''}. "
+            f"{top} wore it in {c} of {len(worn)}.")
 
 
 def _quotes(ev: dict | None, key: str, cap: int = 2) -> list[str]:
@@ -270,8 +306,15 @@ def compose_brief(fx: dict, notes: str, ev: dict | None, generated: date | None 
     if fx["kickoff"] or fx["venue"]:
         where = f" at {fx['venue']}" if fx["venue"] else ""
         para(f"**Kick-off:** {fx['kickoff'] or 'time not stated'}{where} ({'home' if fx['home_game'] else 'away'})")
-    para(f"**Competition:** {league['division']}, {league['season']}" if league
-         else "**Competition:** not verified (public league data unavailable)")
+    competition = fx.get("competition") or next(
+        (f["competition"] for f in (ev or {}).get("fixtures", []) if not f.get("played") and "tiverton" in f["opponent"].lower()), None)
+    if competition:
+        para(f"**Competition:** {competition}")
+        if league:
+            para(f"**Opponent league:** {league['division']}, {league['season']}")
+    else:
+        para(f"**Competition:** {league['division']}, {league['season']}" if league
+             else "**Competition:** not verified (public league data unavailable)")
     para(f"**Evidence:** uploaded club preview; " + (
         f"Football Web Pages table and {len(sheets)} team sheets" if ev else "no public match data"))
     para("⚠ Draft built automatically. A coach checks every line before it reaches the players.")
@@ -289,7 +332,7 @@ def compose_brief(fx: dict, notes: str, ev: dict | None, generated: date | None 
         tiv = next((s for s in league["standings"] if "tiverton" in s["team"].lower()), None)
         if tiv:
             para(f"**Tiverton:** {tiv['position']} with {tiv['points']} points from {tiv['played']} games.")
-    last5 = played[-5:]
+    last5 = [f for f in played if f.get("result")][-5:]
     if last5:
         para(f"**Last {len(last5)} games ({' '.join(f['result'] for f in last5)}):** "
              + "; ".join(_result_line(f) for f in last5) + ".")
@@ -309,21 +352,34 @@ def compose_brief(fx: dict, notes: str, ev: dict | None, generated: date | None 
         xi = sheets[-1]["match"]["starters"]
         para(f"**Most recent XI ({sheets[-1]['date']} v {sheets[-1]['opponent']}):** "
              + ", ".join(f"{p['shirt']} {p['name']}{' (captain)' if p['captain'] else ''}" for p in xi) + ".")
-    scorers = Counter(g["scorer"] for f in played for g in (f.get("match") or {}).get("team_goals", []))
+    scorers = Counter(g["scorer"] for f in played if f.get("match") for g in _goals(f["match"])[0])
+    finishers = [name for name, c in scorers.items() if c == max(scorers.values())] if scorers else []
     if scorers:
-        para("**Goal threat:** " + ", ".join(f"{name} {c}" for name, c in scorers.most_common(3)) + " (goals on team sheets).")
+        para("**Goal threat:** " + ", ".join(f"{name} {c}" for name, c in scorers.most_common(3))
+             + " (goals on team sheets, penalties included).")
     preview("possession")
     para("> **Lever:** Formation is not published. Read their midfield shape in the first 10 minutes and set the Pressing Trigger on their deepest midfielder's first touch.")
 
     # Out of possession
     section("Out of Possession Phase")
-    if played:
-        against = [f["goals_against"] for f in played]
-        para(f"**Defensive record:** {sum(against)} conceded in {len(played)} games; {against.count(0)} clean sheets; most in one game {max(against)}.")
-    captains = Counter(p["name"] for f in sheets for p in f["match"]["starters"] if p["captain"])
-    if captains:
-        cap, c = captains.most_common(1)[0]
-        para(f"**Captain:** {cap} wore the armband in {c} of {len(sheets)} team sheets.")
+    scored_games = [f for f in played if f.get("goals_against") is not None]      # a result without a scoreline has no sample
+    if scored_games:
+        league_label = ((league or {}).get("check") or {}).get("league_label_in_fixtures")
+        groups = ([("league game", [f for f in scored_games if f["competition"] == league_label]),
+                   ("cup game", [f for f in scored_games if f["competition"] != league_label])] if league_label
+                  else [("game", scored_games)])
+        parts = []
+        for noun, games in groups:
+            if not games:
+                continue
+            against = [f["goals_against"] for f in games]
+            sheets_kept = against.count(0)
+            parts.append(f"{sum(against)} conceded in {len(games)} {noun}{'' if len(games) == 1 else 's'} "
+                         f"({sheets_kept} clean sheet{'' if sheets_kept == 1 else 's'}, most in one game {max(against)})")
+        para("**Defensive record:** " + "; ".join(parts) + ".")
+    captain = _captaincy(sheets)
+    if captain:
+        para(captain)
     preview("out_of_possession")
     para("> **Lever:** Attack the Half-Spaces behind their full-backs until their Block height is confirmed from our own footage.")
 
@@ -331,11 +387,13 @@ def compose_brief(fx: dict, notes: str, ev: dict | None, generated: date | None 
     section("Attacking & Defensive Transitions")
     for q in _quotes(ev, "transitions"):
         para(q)
-    if scorers:
-        top, c = scorers.most_common(1)[0]
-        para(f"**Primary finisher:** {top}, {c} goals.")
+    if finishers:
+        top = max(scorers.values())
+        para(f"**Primary finisher{'s' if len(finishers) > 1 else ''}:** {_names_and(finishers)}, "
+             f"{top} goal{'' if top == 1 else 's'}{' each' if len(finishers) > 1 else ''}.")
     preview("transitions")
-    para(f"> **Lever:** Hold Rest Defense of two centre-backs plus the holding midfielder whenever both full-backs advance{f', with one of them tracking {scorers.most_common(1)[0][0]}' if scorers else ''}.")
+    para(f"> **Lever:** Hold Rest Defense of two centre-backs plus the holding midfielder whenever both full-backs advance"
+         f"{f', with one of them tracking {_names_and(finishers)}' if finishers else ''}.")
 
     # Dead balls
     section("Dead-Ball Organization")
@@ -369,8 +427,11 @@ def compose_brief(fx: dict, notes: str, ev: dict | None, generated: date | None 
 
     # Adjustments
     section("Tivvy Tactical Adjustments")
-    preview("adjustments")
-    para("> **Lever:** Name the cover for every absentee listed above before the team meeting.")
+    if _route(sents, "adjustments"):
+        preview("adjustments")
+        para("> **Lever:** Name the cover for every absentee listed above before the team meeting.")
+    else:
+        para("**Absentees:** none named in the preview. Confirm their XI in the warm-up.")
 
     # Data quality
     section("Data Quality & Sources")
