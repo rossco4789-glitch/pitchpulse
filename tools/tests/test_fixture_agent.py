@@ -40,8 +40,8 @@ class _Page:
 
 def test_feed_skips_played_and_postponed_rows():
     fx = fa.parse_next_fixture(PAGE, TODAY)
-    assert fx == {"opponent": "Sholing", "home_away": "Home", "venue": "Ladysmead", "date": "2026-09-19",
-                  "date_str": "Sat 19 Sep 2026", "kickoff": "15:00", "competition": "FA Cup", "slug": "sholing"}
+    assert fx == {"opponent": "Sholing", "home_away": "Home", "venue": "The Slee Blackwell Solicitors Stadium",
+                  "date": "2026-09-19", "date_str": "Sat 19 Sep 2026", "kickoff": "15:00", "competition": "FA Cup", "slug": "sholing"}
 
 
 def test_away_row_designation_and_league_competition():
@@ -84,12 +84,12 @@ def test_stub_header_and_sections_read_back_by_scout_brief(tmp_path):
     path = Path(fa.scaffold_preview_stub(fx, previews=tmp_path))
     text = path.read_text(encoding="utf-8")
     assert path.name == "sholing.md"
-    assert text.splitlines()[0] == "Tiverton Town v Sholing — Sat 19 Sep 2026, 15:00, Ladysmead"
+    assert text.splitlines()[0] == "Tiverton Town v Sholing — Sat 19 Sep 2026, 15:00, The Slee Blackwell Solicitors Stadium"
     for section in ("## Formation", "## Key Players", "## Manager Notes"):
         assert section in text
     detected = sb.detect_fixture(text, TODAY)
     assert (detected["home_game"], detected["date"], detected["kickoff"], detected["venue"]) == \
-        (True, "2026-09-19", "15:00", "Ladysmead")
+        (True, "2026-09-19", "15:00", "The Slee Blackwell Solicitors Stadium")
 
 
 def test_away_stub_puts_opponent_first(tmp_path):

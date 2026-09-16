@@ -15,8 +15,8 @@ Sources, in order:
     footballwebpages.co.uk        <team>/fixtures-results; first unplayed, not-postponed row
 
 Fixture schema:
-    {"opponent": "Sholing", "home_away": "Home", "venue": "Ladysmead", "date": "2026-09-19",
-     "date_str": "Sat 19 Sep 2026", "kickoff": "15:00", "competition": "FA Cup", "slug": "sholing"}
+    {"opponent": "Sholing", "home_away": "Home", "venue": "The Slee Blackwell Solicitors Stadium",
+     "date": "2026-09-19", "date_str": "Sat 19 Sep 2026", "kickoff": "15:00", "competition": "FA Cup", "slug": "sholing"}
 
 Contract:
     get_next_fixture returns None when no source lists an upcoming match; it never raises on network or
@@ -45,7 +45,7 @@ import scout_fetcher as sf  # noqa: E402
 from scout_brief import MONTHS, _resolve_year, slugify  # noqa: E402
 
 CLUB         = "Tiverton Town"
-HOME_GROUND  = "Ladysmead"
+HOME_GROUND  = "The Slee Blackwell Solicitors Stadium"
 MANIFEST     = ROOT / "data" / "scouting" / "fixtures.json"
 PREVIEWS     = ROOT / "data" / "scouting" / "previews"
 FETCHER_PATH = ROOT / "tools" / "scout_fetcher.py"
