@@ -343,7 +343,17 @@ def test_highlight_mode_hides_the_pitch_and_logs_moments(tab_env):
     assert "Logged moments · 18" in "\n".join(_all_text(at.main))
 
 
-def test_next_fixture_opens_opposition_scouting_with_the_top_highlight(tab_env, monkeypatch):
+REELS = [
+    {"match_date": "Sat 12 Sep", "fixture_label": "Sholing v Plymouth Parkway", "score": "1-3",
+     "title": "Plymouth Parkway 3 – 1 Sholing | Match Highlights", "url": "https://www.youtube.com/watch?v=parkway0001",
+     "channel": "Sholing Football Club"},
+    {"match_date": "Sat 22 Aug", "fixture_label": "Sholing v Chertsey Town", "score": "2-4",
+     "title": "Highlights - Sholing 2-4 Chertsey Town", "url": "https://www.youtube.com/watch?v=VqinZ1Dw3eo",
+     "channel": "Sholing Football Club"},
+]
+
+
+def test_next_fixture_opens_opposition_scouting_with_the_match_reel_selector(tab_env, monkeypatch):
     from types import SimpleNamespace
     from streamlit.testing.v1 import AppTest
     from cv import vision_center_ui as ui
@@ -355,10 +365,7 @@ def test_next_fixture_opens_opposition_scouting_with_the_top_highlight(tab_env, 
     monkeypatch.setattr(ui, "_fixture_agent", lambda: SimpleNamespace(scaffold_preview_stub=lambda fx: "previews/sholing.md"))
     links = vc.SOURCES / "sholing" / "video_links.json"
     links.parent.mkdir(parents=True)
-    links.write_text(json.dumps({"opponent": "Sholing", "videos": [
-        {"title": "Highlights - Sholing 2-4 Chertsey Town", "url": "https://www.youtube.com/watch?v=VqinZ1Dw3eo",
-         "channel": "Sholing Football Club", "duration_s": 594, "score": 17, "fixture": "Sat 22 Aug v Chertsey Town"}]}),
-        encoding="utf-8")
+    links.write_text(json.dumps(REELS), encoding="utf-8")
 
     at = AppTest.from_function(_tab_script, default_timeout=60)
     at.run()
@@ -370,7 +377,103 @@ def test_next_fixture_opens_opposition_scouting_with_the_top_highlight(tab_env, 
 
     text = "\n".join(_all_text(at.main))
     assert banned_terms(text) == []
-    assert "Kit contrast check" not in text and "Log a key moment" in text
-    assert "https://www.youtube.com/embed/VqinZ1Dw3eo" in text                # st.video renders the YouTube player
-    assert text.index("VqinZ1Dw3eo") < text.index("Log a key moment")      # the reel sits above the logger
-    assert "Sat 22 Aug v Chertsey Town. 1 video found." in text
+    assert "Kit contrast check" not in text and "Select Match Reel (Last 5 Fixtures)" in text
+    assert "https://www.youtube.com/embed/parkway0001" in text                  # newest fixture plays first
+    assert text.index("embed/parkway0001") < text.index("Log a key moment")     # the reel sits above the logger
+    assert "2 of the last 5 fixtures have a reel." in text
+    assert at.text_input(key="vcc_reel").value == "Sholing v Plymouth Parkway 1-3 · Sat 12 Sep"
+
+    at.selectbox(key="vcc_reel_pick").set_value(1).run()
+    assert not at.exception
+    text = "\n".join(_all_text(at.main))
+    assert "embed/VqinZ1Dw3eo" in text and "embed/parkway0001" not in text
+    assert at.text_input(key="vcc_reel").value == "Sholing v Chertsey Town 2-4 · Sat 22 Aug"
+
+    at.selectbox(key="vcc_hl_kind").set_value("goal_conceded").run()
+    at.button(key="vcc_hl_add").click().run()
+    assert not at.exception
+    assert hd.load_events(hd.events_path(vc.SOURCES, "sholing"))[-1]["source"] == "Sholing v Chertsey Town 2-4 · Sat 22 Aug"
+
+
+# ── Patterns across match reels ──────────────────────────────────────────────
+
+def _evidence():
+    def match(squad, goals):
+        return {"lineup_published": True, "starters": [{"name": n} for n in squad], "bench": [],
+                "events": [{"minute": m, "kind": "goal", "text": f"{who} scores"} for m, who in goals]}
+    squad = ["Harry Taylor", "Jake Mccarthy"]
+    return {"fixtures": [
+        {"played": True, "match": match(squad, [("29", "Harry Taylor"), ("51", "Daniel Berry"), ("86", "Bradley Wilson"), ("90+1", "Nathan Minhas")])},
+        {"played": True, "match": match(squad, [("45+2", "Jake Mccarthy"), ("10", "Adam Liddle"), ("49", "Ruben Bartlett-Antwi")])},
+        {"played": True, "match": {"lineup_published": False}},
+        {"played": False},
+    ]}
+
+
+def _reel_moments():
+    a, b = "Sholing v Plymouth Parkway 1-3 · Sat 12 Sep", "Sholing v Chertsey Town 2-4 · Sat 22 Aug"
+
+    def attack(channel, source):
+        return hd.new_event("goal_scored", {"channel": channel, "action": "Cross", "arrival": "Far post",
+                                            "counter_trigger": "Not a counter"}, source=source)
+
+    def conceded(flaw, side, minute, source):
+        return hd.new_event("goal_conceded", {"flaw": flaw, "side": side}, minute=minute, source=source)
+
+    return [attack("Left wing", a), attack("Left half-space", b), attack("Central", b), attack("Right wing", a),
+            attack("Left wing", b), conceded("Beaten in the air", "Their right", 67, a),
+            conceded("Beaten in the air", "Their right", 86, b), conceded("Cut-back not tracked", "Their left", 51, b),
+            conceded("Isolated 1v1", "Central", 28, a)]
+
+
+def test_goal_timing_counts_only_goals_against_them():
+    assert hd.goal_timing(_evidence()) == {"sheets": 2, "conceded": 5, "first_half": 1, "second_half": 4, "after_75": 2}
+    assert hd.goal_timing(None) is None and hd.goal_timing({"fixtures": [{"played": True}]}) is None
+
+
+def test_patterns_pool_moments_across_match_reels_and_evidence_timing():
+    patterns = hd.build_dossier("Sholing", _reel_moments(), _evidence())["patterns"]
+    corridors, entries, timing = patterns["items"]
+    assert patterns["title"] == "Patterns Across 2 Match Reels"
+    assert corridors == {"label": "Attacking corridors",
+                         "read": "Left 60% · Central 20% · Right 20% of 5 goals and chances across 2 match reels.",
+                         "lever": "Our right-back and right midfielder double up on their left side; force play inside."}
+    assert entries["read"] == ("3 of 4 goals and chances conceded (75%) came from box entries, most often beaten in the air "
+                               "from crosses (2); 2 of 3 on their right side.")
+    assert entries["lever"] == "Cross early to the far post and put our best header on their weakest one."
+    assert timing["read"] == ("4 of 5 goals conceded came after half-time (80%), 2 after the 75th minute, across 2 team sheets. "
+                              "Logged reels: 3 of 4 conceded moments came after half-time.")
+    assert timing["lever"].startswith("Save the press for the second half")
+
+
+def test_patterns_without_moments_or_evidence_prompt_the_analyst():
+    corridors, entries, timing = hd.build_dossier("Sholing", [])["patterns"]["items"]
+    assert not (corridors["lever"] or entries["lever"] or timing["lever"])
+    assert timing["read"] == "No goal times yet. Fetch their results or add minutes to conceded moments."
+    balanced = [hd.new_event("goal_scored", {"channel": c, "action": "Cross", "arrival": "Far post", "counter_trigger": "Not a counter"})
+                for c in ("Left wing", "Central", "Right wing")]
+    assert hd.build_dossier("Sholing", balanced)["patterns"]["items"][0]["lever"].startswith("No corridor above half")
+
+
+def test_patterns_reach_the_print_sheet_card_and_phone_brief():
+    from cv import briefing_sheet as bs
+    from cv import vision_center_ui as ui
+    sys.path.insert(0, str(ROOT / "tools"))
+    import scout_brief as sb
+
+    dossier = hd.build_dossier("Sholing", _reel_moments(), _evidence())
+    sheet, card = bs.dossier_sheet(dossier), ui._dossier_card(dossier)
+    for html in (sheet, card):
+        assert "Patterns Across 2 Match Reels" in html and "Left 60% · Central 20% · Right 20%" in html
+        assert html.index("Patterns Across") < html.index("Attacking Patterns")
+    assert 'class="sh-patterns"' in sheet and 'class="vcc-patterns"' in card
+
+    fx = {"home": "Tiverton Town", "away": "Sholing", "opponent": "Sholing", "home_game": True, "date": "2026-09-19",
+          "kickoff": "15:00", "venue": "The Slee Blackwell Solicitors Stadium"}
+    md = sb.compose_brief(fx, "", None, patterns=dossier["patterns"])
+    assert "## Highlight Reel Patterns" in md and "**Attacking corridors:** Left 60%" in md
+    assert "> **Lever:** Save the press for the second half" in md
+    assert md.index("## Highlight Reel Patterns") < md.index("## Key Opposition Profiles")
+    assert "## Highlight Reel Patterns" not in sb.compose_brief(fx, "", None)
+
+    assert banned_terms(" ".join([hd.dossier_text(dossier), sheet, card, md])) == []

@@ -115,6 +115,8 @@ _CSS = """
 .vcc-phases .ir { font:.88rem/1.5 'Segoe UI',Inter,system-ui,sans-serif; color:#E6EDF3; margin-top:3px; }
 .vcc-phases .ir.empty { color:#6E7681; }
 .vcc-phases .iv { font:600 .84rem/1.5 'Segoe UI',Inter,system-ui,sans-serif; color:#3FB950; margin-top:4px; }
+.vcc-patterns { background:#161B22; padding:14px 0 0; border-top:1px solid #30363D; }
+.vcc-patterns > .vcc-label { padding:0 20px; color:#F2CC60; }
 .vcc-moment { font:.85rem/1.4 'Segoe UI',Inter,system-ui,sans-serif; color:#E6EDF3; padding:7px 0; border-bottom:1px solid #21262D; }
 .vcc-moment span { color:#8B949E; }
 .vcc-club { font:700 1.1rem Bahnschrift,'Arial Narrow',Arial,sans-serif; color:#F0F6FC; letter-spacing:.03em; text-transform:uppercase; margin-bottom:4px; }
@@ -274,6 +276,11 @@ def _match_setup() -> None:
     if name:
         with st.spinner("Looking up the club…"):
             club = _club_assets(name, str(vc.SOURCES))
+    reels = _highlight_finder().cached_reels(name, vc.SOURCES) if highlight and name else None
+    if st.session_state.get("vcc_reel_for") != name:          # a new opponent starts on their newest reel
+        st.session_state["vcc_reel_for"] = name
+        st.session_state["vcc_reel_pick"] = 0
+        st.session_state["vcc_reel"] = reel_source(reels[0]) if reels else ""
     c1, c2 = st.columns([2, 1])
     with c1:
         pick = st.selectbox("Opponent · Southern League Division One South", lr.opponent_options(), key="vcc_opponent_pick")
@@ -283,7 +290,7 @@ def _match_setup() -> None:
             _club_banner(club)
     with c2:
         if highlight:
-            reel = st.text_input("Highlight reel", key="vcc_reel", placeholder="e.g. v Weymouth, 12 Aug")
+            reel = st.text_input("Opponent match", key="vcc_reel", placeholder="e.g. Sholing v Chertsey Town 2-4 · Sat 22 Aug")
         else:
             kit = _kit_selector(club)
     slug = _setup_slug()
@@ -291,7 +298,7 @@ def _match_setup() -> None:
     if highlight:
         _html(_note("Highlight clips can't show team shape. Log each goal, chance, corner and direct free kick; "
                     "the dossier updates as you go."))
-        _highlight_video(name)
+        _match_reels(name, reels)
         _moment_entry(slug, reel)
         return
     left, right = st.columns([1.1, 1], gap="large")
@@ -533,29 +540,43 @@ def _highlight_finder():
     return mod
 
 
-def _highlight_video(name: str) -> None:
-    """Top-ranked public highlight package for the opponent, shown above the moment logger."""
+def reel_source(reel: dict) -> str:
+    """'Opponent match' text saved on each logged moment."""
+    return f"{reel['fixture_label']} {reel['score']} · {reel['match_date']}".replace("  ", " ")
+
+
+def _search_reels(name: str) -> None:
+    result = _highlight_finder().find_match_reels(name, vc.SOURCES, refresh=True)
+    st.session_state["vcc_reel_warnings"] = result["warnings"]
+    st.session_state["vcc_reel_pick"] = 0
+    st.session_state["vcc_reel"] = reel_source(result["reels"][0]) if result["reels"] else ""
+
+
+def _pick_reel(reels: list[dict]) -> None:
+    st.session_state["vcc_reel"] = reel_source(reels[st.session_state["vcc_reel_pick"]])
+
+
+def _match_reels(name: str, reels: list[dict] | None) -> None:
+    """One highlight reel per recent fixture; the chosen reel plays above the moment logger."""
     if not name:
         return
-    hf = _highlight_finder()
-    links = hf.cached_highlights(name, vc.SOURCES)
-    search = st.button("Search again" if links else "Find highlight videos", key="vcc_hl_search",
-                       icon=":material/travel_explore:")
-    if search:
-        with st.spinner(f"Searching for {name} highlights…"):
-            links = hf.find_highlights(name, vc.SOURCES, refresh=True)
-        for warning in links.get("warnings", []):
-            _html(_alert(warning))
-    if not links:
+    st.button("Search again" if reels else "Find match reels", key="vcc_hl_search", icon=":material/travel_explore:",
+              on_click=_search_reels, args=(name,))
+    for warning in st.session_state.pop("vcc_reel_warnings", []):
+        _html(_alert(warning))
+    if reels is None:
         return
-    if not links["videos"]:
-        _html(_note(f"No public highlight videos found for {name}."))
+    if not reels:
+        _html(_note(f"No highlight reels found that match {name}'s recent results."))
         return
-    top = links["videos"][0]
-    _html(_label("Highlight reel"))
-    st.video(top["url"])
-    match = f" · {top['fixture']}" if top.get("fixture") else ""
-    _html(_note(f"{top['title']} · {top['channel']}{match}. {len(links['videos'])} video{'s' if len(links['videos']) != 1 else ''} found."))
+    if st.session_state.get("vcc_reel_pick", 0) >= len(reels):
+        st.session_state["vcc_reel_pick"] = 0
+    st.selectbox("Select Match Reel (Last 5 Fixtures)", range(len(reels)), key="vcc_reel_pick",
+                 format_func=lambda i: f"{reels[i]['match_date']} · {reels[i]['fixture_label']} {reels[i]['score']}",
+                 on_change=_pick_reel, args=(reels,))
+    chosen = reels[st.session_state["vcc_reel_pick"]]
+    st.video(chosen["url"])
+    _html(_note(f"{chosen['title']} · {chosen['channel']}. {len(reels)} of the last 5 fixtures have a reel."))
 
 
 def _moment_entry(slug: str, reel: str) -> None:
@@ -610,7 +631,8 @@ def _dossier_report(logged: list[str]) -> None:
     if len(logged) > 1:
         st.selectbox("Opponent dossier", logged, key="vcc_dossier_opp", format_func=vc.display_name)
     slug = st.session_state["vcc_dossier_opp"]
-    dossier = hd.build_dossier(vc.display_name(slug), hd.load_events(hd.events_path(vc.SOURCES, slug)))
+    evidence = hd.load_evidence(vc.ROOT / "data" / "scouting" / "evidence", slug)
+    dossier = hd.build_dossier(vc.display_name(slug), hd.load_events(hd.events_path(vc.SOURCES, slug)), evidence)
     _html(_dossier_card(dossier))
     _html(bs.dossier_sheet(dossier, _crest_uri(slug), _prepared()))                   # hidden until printed
 
@@ -625,14 +647,17 @@ def _dossier_card(d: dict) -> str:
                   f'<div class="q threat"><div class="k">Primary threat</div><div class="v">{escape(quick["threat"])}</div></div>'
                   f'<div class="q weak"><div class="k">Primary vulnerability</div><div class="v">{escape(quick["vulnerability"])}</div></div>'
                   "</div>")
-    sections = []
-    for i, section in enumerate(d["sections"], start=1):
-        items = []
-        for item in section["items"]:
-            empty = "" if item["lever"] else " empty"
-            lever = f'<div class="iv">→ {escape(item["lever"])}</div>' if item["lever"] else ""
-            items.append(f'<div class="item"><div class="il">{escape(item["label"])}</div>'
-                         f'<div class="ir{empty}">{escape(item["read"])}</div>{lever}</div>')
-        sections.append(f'<div class="p p{i}"><div class="top"><div class="num">{i}</div>'
-                        f'<div class="t">{escape(section["title"])}</div></div>{"".join(items)}</div>')
-    return f'<div class="vcc-brief">{head}{quick_read}<div class="vcc-phases">{"".join(sections)}</div></div>'
+    patterns = (f'<div class="vcc-patterns">{_label(d["patterns"]["title"])}<div class="vcc-phases">'
+                + "".join(f'<div class="p p{i}">{_card_item(item)}</div>' for i, item in enumerate(d["patterns"]["items"], start=1))
+                + "</div></div>")
+    sections = [f'<div class="p p{i}"><div class="top"><div class="num">{i}</div>'
+                f'<div class="t">{escape(section["title"])}</div></div>{"".join(_card_item(item) for item in section["items"])}</div>'
+                for i, section in enumerate(d["sections"], start=1)]
+    return f'<div class="vcc-brief">{head}{quick_read}{patterns}<div class="vcc-phases">{"".join(sections)}</div></div>'
+
+
+def _card_item(item: dict) -> str:
+    empty = "" if item["lever"] else " empty"
+    lever = f'<div class="iv">→ {escape(item["lever"])}</div>' if item["lever"] else ""
+    return (f'<div class="item"><div class="il">{escape(item["label"])}</div>'
+            f'<div class="ir{empty}">{escape(item["read"])}</div>{lever}</div>')

@@ -366,14 +366,120 @@ def _free_kicks(kicks: list[dict]) -> dict:
                  f"Give away no fouls within 30 yards of goal; set the wall for a {foot.split()[0].lower()}-footed taker.")
 
 
-def build_dossier(opponent: str, events: list[dict]) -> dict:
+# ── Patterns across matches ──────────────────────────────────────────────────
+
+CORRIDOR   = {"Left wing": "Left", "Left half-space": "Left", "Central": "Central", "Right half-space": "Right", "Right wing": "Right"}
+BOX_ENTRY  = {"Beaten in the air": "beaten in the air from crosses", "Cut-back not tracked": "cut-backs not tracked",
+              "Space behind full-back": "runs in behind the full-backs"}
+ENTRY_LEVER = {"Beaten in the air": "Cross early to the far post and put our best header on their weakest one.",
+               "Cut-back not tracked": "Wide players drive to the byline and cut back to the penalty spot.",
+               "Space behind full-back": "Wingers spin in behind as soon as their full-back steps up."}
+
+
+def _pct(n: int, total: int) -> int:
+    return round(100 * n / total) if total else 0
+
+
+def load_evidence(evidence_dir: Path, slug: str) -> dict | None:
+    """Public match evidence written by tools/scout_fetcher.py, or None."""
+    try:
+        doc = json.loads((Path(evidence_dir) / f"{slug}.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+def _minute(text: str) -> int:
+    return int(str(text).split("+")[0])
+
+
+def goal_timing(evidence: dict | None) -> dict | None:
+    """Goals the opponent conceded, by half, from team-sheet events. A scorer outside their squad scored against them."""
+    minutes, sheets = [], 0
+    for fx in (evidence or {}).get("fixtures", []):
+        match = fx.get("match") or {}
+        if not (fx.get("played") and match.get("lineup_published")):
+            continue
+        sheets += 1
+        squad = {p["name"] for p in match.get("starters", []) + match.get("bench", [])}
+        for event in match.get("events", []):
+            text = event.get("text", "")
+            if " scores" in text and text.split(" scores")[0] not in squad:
+                minutes.append(_minute(event["minute"]))
+    if not sheets:
+        return None
+    return {"sheets": sheets, "conceded": len(minutes), "first_half": sum(m <= 45 for m in minutes),
+            "second_half": sum(m > 45 for m in minutes), "after_75": sum(m > 75 for m in minutes)}
+
+
+def _corridors(attack: list[dict], reels: int) -> dict:
+    label = "Attacking corridors"
+    if not attack:
+        return _item(label, "No goals or chances logged yet.")
+    counts = Counter(CORRIDOR[e["fields"]["channel"]] for e in attack)
+    shares = {side: _pct(counts[side], len(attack)) for side in ("Left", "Central", "Right")}
+    read = (f"Left {shares['Left']}% · Central {shares['Central']}% · Right {shares['Right']}% of "
+            f"{len(attack)} {_goals_chances(len(attack))} across {_plural(reels, 'match reel')}.")
+    side, share = max(shares.items(), key=lambda kv: kv[1])
+    if share < 50:
+        return _item(label, read, "No corridor above half: keep the back four's width and shift across as one unit.")
+    if side == "Central":
+        return _item(label, read, "Holding midfielder stays in front of the centre-backs; block shooting lanes at the edge of the box.")
+    ours = "right" if side == "Left" else "left"
+    return _item(label, read, f"Our {ours}-back and {ours} midfielder double up on their {side.lower()} side; force play inside.")
+
+
+def _box_entries(defence: list[dict]) -> dict:
+    label = "Crosses and box entries conceded"
+    if not defence:
+        return _item(label, "No goals or chances conceded logged yet.")
+    entries = [e for e in defence if e["fields"]["flaw"] in BOX_ENTRY]
+    conceded = _goals_chances(len(defence), True)
+    if not entries:
+        return _item(label, f"None of {len(defence)} {conceded} came from crosses, cut-backs or runs in behind.")
+    flaw, n = _top(_count(entries, "flaw"))
+    side, s = _top(_count(entries, "side"))
+    where = f"; {s} of {len(entries)} on their {side.split()[-1].lower()} side" if side and side != "Central" else ""
+    return _item(label, f"{len(entries)} of {len(defence)} {conceded} ({_pct(len(entries), len(defence))}%) came from box "
+                        f"entries, most often {BOX_ENTRY[flaw]} ({n}){where}.", ENTRY_LEVER[flaw])
+
+
+def _concession_timing(defence: list[dict], timing: dict | None) -> dict:
+    label = "When they concede"
+    timed = [e for e in defence if e.get("minute") is not None]
+    reads = []
+    if timing and timing["conceded"]:
+        reads.append(f"{timing['second_half']} of {timing['conceded']} goals conceded came after half-time "
+                     f"({_pct(timing['second_half'], timing['conceded'])}%), {timing['after_75']} after the 75th minute, "
+                     f"across {_plural(timing['sheets'], 'team sheet')}.")
+    if timed:
+        late = sum(e["minute"] > 45 for e in timed)
+        reads.append(f"Logged reels: {late} of {len(timed)} conceded moments came after half-time.")
+    if not reads:
+        return _item(label, "No goal times yet. Fetch their results or add minutes to conceded moments.")
+    total = (timing or {}).get("conceded") or len(timed)
+    second = (timing or {}).get("second_half") if timing and timing["conceded"] else sum(e["minute"] > 45 for e in timed)
+    share = _pct(second, total)
+    if share >= 60:
+        lever = "Save the press for the second half: two substitutions between 60 and 70 minutes, Line of Engagement up after the restart."
+    elif share <= 40:
+        lever = "Start at full intensity; they concede before half-time."
+    else:
+        lever = "No half stands out; keep the press level for 90 minutes."
+    return _item(label, " ".join(reads), lever)
+
+
+def build_dossier(opponent: str, events: list[dict], evidence: dict | None = None) -> dict:
     of = lambda *kinds: [e for e in events if e.get("kind") in kinds]
     attack, defence = of("goal_scored", "chance_created"), of("goal_conceded", "chance_conceded")
     corners_for, corners_against, kicks = of("corner_for"), of("corner_against"), of("free_kick")
+    reels = len({e["source"] for e in events if e.get("source")})
     return {
         "opponent": opponent, "footage": "Highlight Reel", "moments": len(events), "confidence": _confidence(len(events)),
         "note": "Highlight reels show goals and big chances, not the full match.",
         "quick_read": {"threat": _threat(attack, corners_for), "vulnerability": _vulnerability(defence, corners_against)},
+        "patterns": {"title": f"Patterns Across {_plural(reels, 'Match Reel').title()}",
+                     "items": [_corridors(attack, reels), _box_entries(defence), _concession_timing(defence, goal_timing(evidence))]},
         "sections": [
             {"title": "Attacking Patterns", "items": [_creation(attack), _arrivals(attack), _counters(attack)]},
             {"title": "Defensive Flaws", "items": [_isolation(defence), _behind(defence), _second_balls(defence, corners_against)]},
@@ -385,7 +491,8 @@ def build_dossier(opponent: str, events: list[dict]) -> dict:
 def dossier_text(dossier: dict) -> str:
     """Every visible string in a dossier, for jargon checks."""
     parts = [dossier["opponent"], dossier["footage"], dossier["note"], dossier["confidence"]["text"],
-             dossier["quick_read"]["threat"], dossier["quick_read"]["vulnerability"]]
+             dossier["quick_read"]["threat"], dossier["quick_read"]["vulnerability"], dossier["patterns"]["title"]]
+    parts += [f"{i['label']} {i['read']} {i['lever']}" for i in dossier["patterns"]["items"]]
     for section in dossier["sections"]:
         parts.append(section["title"])
         parts += [f"{i['label']} {i['read']} {i['lever']}" for i in section["items"]]

@@ -281,7 +281,8 @@ def _quotes(ev: dict | None, key: str, cap: int = 2) -> list[str]:
     return out[:cap]
 
 
-def compose_brief(fx: dict, notes: str, ev: dict | None, generated: date | None = None) -> str:
+def compose_brief(fx: dict, notes: str, ev: dict | None, generated: date | None = None,
+                  patterns: dict | None = None) -> str:
     generated = generated or date.today()
     sents = _sentences("\n".join(ln for ln in notes.splitlines() if len(ln.split()) > 8))  # skip header lines
     league = (ev or {}).get("league")
@@ -407,6 +408,15 @@ def compose_brief(fx: dict, notes: str, ev: dict | None, generated: date | None 
     para("⚠ Corner and free-kick takers and delivery zones are not published.")
     para("> **Lever:** Tag every opposition corner and free kick in the first half so the half-time briefing names the taker and target zone.")
 
+    # Highlight reel patterns (Opposition Scouting track in app.py tab 6)
+    if patterns:
+        section("Highlight Reel Patterns")
+        para(f"**{patterns['title']}.** Pooled from every moment logged on their match reels.")
+        for item in patterns["items"]:
+            para(f"**{item['label']}:** {item['read']}")
+            if item["lever"]:
+                para(f"> **Lever:** {item['lever']}")
+
     # Profiles
     section("Key Opposition Profiles")
     for name, data in (ev or {}).get("players", {}).items():
@@ -483,7 +493,11 @@ def run(filename: str, data: bytes, *, club_site: str | None = None, opponent: s
         out.write_text(json.dumps(ev, indent=2, ensure_ascii=False), encoding="utf-8")
 
     progress("Composing the 4-moments brief")
-    md = compose_brief(fx, text, ev, today)
+    sys.path.insert(0, str(ROOT))
+    from cv import highlight_dossier as hd
+    moments = hd.load_events(hd.events_path(root / "data" / "scouting" / "sources", slug))
+    patterns = hd.build_dossier(fx["opponent"], moments, ev)["patterns"] if moments else None
+    md = compose_brief(fx, text, ev, today, patterns)
     brief_path = src_dir / "brief.md"
     kept_manual = brief_path.exists() and AUTO_MARKER not in brief_path.read_text(encoding="utf-8") and not overwrite
     if kept_manual:

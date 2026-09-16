@@ -58,6 +58,9 @@ PRINT_CSS = """
 .vcc-sheet .sh-quick > div { border:0.3mm solid #C9D1D9; border-left:1.2mm solid #D1242F; padding:2mm 3mm; }
 .vcc-sheet .sh-quick > div.weak { border-left-color:#1B6E2E; }
 .vcc-sheet .sh-quick span { display:block; font:700 11pt Bahnschrift,Arial,sans-serif; color:#0B0F14; margin-top:.8mm; }
+.vcc-sheet .sh-patterns { border:0.3mm solid #C9D1D9; padding:2mm 3mm 0; margin-bottom:3mm; break-inside:avoid; }
+.vcc-sheet .sh-patterns h3 { margin:0 0 1.5mm; font:700 8pt Bahnschrift,Arial,sans-serif; letter-spacing:.12em; text-transform:uppercase; color:#0B0F14; }
+.vcc-sheet .sh-pgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:4mm; }
 .vcc-sheet .sh-sections { display:grid; grid-template-columns:repeat(3,1fr); gap:4mm; break-inside:avoid; }
 .vcc-sheet .sh-item { margin-bottom:2mm; break-inside:avoid; }
 .vcc-sheet .sh-item p { margin:.5mm 0 0; font-size:8.6pt; color:#111418; }
@@ -128,13 +131,16 @@ def dossier_sheet(dossier: dict, crest_uri: str | None = None, generated: str = 
     quick = dossier["quick_read"]
     quick_read = (f'<div class="sh-quick"><div><b>Primary threat</b><span>{escape(quick["threat"])}</span></div>'
                   f'<div class="weak"><b>Primary vulnerability</b><span>{escape(quick["vulnerability"])}</span></div></div>')
-    sections = []
-    for i, section in enumerate(dossier["sections"], start=1):
-        items = []
-        for item in section["items"]:
-            read_class = "" if item["lever"] else ' class="empty"'
-            lever = f'<p class="lever">→ {escape(item["lever"])}</p>' if item["lever"] else ""
-            items.append(f'<div class="sh-item"><b>{escape(item["label"])}</b><p{read_class}>{escape(item["read"])}</p>{lever}</div>')
-        sections.append(f'<section class="p{i}"><h3>{i}. {escape(section["title"])}</h3>{"".join(items)}</section>')
-    return (f'<div class="vcc-sheet">{head}{quick_read}<div class="sh-sections">{"".join(sections)}</div>'
+    patterns = dossier["patterns"]
+    pattern_row = (f'<div class="sh-patterns"><h3>{escape(patterns["title"])}</h3>'
+                   f'<div class="sh-pgrid">{"".join(_sheet_item(item) for item in patterns["items"])}</div></div>')
+    sections = [f'<section class="p{i}"><h3>{i}. {escape(section["title"])}</h3>{"".join(_sheet_item(item) for item in section["items"])}</section>'
+                for i, section in enumerate(dossier["sections"], start=1)]
+    return (f'<div class="vcc-sheet">{head}{quick_read}{pattern_row}<div class="sh-sections">{"".join(sections)}</div>'
             f"{_foot(generated)}</div>")
+
+
+def _sheet_item(item: dict) -> str:
+    read_class = "" if item["lever"] else ' class="empty"'
+    lever = f'<p class="lever">→ {escape(item["lever"])}</p>' if item["lever"] else ""
+    return f'<div class="sh-item"><b>{escape(item["label"])}</b><p{read_class}>{escape(item["read"])}</p>{lever}</div>'
