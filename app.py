@@ -2199,7 +2199,7 @@ with tab3:
         <div style="background:#1E293B;border:1px solid #334155;
                     border-radius:12px;padding:40px;text-align:center">
           <div style="font-family:'Inter',sans-serif;font-size:.82rem;color:#A8B5C7">
-            Run the pipeline above — the approval gate unlocks once all four agents have run.
+            Run the match review above — sign-off opens once all four review sections are complete.
           </div>
         </div>
         """, unsafe_allow_html=True)
