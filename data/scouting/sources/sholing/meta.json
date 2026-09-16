@@ -1,0 +1,9 @@
+{
+  "name": "Sholing F.C.",
+  "slug": "sholing",
+  "badge_path": "data/scouting/sources/sholing/badge.png",
+  "home_kit": "#FF0000",
+  "away_kit": "#FFFF00",
+  "verified": true,
+  "kit_source": "club records"
+}

@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "events": [
+    {
+      "id": "2eeeb757",
+      "kind": "goal_conceded",
+      "fields": {
+        "flaw": "Set piece",
+        "side": "Their right",
+        "player": ""
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:26:11"
+    },
+    {
+      "id": "f4b768ac",
+      "kind": "chance_created",
+      "fields": {
+        "channel": "Left wing",
+        "action": "Cross",
+        "arrival": "Six-yard box",
+        "counter_trigger": "Not a counter"
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:26:57"
+    },
+    {
+      "id": "dcb7990c",
+      "kind": "goal_conceded",
+      "fields": {
+        "flaw": "Second ball after clearance",
+        "side": "Their right",
+        "player": ""
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:27:59"
+    },
+    {
+      "id": "3e486cb3",
+      "kind": "chance_created",
+      "fields": {
+        "channel": "Central",
+        "action": "Through ball",
+        "arrival": "Edge of the box",
+        "counter_trigger": "Not a counter"
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:29:08"
+    },
+    {
+      "id": "f65adce3",
+      "kind": "chance_conceded",
+      "fields": {
+        "flaw": "Second ball after clearance",
+        "side": "Their left",
+        "player": ""
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:29:57"
+    },
+    {
+      "id": "77719186",
+      "kind": "chance_conceded",
+      "fields": {
+        "flaw": "Space behind full-back",
+        "side": "Their right",
+        "player": ""
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:30:57"
+    },
+    {
+      "id": "a348b708",
+      "kind": "chance_created",
+      "fields": {
+        "channel": "Left wing",
+        "action": "Through ball",
+        "arrival": "Edge of the box",
+        "counter_trigger": "Regain in midfield"
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:31:48"
+    },
+    {
+      "id": "ef286168",
+      "kind": "chance_conceded",
+      "fields": {
+        "flaw": "Second ball after clearance",
+        "side": "Central",
+        "player": ""
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:32:36"
+    },
+    {
+      "id": "33ae9df0",
+      "kind": "chance_conceded",
+      "fields": {
+        "flaw": "Space behind full-back",
+        "side": "Their left",
+        "player": ""
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:33:17"
+    },
+    {
+      "id": "8599133f",
+      "kind": "chance_created",
+      "fields": {
+        "channel": "Central",
+        "action": "Shot from distance",
+        "arrival": "Edge of the box",
+        "counter_trigger": "Not a counter"
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:34:24"
+    },
+    {
+      "id": "9d9db5e8",
+      "kind": "goal_scored",
+      "fields": {
+        "channel": "Central",
+        "action": "Cross",
+        "arrival": "Penalty spot",
+        "counter_trigger": "Not a counter"
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:34:56"
+    },
+    {
+      "id": "b7dc01a1",
+      "kind": "chance_created",
+      "fields": {
+        "channel": "Left half-space",
+        "action": "Shot from distance",
+        "arrival": "Outside the box",
+        "counter_trigger": "Not a counter"
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:35:58"
+    },
+    {
+      "id": "79ad975a",
+      "kind": "chance_created",
+      "fields": {
+        "channel": "Left wing",
+        "action": "Dribble",
+        "arrival": "Outside the box",
+        "counter_trigger": "Not a counter"
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:36:35"
+    },
+    {
+      "id": "23b6ab27",
+      "kind": "goal_conceded",
+      "fields": {
+        "flaw": "Isolated 1v1",
+        "side": "Their right",
+        "player": ""
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:39:30"
+    },
+    {
+      "id": "1757fc5a",
+      "kind": "chance_conceded",
+      "fields": {
+        "flaw": "Second ball after clearance",
+        "side": "Central",
+        "player": ""
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:39:42"
+    },
+    {
+      "id": "4b46aec1",
+      "kind": "chance_conceded",
+      "fields": {
+        "flaw": "Second ball after clearance",
+        "side": "Their left",
+        "player": ""
+      },
+      "minute": null,
+      "source": "Sholing v Plymouth Parkway 1-3 \u00b7 Sat 12 Sep",
+      "logged_at": "2026-09-16T16:40:15"
+    }
+  ]
+}
