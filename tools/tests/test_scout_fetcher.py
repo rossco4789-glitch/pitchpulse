@@ -132,7 +132,16 @@ def test_match_xi_is_first_eleven_not_the_playing_class():
     assert spetch["name"] == "Will Spetch" and spetch["captain"]
     assert m["full_time"] == "Brixham AFC 2-3 Dorchester Town"
     assert [e["kind"] for e in m["events"]] == ["red", "goal", "sub", "yellow", "goal"]
-    assert m["team_goals"] == [{"minute": "57", "scorer": "Tom Purrington"}]
+    assert m["team_goals"] == [{"minute": "57", "scorer": "Tom Purrington", "penalty": False}]
+
+
+def test_penalty_goals_count_for_the_team_and_the_scorer():
+    page = MATCH_HTML.replace("<span>Tom Purrington scores</span>", "<span>Tom Purrington scores (pen)</span>").replace(
+        "<span>James Moxon scores</span>", "<span>James Moxon scores (og)</span>")
+    m = sf.parse_match(page, "dorchester-town")
+    assert [e["kind"] for e in m["events"]] == ["red", "goal", "sub", "yellow", "own_goal"]
+    assert m["team_goals"] == [{"minute": "57", "scorer": "Tom Purrington", "penalty": True}]
+    assert sf.involvement(m, "Tom Purrington")["goals"] == ["57"]
 
 
 def test_involvement_statuses_minutes_goals_cards():

@@ -71,6 +71,7 @@ NEWS_PAGES  = 4
 SCORE = re.compile(r"^(?:\((\d+)\))?\s*(\d+)\s*-\s*(\d+)\s*(?:\((\d+)\))?$")
 EVENT = re.compile(r"^(\d{1,3}(?:\+\d+)?)'\s*(.+)$")
 CAPTAIN = re.compile(r"\s*\((?:C|Captain)\)\s*$")
+SCORES = re.compile(r"^(.+?) scores( \((?:pen|penalty)\))?$", re.I)
 
 
 def _now() -> str:
@@ -359,7 +360,7 @@ def parse_match(page: str, team_slug: str) -> dict:
         if not m:
             continue
         text = m.group(2)
-        kind = ("own_goal" if "(og)" in text else "goal" if text.endswith(" scores")
+        kind = ("own_goal" if "(og)" in text else "goal" if SCORES.match(text)
                 else "sub" if " replaced " in text else "red" if "sent off" in text
                 else "yellow" if "cautioned" in text else "other")
         events.append({"minute": m.group(1), "kind": kind, "text": text})
@@ -378,8 +379,8 @@ def parse_match(page: str, team_slug: str) -> dict:
         "starters": [pl for pl in players if pl["started"]],
         "bench": [pl for pl in players if not pl["started"]],
         "events": events,
-        "team_goals": [{"minute": e["minute"], "scorer": e["text"][: -len(" scores")]}
-                       for e in events if e["kind"] == "goal" and e["text"][: -len(" scores")] in names],
+        "team_goals": [{"minute": e["minute"], "scorer": g.group(1), "penalty": bool(g.group(2))}
+                       for e in events if e["kind"] == "goal" and (g := SCORES.match(e["text"])) and g.group(1) in names],
     }
 
 
@@ -406,7 +407,8 @@ def involvement(match: dict, name: str) -> dict:
         "captain": bool(mine and mine["captain"]),
         "on": on,
         "off": off,
-        "goals": [e["minute"] for e in events if e["kind"] == "goal" and e["text"] == f"{name} scores"],
+        "goals": [e["minute"] for e in events
+                  if e["kind"] == "goal" and (g := SCORES.match(e["text"])) and g.group(1) == name],
         "cards": [f"{e['kind']} {e['minute']}'" for e in events
                   if e["kind"] in ("yellow", "red") and e["text"].startswith(f"{name} ")],
     }
